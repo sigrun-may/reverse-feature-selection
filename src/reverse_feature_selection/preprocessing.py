@@ -10,9 +10,9 @@ import settings
 
 
 def yeo_johnson_transform_test_train_splits(
-        num_inner_folds: int,
-        data_df: pd.DataFrame,
-        path: Optional[str],
+    num_inner_folds: int,
+    data_df: pd.DataFrame,
+    path: Optional[str],
 ) -> Dict[str, List[Union[Tuple[np.array], str]]]:
     """
     Do test and train splits and transform (Yeo Johnson) them.
@@ -126,10 +126,12 @@ def cluster_data(data_df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, List[st
         # joblib.load('klkhlh')
     except:
         unlabeled_data_df = data_df.iloc[:, 1:]
-        correlation_matrix = unlabeled_data_df.corr(method = "spearman")
-        joblib.dump(correlation_matrix, correlation_matrix_path, compress = ("gzip", 3))
+        correlation_matrix = unlabeled_data_df.corr(method="spearman")
+        joblib.dump(correlation_matrix, correlation_matrix_path, compress=("gzip", 3))
     assert (
-            correlation_matrix.shape[0] == correlation_matrix.shape[1] == data_df.shape[1] - 1
+        correlation_matrix.shape[0]
+        == correlation_matrix.shape[1]
+        == data_df.shape[1] - 1
     )
 
     # load or calculate clusters
@@ -139,7 +141,9 @@ def cluster_data(data_df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, List[st
         # joblib.load('klkhlh')
     except:
         cluster_dict = get_cluster_dict(
-            correlation_matrix, settings.CORRELATION_THRESHOLD_CLUSTER, cluster_dict_path
+            correlation_matrix,
+            settings.CORRELATION_THRESHOLD_CLUSTER,
+            cluster_dict_path,
         )
 
     print(cluster_dict)
@@ -156,10 +160,10 @@ def cluster_data(data_df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, List[st
     clustered_data_df.insert(0, "label", data_df["label"])
 
     assert (
-            clustered_data_df.shape[1]
-            == (len(cluster_dict.keys()) - 1)
-            + len(cluster_dict["uncorrelated_features"])
-            + 1  # the label
+        clustered_data_df.shape[1]
+        == (len(cluster_dict.keys()) - 1)
+        + len(cluster_dict["uncorrelated_features"])
+        + 1  # the label
     )
     print(clustered_data_df.shape)
     return clustered_data_df, cluster_dict
