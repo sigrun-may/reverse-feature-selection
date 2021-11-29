@@ -1,5 +1,5 @@
 from ctypes import Union
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any
 
 from optuna.samplers import TPESampler
 from optuna import TrialPruned
@@ -16,7 +16,7 @@ from sklearn.metrics import r2_score
 def calculate_adjusted_r2(y, predicted_y, number_of_coefficients):
     # calculate the coefficient of determination, r2:
     # The proportion of the variance in the dependent variable that is predictable from the independent variable(s).
-    # It provides a measure of how well observed outcomes are replicated by the model, based on the proportion of total
+    # It provides selected_feature_subset_list measure of how well observed outcomes are replicated by the model, based on the proportion of total
     # variation of outcomes explained by the model
     r2 = r2_score(y, predicted_y)
     # print('r2:', r2)
@@ -40,7 +40,9 @@ def calculate_adjusted_r2(y, predicted_y, number_of_coefficients):
 
 
 def select_features(
-    preprocessed_data_dict: Dict[str, List[Union[Tuple[np.array], str]]],
+    preprocessed_data_dict,
+    outer_cv_loop,
+        # preprocessed_data_dict: Dict[str, List[Union[Tuple[Any], str]]],
 ) -> Dict[str, float]:
     pass
 
@@ -114,7 +116,7 @@ def select_features(
 
             # build LASSO model
             lasso = celer.Lasso(
-                alpha=alpha, fit_intercept=True, positive=False, prune=True
+                alpha=alpha, fit_intercept=True, positive=False, prune=True, verbose=0
             )
             lasso.fit(x_train, y_train)
             coefficients.append(lasso.coef_)
@@ -143,11 +145,13 @@ def select_features(
             predicted_y.extend(predicted_y_test)
 
         feature_idx = np.sum(np.array(sum_of_all_shap_values), axis=0)
+        feature_names = feature_names.drop(["label"])
         selected_features = feature_names[feature_idx.nonzero()]
+        nonzero_shap_values = feature_idx[feature_idx.nonzero()]
         assert len(selected_features) == feature_idx.nonzero()[0].size
         # trial.set_user_attr("label_coefficients", coefficients)
         trial.set_user_attr(
-            "shap_values", sum_of_all_shap_values[feature_idx.nonzero()]
+            "shap_values", nonzero_shap_values
         )
         trial.set_user_attr("selected_features", selected_features)
         # r2 = r2_score(true_y, predicted_y_proba)
@@ -161,7 +165,7 @@ def select_features(
     study = optuna.create_study(
         # storage = "sqlite:///optuna_test.db",
         # load_if_exists = True,
-        study_name="standard_lasso",
+        study_name=f"standard_lasso_iteration_{outer_cv_loop}",
         direction="maximize",
         sampler=TPESampler(
             multivariate=False,
@@ -174,7 +178,7 @@ def select_features(
     study.optimize(
         optuna_objective,
         # n_trials = 40,
-        n_trials=20,
+        n_trials=5,
         n_jobs=1,
     )
 

@@ -4,16 +4,16 @@ import os
 # Settings
 ########################################################
 N_JOBS_PREPROCESSING = 1  # number of parallel threads
-N_JOBS = 12
+N_JOBS = 1
 N_FOLDS_INNER_CV = 10
 # INPUT_DATA_PATH = "input_data/colon.csv"
 # INPUT_DATA_PATH = 'input_data/leukemia.csv'
 # INPUT_DATA_PATH = "input_data/lasso_data.csv"
-INPUT_DATA_PATH = "input_data/huge_data.csv"
-DIRECTORY_FOR_PICKLED_FILES = "pickled_files"
-NUMBER_OF_FEATURES = 10000
+INPUT_DATA_PATH = "../../data/small_50.csv"
+DIRECTORY_FOR_PICKLED_FILES = "../../pickled_files"
+NUMBER_OF_FEATURES = 50
 # EXPERIMENT_NAME = "artificial_5000_10_fold"
-EXPERIMENT_NAME = f"artificial_{NUMBER_OF_FEATURES}_{N_FOLDS_INNER_CV}_fold"
+EXPERIMENT_NAME = f"test_{NUMBER_OF_FEATURES}_{N_FOLDS_INNER_CV}_fold"
 CORRELATION_THRESHOLD_CLUSTER = 0.85
 CORRELATION_THRESHOLD_REGRESSION = 0.3
 N_NEIGHBORS = 5

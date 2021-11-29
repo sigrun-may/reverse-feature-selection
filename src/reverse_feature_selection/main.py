@@ -10,13 +10,15 @@ import settings
 import weighted_knn
 from preprocessing import cluster_data, yeo_johnson_transform_test_train_splits
 import standard_lasso_feature_selection
+import reverse_lasso_feature_selection
+import rf_feature_selection
 
 
 def parse_data(number_of_features: int, path: str) -> pd.DataFrame:
-    data_df = pd.read_csv(path)
-    data_df = data_df.iloc[:, :number_of_features]
-    print(data_df.shape)
-    return data_df
+    data = pd.read_csv(path)
+    # data = data.iloc[:, :number_of_features]
+    print(data.shape)
+    return data
 
 
 def evaluate_selected_features(
@@ -31,12 +33,13 @@ def evaluate_selected_features(
 
 
 def select_feature_subset(
-    data: pd.DataFrame, train_index, index: int
+    data: pd.DataFrame, train_index, outer_cv_loop: int
 ):
+    print("iteration: ", outer_cv_loop, " #############################################################")
     # load or generate transformed and standardized train test splits with respective train correlation matrix
     transformed_data_path_iteration = (
         f"{settings.DIRECTORY_FOR_PICKLED_FILES}/{settings.EXPERIMENT_NAME}/"
-        f"transformed_test_train_splits_dict_{index}.pkl"
+        f"transformed_test_train_splits_dict_{outer_cv_loop}.pkl"
     )
     preprocessed_data_dict = yeo_johnson_transform_test_train_splits(
         settings.N_FOLDS_INNER_CV, data.iloc[train_index, :], None
@@ -45,28 +48,31 @@ def select_feature_subset(
     # TODO pickle feature subsets
     selected_feature_subset = {
         "standard_lasso": standard_lasso_feature_selection.select_features(
-            preprocessed_data_dict
+            preprocessed_data_dict, outer_cv_loop
         ),
-        "reverse_lasso": standard_lasso_feature_selection.select_features(
-            preprocessed_data_dict
+        "reverse_lasso": reverse_lasso_feature_selection.select_features(
+            preprocessed_data_dict, outer_cv_loop, settings.CORRELATION_THRESHOLD_REGRESSION
         ),
-        "random_forest": standard_lasso_feature_selection.select_features(
-            preprocessed_data_dict
+        "random_forest": rf_feature_selection.select_features(
+            preprocessed_data_dict, outer_cv_loop
         ),
     }
-    # selected_feature_subset = select_features(preprocessed_data_dict)
-    # selected_feature_subset = selection_method_rf(preprocessed_data_dict)
+    # print(selected_features)
+    # selected_features = select_features(preprocessed_data_dict)
+    # selected_features = selection_method_rf(preprocessed_data_dict)
 
     # # append metrics to overall result for outer cross-validation
-    # for k, v in metrics_dict.items():
-    #     r = validation_metrics_dict.get(k, [])
-    #     r.append(v)
-    #     validation_metrics_dict[k] = r
+    # for selection_method, selected_features in metrics_dict.items():
+    #     r = validation_metrics_dict.get(selection_method, [])
+    #     r.append(selected_features)
+    #     validation_metrics_dict[selection_method] = r
 
     return selected_feature_subset
 
 
 if __name__ == "__main__":
+    # data_df1 = parse_data(settings.NUMBER_OF_FEATURES, settings.INPUT_DATA_PATH)
+    # data_df1.iloc[:, 1:].to_csv("../../data/small_50.csv", index=False)
     data_df = parse_data(settings.NUMBER_OF_FEATURES, settings.INPUT_DATA_PATH)
     clustered_data_df, cluster_dict = cluster_data(data_df)
 
@@ -81,20 +87,25 @@ if __name__ == "__main__":
         for index, (train_index, test_index) in enumerate(loo.split(clustered_data_df))
     )
     # if settings.SAVE_RESULT:
-    joblib.dump(feature_subsets, settings.PATH_TO_RESULT, compress=("gzip", 3))
+    # print(feature_subsets)
+    # joblib.dump(feature_subsets, settings.PATH_TO_RESULT, compress=("gzip", 3))
 
-    for feature_subset in feature_subsets:
-        metrics = Parallel(n_jobs=settings.N_JOBS, verbose=5)(
-            delayed(weighted_knn.validate_feature_subset)(
-                test=clustered_data_df.iloc[test_index, :],
-                train=clustered_data_df.iloc[train_index, :],
-                selected_feature_subset=feature_subset,
-                number_of_neighbors=3,  # TODO intern optimieren
-            )
-            for index, (train_index, test_index) in enumerate(
-                loo.split(clustered_data_df)
-            )
-        )
+
+        # print(feature_subset)
+
+
+    # for feature_subset in feature_subsets:
+    #     metrics = Parallel(n_jobs=settings.N_JOBS, verbose=5)(
+    #         delayed(weighted_knn.validate_feature_subset)(
+    #             test=clustered_data_df.iloc[test_index, :],
+    #             train=clustered_data_df.iloc[train_index, :],
+    #             selected_features=feature_subset,
+    #             number_of_neighbors=3,  # TODO intern optimieren
+    #         )
+    #         for index, (train_index, test_index) in enumerate(
+    #             loo.split(clustered_data_df)
+    #         )
+    #     )
 
     # # outer cross-validation to validate feature subsets
     # loo = LeaveOneOut()
@@ -110,32 +121,39 @@ if __name__ == "__main__":
     #         settings.N_FOLDS_INNER_CV, clustered_data_df.iloc[train_index, :], None
     #     )
     #
-    #     selected_feature_subset = select_features(preprocessed_data_dict)
-    #     # selected_feature_subset = selection_method_reverse_lasso(preprocessed_data_dict)
-    #     # selected_feature_subset = selection_method_rf(preprocessed_data_dict)
-    #     feature_subsets.append(selected_feature_subset)
+    #     selected_features = select_features(preprocessed_data_dict)
+    #     # selected_features = selection_method_reverse_lasso(preprocessed_data_dict)
+    #     # selected_features = selection_method_rf(preprocessed_data_dict)
+    #     feature_subsets.append(selected_features)
     #
     #     metrics_dict = weighted_knn.validate_feature_subset(
     #         test=clustered_data_df.iloc[test_index, :],
-    #         train=clustered_data_df[selected_feature_subset.keys()].iloc[
+    #         train=clustered_data_df[selected_features.keys()].iloc[
     #             train_index, :
     #         ],
-    #         selected_feature_subset=selected_feature_subset,
+    #         selected_features=selected_features,
     #         number_of_neighbors=3,
     #     )
     #
     #     # append metrics to overall result for outer cross-validation
-    #     for k, v in metrics_dict.items():
-    #         r = validation_metrics_dict.get(k, [])
-    #         r.append(v)
-    #         validation_metrics_dict[k] = r
+    #     for selection_method, selected_features in metrics_dict.items():
+    #         r = validation_metrics_dict.get(selection_method, [])
+    #         r.append(selected_features)
+    #         validation_metrics_dict[selection_method] = r
 
     # validation_metrics_dict = {
-    #     k: np.mean(v) for k, v in validation_metrics_dict.items()
+    #     selection_method: np.mean(selected_features) for selection_method, selected_features in validation_metrics_dict.items()
     # }
+    # rewrite data structure
+    feature_selection_result_dict = {}
+    for feature_subset in feature_subsets:
+        for selection_method, selected_features in feature_subset.items():
+            selected_feature_subset_list = feature_selection_result_dict.get(selection_method, [])
+            selected_feature_subset_list.append(selected_features)
+            feature_selection_result_dict[selection_method] = selected_feature_subset_list
 
-    print(
-        "union_of_features",
-        "intersection_of_features",
-        evaluate_selected_features(feature_subsets),
-    )
+    for feature_selection_method, selected_feature_subsets in feature_selection_result_dict.items():
+        union, intersect = evaluate_selected_features(selected_feature_subsets)
+        print(feature_selection_method, ": ")
+        print("union_of_features: ", union)
+        print("intersection_of_features: ", intersect)

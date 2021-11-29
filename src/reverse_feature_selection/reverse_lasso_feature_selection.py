@@ -1,22 +1,21 @@
 import math
 
-import joblib
 import numpy as np
+import pandas as pd
 import optuna
-from joblib import Parallel, delayed
 from optuna import TrialPruned
 from optuna.samplers import TPESampler
 from sklearn.metrics import r2_score
-from sklearn.model_selection import LeaveOneOut
 import datetime
 import settings
-import preprocessing
+import celer
+#
 
 
 def calculate_adjusted_r2(y, predicted_y, number_of_coefficients):
     # calculate the coefficient of determination, r2:
     # The proportion of the variance in the dependent variable that is predictable from the independent variable(s).
-    # It provides a measure of how well observed outcomes are replicated by the model, based on the proportion of total
+    # It provides selected_feature_subset_list measure of how well observed outcomes are replicated by the model, based on the proportion of total
     # variation of outcomes explained by the model
     r2 = r2_score(y, predicted_y)
     # print('r2:', r2)
@@ -285,14 +284,14 @@ def optimize(
         n_jobs=1,
     )
 
+    # check if study.best_value is available and at least one trial was completed
     try:
         study.best_value
         # if study.best_value > 0:
         #     fig = optuna.visualization.plot_optimization_history(study)
         #     fig.show()
     except:
-        # print(target_feature_name, ' no best trial')
-        return 0, 0, 0
+        return 0, 0, None
 
     # Was the label included in the best model?
     if np.sum(np.abs(study.best_trial.user_attrs["label_coefficients"])) > 0:
@@ -311,7 +310,7 @@ def optimize(
             best_alpha = study.best_params["alpha"]
 
         # calculate r2_adjusted adjusted without the label in the training data for the same alpha
-        r2_adjusted = lasso_regression_celer.calculate_r2_adjusted(
+        r2_adjusted = calculate_r2_adjusted(
             best_alpha,
             target_feature_name,
             deselected_features,
@@ -333,40 +332,12 @@ def optimize(
         )
 
 
-def select_relevant_features(data_df, train_index, test_index, i):
-    print("iteration ", i, " of", data_df.shape[0], " ----------------------")
-    intermediate_result = {}
-
-    # load or generate transformed and standardized train test splits with respective train correlation matrix
-    transformed_data_path_iteration = (
-        f"{settings.DIRECTORY_FOR_PICKLED_FILES}/{settings.EXPERIMENT_NAME}/"
-        f"transformed_test_train_splits_dict_{str(i)}.pkl"
-    )
-    try:
-        transformed_test_train_splits_dict = joblib.load(
-            transformed_data_path_iteration
-        )
-        # joblib.load(
-        #     'dfsdfgsdg'
-        # )
-    except:
-        transformed_test_train_splits_dict = preprocessing.yeo_johnson_transform_test_train_splits(
-            data_df.iloc[train_index, :],
-            None
-            # transformed_data_path_iteration,
-        )
-    assert "transformed_data" in transformed_test_train_splits_dict.keys()
-    assert "feature_names" in transformed_test_train_splits_dict.keys()
-
-    assert (
-        len(transformed_test_train_splits_dict["transformed_data"])
-        == settings.N_FOLDS_INNER_CV
-    )
+def select_features(transformed_test_train_splits_dict, outer_cv_loop, correlation_threshold):
 
     # calculate relevance for each feature
-    deselected_features = []
-    relevant_features_dict = {}
-    for target_feature_name in data_df.columns:
+    deselected_features_list = []
+    selected_features_dict = {}
+    for target_feature_name in transformed_test_train_splits_dict["feature_names"]:
 
         # exclude the label
         if target_feature_name == "label":
@@ -377,57 +348,23 @@ def select_relevant_features(data_df, train_index, test_index, i):
             r2_adjusted_unlabeled,
             r2_adjusted,
             label_coefficients_list,
-        ) = optimize_alpha.optimize(
+        ) = optimize(
             transformed_test_train_splits_dict,
             target_feature_name,
-            settings.CORRELATION_THRESHOLD_REGRESSION,
-            deselected_features,
-            outer_cv_loop=i,
+            correlation_threshold,
+            deselected_features_list,
+            outer_cv_loop=outer_cv_loop,
         )
 
-        # Was no trial completed/ Could no relevant model be built?
-        if r2_adjusted == r2_adjusted_unlabeled == label_coefficients_list == 0:
-            # exclude irrelevant feature from training data
-            deselected_features.append(target_feature_name)
-            # print(deselected_features)
-            continue
-
-        # Was the model with the label included better than without the label?
-        if r2_adjusted_unlabeled < r2_adjusted:
-            relevant_features_dict[target_feature_name] = (
+        if (r2_adjusted > 0) and (r2_adjusted_unlabeled < r2_adjusted):
+            # select feature
+            selected_features_dict[target_feature_name] = (
                 r2_adjusted_unlabeled,
                 r2_adjusted,
                 label_coefficients_list,
             )
-            # if 'cluster' in target_feature_name:
-            #     print(target_feature_name)
-            #     print(single_cluster_dict[target_feature_name.replace('cluster_', '')])
-            # print(target_feature_name, (r2_adjusted - r2_adjusted_unlabeled))
         else:
             # exclude irrelevant feature from training data
-            deselected_features.append(target_feature_name)
-            # print("deselected_features", deselected_features)
+            deselected_features_list.append(target_feature_name)
 
-    intermediate_result["relevant_features_dict"] = relevant_features_dict
-    intermediate_result["test_train_indices"] = {
-        "test": test_index,
-        "train": train_index,
-    }
-    for feature, value in relevant_features_dict.items():
-        print(feature, value)
-
-    return intermediate_result
-
-
-########################################################
-# Outer cross-validation for feature selection
-########################################################
-def select_features(data_df):
-    loo = LeaveOneOut()
-    results = Parallel(n_jobs=settings.N_JOBS, verbose=5)(
-        delayed(select_relevant_features)(data_df, train_index, test_index, index)
-        for index, (train_index, test_index) in enumerate(loo.split(data_df))
-    )
-    # if settings.SAVE_RESULT:
-    joblib.dump(results, settings.PATH_TO_RESULT, compress=("gzip", 3))
-    return results
+    return selected_features_dict

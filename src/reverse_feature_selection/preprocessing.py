@@ -20,7 +20,7 @@ def yeo_johnson_transform_test_train_splits(
     :param num_inner_folds: number of inner cross-validation folds
     :param data_df: original data
     :param path: path to pickle transformed data
-    :return: the transformed data in a dict with transformed test/train set for each sample and the column names
+    :return: the transformed data in selected_feature_subset_list dict with transformed test/train set for each sample and the column names
     """
 
     k_fold = KFold(n_splits=num_inner_folds, shuffle=True, random_state=42)
@@ -178,8 +178,8 @@ def _calculate_cluster_representative(cluster_feature_names, correlation_matrix_
             np.abs((correlation_matrix_df[base_feature][cluster_feature_names]))
         )
 
-    # The key parameter takes a function, and for each entry in the iterable,
-    # it'll find the one for which the key function returns the highest value.
+    # The feature_selection_method parameter takes selected_feature_subset_list function, and for each entry in the iterable,
+    # it'll find the one for which the feature_selection_method function returns the highest selected_feature_subsets.
     return max(
         sum_of_correlation_coefficients_dict,
         key=sum_of_correlation_coefficients_dict.get,

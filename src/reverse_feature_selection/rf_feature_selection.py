@@ -16,6 +16,7 @@ import settings
 
 def select_features(
     transformed_test_train_splits_dict,
+    outer_cv_loop
 ):
     """Optimize regularization parameter alpha for lasso regression."""
 
@@ -26,7 +27,7 @@ def select_features(
 
         if trial.number >= 10:
             try:
-                print(trial.study.best_value)
+                trial.study.best_value
             except:
                 # print('no results for more than 10 trials')
                 # print(target_feature_name)
@@ -127,7 +128,7 @@ def select_features(
     study = optuna.create_study(
         # storage = "sqlite:///optuna_test.db",
         # load_if_exists = True,
-        study_name="standard_rf",
+        study_name=f"standard_rf_iteration_{outer_cv_loop}",
         direction="minimize",
         sampler=TPESampler(
             multivariate=True,
@@ -153,7 +154,6 @@ def select_features(
     relevant_features_dict = dict(
         label=(0, 0, study.best_trial.user_attrs["shap_values"])
     )
-    print(study.best_trial.user_attrs["shap_values"])
     intermediate_result = dict(relevant_features_dict=relevant_features_dict)
     intermediate_result["test_train_indices"] = {}
     # return study.best_trial.user_attrs["label_coefficients"]
