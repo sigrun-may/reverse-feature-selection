@@ -11,6 +11,7 @@ import weighted_knn
 from preprocessing import cluster_data, yeo_johnson_transform_test_train_splits
 import standard_lasso_feature_selection
 
+
 def parse_data(number_of_features: int, path: str) -> pd.DataFrame:
     data_df = pd.read_csv(path)
     data_df = data_df.iloc[:, :number_of_features]
@@ -29,25 +30,32 @@ def evaluate_selected_features(
     return union_of_features, intersection_of_features
 
 
-def select_feature_subset(data: pd.DataFrame, train_index, test_index, index: int):
+def select_feature_subset(
+    data: pd.DataFrame, train_index, index: int
+):
     # load or generate transformed and standardized train test splits with respective train correlation matrix
     transformed_data_path_iteration = (
         f"{settings.DIRECTORY_FOR_PICKLED_FILES}/{settings.EXPERIMENT_NAME}/"
-        f"transformed_test_train_splits_dict_{str(index)}.pkl"
+        f"transformed_test_train_splits_dict_{index}.pkl"
     )
     preprocessed_data_dict = yeo_johnson_transform_test_train_splits(
         settings.N_FOLDS_INNER_CV, data.iloc[train_index, :], None
     )
 
-    selected_feature_subset={
-    'standard_lasso' : standard_lasso_feature_selection.select_features(preprocessed_data_dict),
-    'reverse_lasso' : standard_lasso_feature_selection.select_features(preprocessed_data_dict),
-    'random_forest' : standard_lasso_feature_selection.select_features(preprocessed_data_dict),
+    # TODO pickle feature subsets
+    selected_feature_subset = {
+        "standard_lasso": standard_lasso_feature_selection.select_features(
+            preprocessed_data_dict
+        ),
+        "reverse_lasso": standard_lasso_feature_selection.select_features(
+            preprocessed_data_dict
+        ),
+        "random_forest": standard_lasso_feature_selection.select_features(
+            preprocessed_data_dict
+        ),
     }
     # selected_feature_subset = select_features(preprocessed_data_dict)
     # selected_feature_subset = selection_method_rf(preprocessed_data_dict)
-
-
 
     # # append metrics to overall result for outer cross-validation
     # for k, v in metrics_dict.items():
@@ -65,7 +73,11 @@ if __name__ == "__main__":
     # outer cross-validation to validate selected feature subsets
     loo = LeaveOneOut()
     feature_subsets = Parallel(n_jobs=settings.N_JOBS, verbose=5)(
-        delayed(select_feature_subset)(clustered_data_df, train_index, index)
+        delayed(select_feature_subset)(
+            clustered_data_df,
+            train_index,
+            index,
+        )
         for index, (train_index, test_index) in enumerate(loo.split(clustered_data_df))
     )
     # if settings.SAVE_RESULT:
@@ -77,10 +89,12 @@ if __name__ == "__main__":
                 test=clustered_data_df.iloc[test_index, :],
                 train=clustered_data_df.iloc[train_index, :],
                 selected_feature_subset=feature_subset,
-                number_of_neighbors=3,
-                )
-            for index, (train_index, test_index) in enumerate(loo.split(clustered_data_df))
-    )
+                number_of_neighbors=3,  # TODO intern optimieren
+            )
+            for index, (train_index, test_index) in enumerate(
+                loo.split(clustered_data_df)
+            )
+        )
 
     # # outer cross-validation to validate feature subsets
     # loo = LeaveOneOut()
@@ -116,9 +130,9 @@ if __name__ == "__main__":
     #         r.append(v)
     #         validation_metrics_dict[k] = r
 
-    validation_metrics_dict = {
-        k: np.mean(v) for k, v in validation_metrics_dict.items()
-    }
+    # validation_metrics_dict = {
+    #     k: np.mean(v) for k, v in validation_metrics_dict.items()
+    # }
 
     print(
         "union_of_features",

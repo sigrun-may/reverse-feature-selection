@@ -151,9 +151,7 @@ def select_features(
         )
         trial.set_user_attr("selected_features", selected_features)
         # r2 = r2_score(true_y, predicted_y_proba)
-        return calculate_adjusted_r2(
-            true_y, predicted_y, number_of_coefficients
-        )
+        return calculate_adjusted_r2(true_y, predicted_y, number_of_coefficients)
 
     # try:
     #     optuna.study.delete_study(f"{target_feature_name}_iteration_{outer_cv_loop}", storage = "sqlite:///optuna_db.db")
