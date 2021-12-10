@@ -1,14 +1,12 @@
-import math
-
 import numpy as np
 import pandas as pd
 import optuna
 from optuna import TrialPruned
 from optuna.samplers import TPESampler
 from sklearn.metrics import r2_score
-import datetime
 import settings
 import celer
+
 #
 import study_pruner
 
@@ -39,7 +37,6 @@ def calculate_r2_adjusted(
     data_dict,
     include_label,
     trial,
-    correlation_threshold,
 ):
     predicted_y = []
     true_y = []
@@ -50,9 +47,7 @@ def calculate_r2_adjusted(
     transformed_data = data_dict["transformed_data"]
 
     # cross validation for the optimization of alpha
-    for fold_index, (test, train, train_correlation_matrix_complete) in enumerate(
-        transformed_data
-    ):
+    for test, train, train_correlation_matrix_complete in transformed_data:
 
         # remove irrelevant features from train_correlation_matrix
         train_correlation_matrix = train_correlation_matrix_complete.drop(
@@ -89,7 +84,7 @@ def calculate_r2_adjusted(
         correlated_features = [
             index
             for index, value in train_correlation_matrix[target_feature_name].items()
-            if abs(value) > correlation_threshold
+            if abs(value) > settings.CORRELATION_THRESHOLD_REGRESSION
         ]
         if target_feature_name in correlated_features:
             correlated_features.remove(target_feature_name)
@@ -134,7 +129,6 @@ def calculate_r2_adjusted(
         assert len(lasso.coef_) == x_train.shape[1]
         number_of_coefficients = sum(lasso.coef_ != 0.0)
         number_of_coefficients_list.append(number_of_coefficients)
-        # print(lasso.coef_[np.nonzero(lasso.coef_)])
 
         if include_label:
             # prune trials if label coefficient is zero
@@ -146,28 +140,28 @@ def calculate_r2_adjusted(
         # predict y_test
         predicted_y.extend(lasso.predict(x_test))
 
-    if include_label:   #TODO prüfen, ob das noch gebraucht wird
+    if include_label:  # TODO prüfen, ob das noch gebraucht wird
         trial.set_user_attr("label_coefficients", label_coefficients)
 
     # assume n = number of samples , p = number of independent variables
     # adjusted_r2 = 1-(1-R2)*(n-1)/(n-p-1)
     sample_size = len(true_y)
-    adjusted_r2 = 1 - (1 - r2_score(true_y, predicted_y)) * (sample_size - 1) /\
-                  (sample_size - (np.median(number_of_coefficients_list)) - 1)
+    adjusted_r2 = 1 - (1 - r2_score(true_y, predicted_y)) * (sample_size - 1) / (
+        sample_size - (np.median(number_of_coefficients_list)) - 1
+    )
     return adjusted_r2
 
 
 def optimize(
     transformed_test_train_splits_dict,
     target_feature_name,
-    correlation_threshold,
     deselected_features,
     outer_cv_loop,
 ):
     """Optimize regularization parameter alpha for lasso regression."""
 
     def optuna_objective(trial):
-        study_pruner.study_pruner(trial, epsilon = 0.0005, warm_up_steps = 10, patience = 15)
+        study_pruner.study_pruner(trial, epsilon=0.0005, warm_up_steps=10, patience=15)
 
         return calculate_r2_adjusted(
             alpha=trial.suggest_loguniform("alpha", 0.001, 5.0),
@@ -176,7 +170,6 @@ def optimize(
             data_dict=transformed_test_train_splits_dict,
             include_label=True,
             trial=trial,
-            correlation_threshold=correlation_threshold,
         )
 
     # try:
@@ -203,7 +196,7 @@ def optimize(
         n_jobs=settings.N_JOBS,
     )
 
-    # check if study.best_value is available and at least one trial was completed
+    # check if study.best_params is available and at least one trial was completed
     try:
         if study.best_value > 0:
             fig = optuna.visualization.plot_optimization_history(study)
@@ -211,13 +204,12 @@ def optimize(
 
         # calculate r2_adjusted adjusted without the label in the training data for the same alpha
         r2_adjusted = calculate_r2_adjusted(
-            study.best_params['alpha'],
+            study.best_params["alpha"],
             target_feature_name,
             deselected_features,
             transformed_test_train_splits_dict,
             include_label=False,
             trial=None,
-            correlation_threshold=correlation_threshold,
         )
         return (
             r2_adjusted,
@@ -228,7 +220,7 @@ def optimize(
         return 0, 0, None
 
 
-def select_features(transformed_test_train_splits_dict, outer_cv_loop, correlation_threshold):
+def select_features(transformed_test_train_splits_dict, outer_cv_loop_iteration):
 
     # calculate relevance for each feature
     deselected_features_list = []
@@ -240,16 +232,11 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop, correlati
             continue
 
         # get performance of target feature
-        (
-            r2_adjusted_unlabeled,
-            r2_adjusted,
-            label_coefficients_list,
-        ) = optimize(
+        (r2_adjusted_unlabeled, r2_adjusted, label_coefficients_list,) = optimize(
             transformed_test_train_splits_dict,
             target_feature_name,
-            correlation_threshold,
             deselected_features_list,
-            outer_cv_loop=outer_cv_loop,
+            outer_cv_loop=outer_cv_loop_iteration,
         )
 
         if (r2_adjusted > 0) and (r2_adjusted_unlabeled < r2_adjusted):

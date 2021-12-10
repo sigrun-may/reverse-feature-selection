@@ -33,13 +33,17 @@ def evaluate_selected_features(
 
 
 def select_feature_subset(
-    data: pd.DataFrame, train_indices, test_index: int
+    data: pd.DataFrame, train_indices, outer_cv_loop_iteration: int
 ):
-    print("iteration: ", test_index, " #############################################################")
+    print(
+        "iteration: ",
+        outer_cv_loop_iteration,
+        " #############################################################",
+    )
     # load or generate transformed and standardized train test splits with respective train correlation matrix
     transformed_data_path_iteration = (
         f"{settings.DIRECTORY_FOR_PICKLED_FILES}/{settings.EXPERIMENT_NAME}/"
-        f"transformed_test_train_splits_dict_{test_index}.pkl"
+        f"transformed_test_train_splits_dict_{outer_cv_loop_iteration}.pkl"
     )
     preprocessed_data_dict = yeo_johnson_transform_test_train_splits(
         settings.N_FOLDS_INNER_CV, data.iloc[train_indices, :], None
@@ -48,13 +52,13 @@ def select_feature_subset(
     # TODO pickle feature subsets
     selected_feature_subset = {
         "standard_lasso": standard_lasso_feature_selection.select_features(
-            preprocessed_data_dict, test_index
+            preprocessed_data_dict, outer_cv_loop_iteration
         ),
         "reverse_lasso": reverse_lasso_feature_selection.select_features(
-            preprocessed_data_dict, test_index, settings.CORRELATION_THRESHOLD_REGRESSION
+            preprocessed_data_dict, outer_cv_loop_iteration
         ),
         "random_forest": rf_feature_selection.select_features(
-            preprocessed_data_dict, test_index
+            preprocessed_data_dict, outer_cv_loop_iteration
         ),
     }
     # print(selected_features)
@@ -82,17 +86,17 @@ if __name__ == "__main__":
         delayed(select_feature_subset)(
             clustered_data_df,
             train_indices,
-            test_index,
+            outer_cv_loop_iteration,
         )
-        for train_indices, test_index in loo.split(clustered_data_df)
+        for outer_cv_loop_iteration, (train_indices, test_index) in enumerate(
+            loo.split(clustered_data_df)
+        )
     )
     # if settings.SAVE_RESULT:
     # print(feature_subsets)
     joblib.dump(feature_subsets, settings.PATH_TO_RESULT, compress=("gzip", 3))
 
-
-        # print(feature_subset)
-
+    # print(feature_subset)
 
     # for feature_subset in feature_subsets:
     #     metrics = Parallel(n_jobs=settings.N_JOBS, verbose=5)(
@@ -148,11 +152,18 @@ if __name__ == "__main__":
     feature_selection_result_dict = {}
     for feature_subset in feature_subsets:
         for selection_method, selected_features in feature_subset.items():
-            selected_feature_subset_list = feature_selection_result_dict.get(selection_method, [])
+            selected_feature_subset_list = feature_selection_result_dict.get(
+                selection_method, []
+            )
             selected_feature_subset_list.append(selected_features)
-            feature_selection_result_dict[selection_method] = selected_feature_subset_list
+            feature_selection_result_dict[
+                selection_method
+            ] = selected_feature_subset_list
 
-    for feature_selection_method, selected_feature_subsets in feature_selection_result_dict.items():
+    for (
+        feature_selection_method,
+        selected_feature_subsets,
+    ) in feature_selection_result_dict.items():
         union, intersect = evaluate_selected_features(selected_feature_subsets)
         print(feature_selection_method, ": ")
         print("union_of_features: ", union)

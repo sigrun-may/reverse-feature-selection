@@ -1,6 +1,7 @@
 import optuna
 
-epsilon = 1/1000
+epsilon = 1 / 1000
+
 
 def study_pruner(trial, epsilon, warm_up_steps, patience):
 
@@ -19,8 +20,12 @@ def study_pruner(trial, epsilon, warm_up_steps, patience):
                 evaluation_metrics_of_completed_trials.append(_trial.value)
 
         if len(evaluation_metrics_of_completed_trials) > patience:
-            evaluation_metrics_within_patience = evaluation_metrics_of_completed_trials[-patience:]
-            evaluation_metrics_before_patience = evaluation_metrics_of_completed_trials[:patience]
+            evaluation_metrics_within_patience = evaluation_metrics_of_completed_trials[
+                -patience:
+            ]
+            evaluation_metrics_before_patience = evaluation_metrics_of_completed_trials[
+                :patience
+            ]
 
             best_value_within_patience = max(evaluation_metrics_within_patience)
             best_value_before_patience = max(evaluation_metrics_before_patience)
@@ -29,5 +34,3 @@ def study_pruner(trial, epsilon, warm_up_steps, patience):
             if best_value_before_patience + epsilon > best_value_within_patience:
                 trial.study.stop()
                 raise optuna.TrialPruned()
-
-

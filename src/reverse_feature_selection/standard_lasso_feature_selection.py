@@ -44,7 +44,7 @@ def calculate_adjusted_r2(y, predicted_y, number_of_coefficients):
 def select_features(
     preprocessed_data_dict,
     test_index: int,
-        # preprocessed_data_dict: Dict[str, List[Union[Tuple[Any], str]]],
+    # preprocessed_data_dict: Dict[str, List[Union[Tuple[Any], str]]],
 ) -> Dict[str, float]:
     """Select feature subset for best value of regularization parameter alpha.
 
@@ -58,7 +58,7 @@ def select_features(
     def optuna_objective(trial):
         """Optimize regularization parameter alpha for lasso regression."""
 
-        study_pruner(trial, epsilon = 0.0005, warm_up_steps=10, patience=15)
+        study_pruner(trial, epsilon=0.0005, warm_up_steps=10, patience=15)
         # # if "random" in target_feature_name or "pseudo" in target_feature_name:
         # #     trial.study.stop()
         #
@@ -123,7 +123,11 @@ def select_features(
 
             # build LASSO model
             lasso = celer.Lasso(
-                alpha=trial.suggest_loguniform("alpha", 0.001, 5.0), fit_intercept=True, positive=False, prune=True, verbose=0
+                alpha=trial.suggest_loguniform("alpha", 0.001, 5.0),
+                fit_intercept=True,
+                positive=False,
+                prune=True,
+                verbose=0,
             )
             lasso.fit(x_train, y_train)
             coefficients.append(lasso.coef_)
@@ -157,9 +161,7 @@ def select_features(
         nonzero_shap_values = feature_idx[feature_idx.nonzero()]
         assert len(selected_features) == feature_idx.nonzero()[0].size
         # trial.set_user_attr("label_coefficients", coefficients)
-        trial.set_user_attr(
-            "shap_values", nonzero_shap_values
-        )
+        trial.set_user_attr("shap_values", nonzero_shap_values)
         trial.set_user_attr("selected_features", selected_features)
         # r2 = r2_score(true_y, predicted_y_proba)
         return calculate_adjusted_r2(true_y, predicted_y, number_of_coefficients)
