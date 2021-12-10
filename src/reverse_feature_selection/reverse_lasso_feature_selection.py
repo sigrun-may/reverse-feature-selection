@@ -196,28 +196,31 @@ def optimize(
         n_jobs=settings.N_JOBS,
     )
 
-    # check if study.best_params is available and at least one trial was completed
-    try:
-        if study.best_value > 0:
-            fig = optuna.visualization.plot_optimization_history(study)
-            fig.show()
+    if study.best_value > 0:
+        fig = optuna.visualization.plot_optimization_history(study)
+        fig.show()
 
-        # calculate r2_adjusted adjusted without the label in the training data for the same alpha
-        r2_adjusted = calculate_r2_adjusted(
-            study.best_params["alpha"],
-            target_feature_name,
-            deselected_features,
-            transformed_test_train_splits_dict,
-            include_label=False,
-            trial=None,
-        )
-        return (
-            r2_adjusted,
-            study.best_value,
-            study.best_trial.user_attrs["label_coefficients"],
-        )
+    # check if study.best_value is available and at least one trial was completed
+    try:
+        if study.best_value <= 0:  # Was r2 adjusted greater than zero?
+            return 0, 0, None
     except:
         return 0, 0, None
+
+    # calculate r2_adjusted adjusted without the label in the training data for the same alpha
+    r2_adjusted = calculate_r2_adjusted(
+        study.best_params["alpha"],
+        target_feature_name,
+        deselected_features,
+        transformed_test_train_splits_dict,
+        include_label=False,
+        trial=None,
+    )
+    return (
+        r2_adjusted,
+        study.best_value,
+        study.best_trial.user_attrs["label_coefficients"],
+    )
 
 
 def select_features(transformed_test_train_splits_dict, outer_cv_loop_iteration):
@@ -239,7 +242,7 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop_iteration)
             outer_cv_loop=outer_cv_loop_iteration,
         )
 
-        if (r2_adjusted > 0) and (r2_adjusted_unlabeled < r2_adjusted):
+        if r2_adjusted_unlabeled < r2_adjusted:
             # select feature
             selected_features_dict[target_feature_name] = (
                 r2_adjusted_unlabeled,
