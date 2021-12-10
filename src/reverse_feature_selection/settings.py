@@ -9,17 +9,20 @@ N_FOLDS_INNER_CV = 10
 # INPUT_DATA_PATH = "input_data/colon.csv"
 # INPUT_DATA_PATH = 'input_data/leukemia.csv'
 # INPUT_DATA_PATH = "input_data/lasso_data.csv"
-INPUT_DATA_PATH = "../../data/small_50.csv"
+INPUT_DATA_PATH = "../../data/huge_data.csv"
+# INPUT_DATA_PATH = "../../data/small_50.csv"
 DIRECTORY_FOR_PICKLED_FILES = "../../pickled_files"
-NUMBER_OF_FEATURES = 50
+NUMBER_OF_FEATURES = 200
 # EXPERIMENT_NAME = "artificial_5000_10_fold"
 EXPERIMENT_NAME = f"test_{NUMBER_OF_FEATURES}_{N_FOLDS_INNER_CV}_fold"
+NUMBER_OF_TRIALS = 20
+PATIENCE_BEFORE_PRUNING_OF_STUDY = 10
 CORRELATION_THRESHOLD_CLUSTER = 0.85
 CORRELATION_THRESHOLD_REGRESSION = 0.3
 N_NEIGHBORS = 5
 SAVE_RESULT = False
-# PATH_TO_RESULT = f"results/{EXPERIMENT_NAME}_threshold_{CORRELATION_THRESHOLD_REGRESSION}_{CORRELATION_THRESHOLD_CLUSTER}.pkl.gz"
-PATH_TO_RESULT = f"/vol/projects/smay/develop/reverse_lasso_feature_selection/results/{EXPERIMENT_NAME}_threshold_{CORRELATION_THRESHOLD_REGRESSION}_{CORRELATION_THRESHOLD_CLUSTER}.pkl.gz"
+PATH_TO_RESULT = f"../../results/{EXPERIMENT_NAME}_threshold_{CORRELATION_THRESHOLD_REGRESSION}_{CORRELATION_THRESHOLD_CLUSTER}.pkl.gz"
+# PATH_TO_RESULT = f"/vol/projects/smay/develop/reverse_lasso_feature_selection/results/{EXPERIMENT_NAME}_threshold_{CORRELATION_THRESHOLD_REGRESSION}_{CORRELATION_THRESHOLD_CLUSTER}.pkl.gz"
 
 # create directory for pickled preprocessing files for the experiment
 # path_to_pickled_files = f"{DIRECTORY_FOR_PICKLED_FILES}/{EXPERIMENT_NAME}"

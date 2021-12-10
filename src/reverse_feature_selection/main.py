@@ -16,7 +16,7 @@ import rf_feature_selection
 
 def parse_data(number_of_features: int, path: str) -> pd.DataFrame:
     data = pd.read_csv(path)
-    # data = data.iloc[:, :number_of_features]
+    data = data.iloc[:, :number_of_features]
     print(data.shape)
     return data
 
@@ -33,28 +33,28 @@ def evaluate_selected_features(
 
 
 def select_feature_subset(
-    data: pd.DataFrame, train_index, outer_cv_loop: int
+    data: pd.DataFrame, train_indices, test_index: int
 ):
-    print("iteration: ", outer_cv_loop, " #############################################################")
+    print("iteration: ", test_index, " #############################################################")
     # load or generate transformed and standardized train test splits with respective train correlation matrix
     transformed_data_path_iteration = (
         f"{settings.DIRECTORY_FOR_PICKLED_FILES}/{settings.EXPERIMENT_NAME}/"
-        f"transformed_test_train_splits_dict_{outer_cv_loop}.pkl"
+        f"transformed_test_train_splits_dict_{test_index}.pkl"
     )
     preprocessed_data_dict = yeo_johnson_transform_test_train_splits(
-        settings.N_FOLDS_INNER_CV, data.iloc[train_index, :], None
+        settings.N_FOLDS_INNER_CV, data.iloc[train_indices, :], None
     )
 
     # TODO pickle feature subsets
     selected_feature_subset = {
         "standard_lasso": standard_lasso_feature_selection.select_features(
-            preprocessed_data_dict, outer_cv_loop
+            preprocessed_data_dict, test_index
         ),
         "reverse_lasso": reverse_lasso_feature_selection.select_features(
-            preprocessed_data_dict, outer_cv_loop, settings.CORRELATION_THRESHOLD_REGRESSION
+            preprocessed_data_dict, test_index, settings.CORRELATION_THRESHOLD_REGRESSION
         ),
         "random_forest": rf_feature_selection.select_features(
-            preprocessed_data_dict, outer_cv_loop
+            preprocessed_data_dict, test_index
         ),
     }
     # print(selected_features)
@@ -81,14 +81,14 @@ if __name__ == "__main__":
     feature_subsets = Parallel(n_jobs=settings.N_JOBS, verbose=5)(
         delayed(select_feature_subset)(
             clustered_data_df,
-            train_index,
-            index,
+            train_indices,
+            test_index,
         )
-        for index, (train_index, test_index) in enumerate(loo.split(clustered_data_df))
+        for train_indices, test_index in loo.split(clustered_data_df)
     )
     # if settings.SAVE_RESULT:
     # print(feature_subsets)
-    # joblib.dump(feature_subsets, settings.PATH_TO_RESULT, compress=("gzip", 3))
+    joblib.dump(feature_subsets, settings.PATH_TO_RESULT, compress=("gzip", 3))
 
 
         # print(feature_subset)
@@ -98,11 +98,11 @@ if __name__ == "__main__":
     #     metrics = Parallel(n_jobs=settings.N_JOBS, verbose=5)(
     #         delayed(weighted_knn.validate_feature_subset)(
     #             test=clustered_data_df.iloc[test_index, :],
-    #             train=clustered_data_df.iloc[train_index, :],
+    #             train=clustered_data_df.iloc[train_indices, :],
     #             selected_features=feature_subset,
     #             number_of_neighbors=3,  # TODO intern optimieren
     #         )
-    #         for index, (train_index, test_index) in enumerate(
+    #         for index, (train_indices, test_index) in enumerate(
     #             loo.split(clustered_data_df)
     #         )
     #     )
@@ -111,14 +111,14 @@ if __name__ == "__main__":
     # loo = LeaveOneOut()
     # feature_subsets = []
     # validation_metrics_dict = {}
-    # for index, (train_index, test_index) in enumerate(loo.split(clustered_data_df)):
+    # for index, (train_indices, test_index) in enumerate(loo.split(clustered_data_df)):
     #     # load or generate transformed and standardized train test splits with respective train correlation matrix
     #     transformed_data_path_iteration = (
     #         f"{settings.DIRECTORY_FOR_PICKLED_FILES}/{settings.EXPERIMENT_NAME}/"
     #         f"transformed_test_train_splits_dict_{str(index)}.pkl"
     #     )
     #     preprocessed_data_dict = yeo_johnson_transform_test_train_splits(
-    #         settings.N_FOLDS_INNER_CV, clustered_data_df.iloc[train_index, :], None
+    #         settings.N_FOLDS_INNER_CV, clustered_data_df.iloc[train_indices, :], None
     #     )
     #
     #     selected_features = select_features(preprocessed_data_dict)
@@ -129,7 +129,7 @@ if __name__ == "__main__":
     #     metrics_dict = weighted_knn.validate_feature_subset(
     #         test=clustered_data_df.iloc[test_index, :],
     #         train=clustered_data_df[selected_features.keys()].iloc[
-    #             train_index, :
+    #             train_indices, :
     #         ],
     #         selected_features=selected_features,
     #         number_of_neighbors=3,

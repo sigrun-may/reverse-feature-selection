@@ -121,7 +121,7 @@ def select_features(
         return trim_mean(validation_metric_history, proportiontocut = 0.2)
 
     # try:
-    #     optuna.study.delete_study(f"{target_feature_name}_iteration_{outer_cv_loop}", storage = "sqlite:///optuna_db.db")
+    #     optuna.study.delete_study(f"{target_feature_name}_iteration_{test_index}", storage = "sqlite:///optuna_db.db")
     # except:
     #     print("new study")
 
@@ -133,7 +133,6 @@ def select_features(
         sampler=TPESampler(
             multivariate=True,
             n_startup_trials=3,
-            consider_magic_clip=True,
             constant_liar=True,
             warn_independent_sampling = False,
         ),

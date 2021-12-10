@@ -11,6 +11,8 @@ import shap
 
 import numpy as np
 from sklearn.metrics import r2_score
+import settings
+from study_pruner import study_pruner
 
 
 def calculate_adjusted_r2(y, predicted_y, number_of_coefficients):
@@ -41,54 +43,59 @@ def calculate_adjusted_r2(y, predicted_y, number_of_coefficients):
 
 def select_features(
     preprocessed_data_dict,
-    outer_cv_loop,
+    test_index: int,
         # preprocessed_data_dict: Dict[str, List[Union[Tuple[Any], str]]],
 ) -> Dict[str, float]:
-    pass
+    """Select feature subset for best value of regularization parameter alpha.
 
-    """Optimize regularization parameter alpha for lasso regression."""
+    Args:
+        preprocessed_data_dict: yj +pearson train data
+        test_index: test index of outer cross-validation loop
+
+    Returns: selected features + weights
+    """
 
     def optuna_objective(trial):
+        """Optimize regularization parameter alpha for lasso regression."""
 
-        # if "random" in target_feature_name or "pseudo" in target_feature_name:
-        #     trial.study.stop()
-
-        if trial.number >= 10:
-            try:
-                print(trial.study.best_value)
-            except:
-                # print('no results for more than 10 trials')
-                # print(target_feature_name)
-                trial.study.stop()
-
-        #  adapt TPE sampler to suggest new parameter, when suggested parameter is repeated
-        alphas_history = []
-        for _trial in study.trials:
-            if _trial.user_attrs:
-                alphas_history.append(_trial.user_attrs["alpha"])
-            else:
-                continue
-
-        # alpha = trial.suggest_discrete_uniform("alpha", 0.01, 1.0, 0.01)
-        # print(alphas_history)
-        alpha = trial.suggest_int("alpha", 1, 101, log=True) / 100
-        if alpha in alphas_history:
-            # print('alpha', alpha)
-            alpha = trial.suggest_int("beta", 1, 101, log=True) / 100
-            # print('alpha_beta', alpha)
-        if alpha in alphas_history:
-            # print('alpha', alpha)
-            alpha = trial.suggest_int("gamma", 1, 101, log=True) / 100
-            # print('alpha_gamma', alpha)
-
-        # prune study when aplha is repeated
-        if alpha in alphas_history:
-            print("repeated alpha: ", alpha, "in trial ", trial.number)
-            raise TrialPruned()
-        # alphas_history.append(alpha)
-
-        # save calculated alpha
-        trial.set_user_attr("alpha", alpha)
+        study_pruner(trial, epsilon = 0.0005, warm_up_steps=10, patience=15)
+        # # if "random" in target_feature_name or "pseudo" in target_feature_name:
+        # #     trial.study.stop()
+        #
+        # # pruning of complete study
+        # if trial.number >= settings.PATIENCE_BEFORE_PRUNING_OF_STUDY:
+        #     try:
+        #         # check if any trial was completed and not pruned
+        #         _ = trial.study.best_value
+        #     except:
+        #         trial.study.stop()
+        #
+        # #  adapt TPE sampler to suggest new parameter, when suggested parameter is repeated
+        # alphas_history = []
+        # for _trial in study.trials:
+        #     if _trial.user_attrs:
+        #         alphas_history.append(_trial.user_attrs["alpha"])
+        #
+        # alpha = trial.suggest_discrete_uniform("alpha", -5.0, 5.0, 0.01)
+        # alpha = trial.suggest_loguniform("alpha", 0.001, 5.0)
+        # # print(alphas_history)
+        # alpha = trial.suggest_int("alpha", 1, 101, log=True) / 100
+        # if alpha in alphas_history:
+        #     # print('alpha', alpha)
+        #     alpha = trial.suggest_int("beta", 1, 101, log=True) / 100
+        #     # print('alpha_beta', alpha)
+        # if alpha in alphas_history:
+        #     # print('alpha', alpha)
+        #     alpha = trial.suggest_int("gamma", 1, 101, log=True) / 100
+        #     # print('alpha_gamma', alpha)
+        #
+        # # prune study when alpha is repeated
+        # if alpha in alphas_history:
+        #     print("repeated alpha: ", alpha, "in trial ", trial.number)
+        #     raise TrialPruned()
+        #
+        # # save calculated alpha
+        # trial.set_user_attr("alpha", alpha)
 
         predicted_y = []
         true_y = []
@@ -116,7 +123,7 @@ def select_features(
 
             # build LASSO model
             lasso = celer.Lasso(
-                alpha=alpha, fit_intercept=True, positive=False, prune=True, verbose=0
+                alpha=trial.suggest_loguniform("alpha", 0.001, 5.0), fit_intercept=True, positive=False, prune=True, verbose=0
             )
             lasso.fit(x_train, y_train)
             coefficients.append(lasso.coef_)
@@ -158,28 +165,26 @@ def select_features(
         return calculate_adjusted_r2(true_y, predicted_y, number_of_coefficients)
 
     # try:
-    #     optuna.study.delete_study(f"{target_feature_name}_iteration_{outer_cv_loop}", storage = "sqlite:///optuna_db.db")
+    #     optuna.study.delete_study(f"{target_feature_name}_iteration_{test_index}", storage = "sqlite:///optuna_db.db")
     # except:
     #     print("new study")
 
     study = optuna.create_study(
         # storage = "sqlite:///optuna_test.db",
         # load_if_exists = True,
-        study_name=f"standard_lasso_iteration_{outer_cv_loop}",
+        study_name=f"standard_lasso_iteration_{test_index}",
         direction="maximize",
         sampler=TPESampler(
             multivariate=False,
             n_startup_trials=3,
-            consider_magic_clip=True,
-            constant_liar=True,
+            constant_liar=True,  # ??
         ),
     )
     # optuna.logging.set_verbosity(optuna.logging.ERROR)
     study.optimize(
         optuna_objective,
-        # n_trials = 40,
-        n_trials=5,
-        n_jobs=1,
+        n_trials=settings.NUMBER_OF_TRIALS,
+        n_jobs=settings.N_JOBS,
     )
 
     return dict(
