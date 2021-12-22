@@ -1,4 +1,10 @@
-from sklearn.metrics import matthews_corrcoef, accuracy_score, f1_score, balanced_accuracy_score
+import numpy as np
+from sklearn.metrics import (
+    matthews_corrcoef,
+    accuracy_score,
+    f1_score,
+    balanced_accuracy_score,
+)
 
 from src.reverse_feature_selection import weighted_knn
 from src.reverse_feature_selection.misc import evaluate_selected_features
@@ -6,7 +12,7 @@ from src.reverse_feature_selection.misc import evaluate_selected_features
 import settings
 
 
-def extract_indices_and_results(feature_selection_result):
+def _extract_indices_and_results(feature_selection_result):
     # rewrite data structure
     result_dict = {}
     test_train_indices = []
@@ -16,27 +22,22 @@ def extract_indices_and_results(feature_selection_result):
             selected_feature_subset_list = result_dict.get(selection_method, [])
             selected_feature_subset_list.append(selected_features)
             result_dict[selection_method] = selected_feature_subset_list
-    assert len(test_train_indices) == settings.N_FOLDS_OUTER_CV
+    # assert len(test_train_indices) == settings.N_FOLDS_OUTER_CV
     return result_dict, test_train_indices
 
 
-def calculate_weights_for_reverse_lasso(selected_feature_subsets, delta=0, factor=1):
+def _calculate_weights_for_reverse_lasso(selected_feature_subsets, delta=0, factor=1):
     weighted_selected_feature_subsets = []
     for feature_subset in selected_feature_subsets:
         subset = {}
-        for feature in feature_subset.keys():
-            if (
-                feature_subset[feature][1]
-                >= feature_subset[feature][0] + delta * factor
-            ):
-                subset[feature] = (
-                    feature_subset[feature][1] - feature_subset[feature][0]
-                )
+        for feature, (r2_unlabeled, r2, label_coefficients) in feature_subset.items():
+            if r2 >= r2_unlabeled + delta * factor:
+                subset[feature] = r2 - r2_unlabeled
         weighted_selected_feature_subsets.append(subset)
     return weighted_selected_feature_subsets
 
 
-def extract_data_structure_from_intersect(selected_feature_subsets, intersect):
+def _select_intersect_from_feature_subsets(selected_feature_subsets, intersect):
     intersect_dict_list = []
     for subset_dict in selected_feature_subsets:
         intersect_dict = dict()
@@ -47,7 +48,7 @@ def extract_data_structure_from_intersect(selected_feature_subsets, intersect):
     return intersect_dict_list
 
 
-def validate_feature_subset(
+def classify_feature_subsets(
     k_neighbors, test_train_indices_list, feature_subset_dict_list, data_df
 ):
     assert len(feature_subset_dict_list) == len(test_train_indices_list)
@@ -100,13 +101,11 @@ def calculate_metrics(predicted_classes, true_classes):
     }
 
 
-def validate_feature_subsets(
+def evaluate_feature_selection_methods(
     feature_selection_result_dict,
     test_train_indices_list,
     data_df,
     k_neighbors,
-    delta=0,
-    factor=1,
 ):
     metrics_per_method_dict = {}
     for (
@@ -114,22 +113,51 @@ def validate_feature_subsets(
         selected_feature_subsets,
     ) in feature_selection_result_dict.items():
         print("##############################", feature_selection_method, ": ")
-        union, intersect = evaluate_selected_features(selected_feature_subsets)
 
         if feature_selection_method == "reverse_lasso":
-            selected_feature_subsets = calculate_weights_for_reverse_lasso(
-                selected_feature_subsets, delta, factor
+            # optimize distance between the performance evaluation metrics of the selected features
+            result_per_difference_dict = {}
+            min_difference_delta_factor = list(
+                zip(
+                    (np.asarray(range(1, 7, 1)) / 10),
+                    np.ones_like(np.asarray(range(1, 7, 1))),
+                )
             )
+            for delta, factor in min_difference_delta_factor:
+                reverse_selected_feature_subsets = _calculate_weights_for_reverse_lasso(
+                    selected_feature_subsets, delta, factor
+                )
+                result_per_difference_dict[delta] = evaluate_selected_subsets(
+                    data_df,
+                    reverse_selected_feature_subsets,
+                    test_train_indices_list,
+                    k_neighbors,
+                )
+            metrics_per_method_dict[
+                feature_selection_method
+            ] = result_per_difference_dict
+        else:
+            metrics_dict = evaluate_selected_subsets(
+                data_df, selected_feature_subsets, test_train_indices_list, k_neighbors
+            )
+            metrics_per_method_dict[feature_selection_method] = metrics_dict
+    return metrics_per_method_dict
 
-            union, intersect = evaluate_selected_features(selected_feature_subsets)
-            # number_of_features.append(len(intersect))
 
-        intersect_dict_list = extract_data_structure_from_intersect(
+def evaluate_selected_subsets(
+    data_df, selected_feature_subsets, test_train_indices_list, k_neighbors
+):
+    union, intersect = evaluate_selected_features(selected_feature_subsets)
+
+    if not intersect:
+        return 0
+
+    if settings.CLASSIFY_INTERSECT_ONLY:
+        selected_feature_subsets = _select_intersect_from_feature_subsets(
             selected_feature_subsets, intersect
         )
-        predicted_classes, true_classes = validate_feature_subset(
-            k_neighbors, test_train_indices_list, intersect_dict_list, data_df
-        )
-        metrics_dict = calculate_metrics(predicted_classes, true_classes)
-        metrics_per_method_dict[feature_selection_method] = metrics_dict
-    return metrics_per_method_dict
+
+    predicted_classes, true_classes = classify_feature_subsets(
+        k_neighbors, test_train_indices_list, selected_feature_subsets, data_df
+    )
+    return calculate_metrics(predicted_classes, true_classes)

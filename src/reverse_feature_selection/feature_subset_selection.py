@@ -5,8 +5,11 @@ from sklearn.model_selection import LeaveOneOut
 
 import settings
 from preprocessing import yeo_johnson_transform_test_train_splits
-from src.reverse_feature_selection import standard_lasso_feature_selection, reverse_lasso_feature_selection, \
-    rf_feature_selection
+from src.reverse_feature_selection import (
+    standard_lasso_feature_selection,
+    reverse_lasso_feature_selection,
+    rf_feature_selection,
+)
 
 
 def select_feature_subset(
@@ -58,7 +61,7 @@ def select_feature_subset(
 def load_or_generate_feature_subsets_old(data_df):
     try:
         return joblib.load(settings.PATH_TO_RESULT)
-    except:
+    except:  # noqa
         return parallel_feature_subset_selection(data_df)
 
 

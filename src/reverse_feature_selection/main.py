@@ -10,7 +10,11 @@ from sklearn.datasets import load_breast_cancer
 
 import settings
 import weighted_knn
-from preprocessing import cluster_data, yeo_johnson_transform_test_train_splits
+from preprocessing import (
+    cluster_data,
+    yeo_johnson_transform_test_train_splits,
+    parse_data,
+)
 import standard_lasso_feature_selection
 import reverse_lasso_feature_selection
 import rf_feature_selection
@@ -22,10 +26,17 @@ from sklearn.metrics import (
     mutual_info_score,
 )
 
-from src.reverse_feature_selection.misc import (
-    parse_data,
-    extract_indices_and_results,
-    validate_feature_subsets, load_or_generate_feature_subsets_old,
+# from src.reverse_feature_selection.misc import (
+#     parse_data,
+#     _extract_indices_and_results,
+#     validate_feature_subsets, load_or_generate_feature_subsets_old,
+# )
+from src.reverse_feature_selection.feature_subset_selection import (
+    load_or_generate_feature_subsets_old,
+)
+from src.reverse_feature_selection.validation import (
+    _extract_indices_and_results,
+    evaluate_feature_selection_methods,
 )
 
 if __name__ == "__main__":
@@ -63,23 +74,22 @@ if __name__ == "__main__":
     (
         feature_selection_result_dict,
         test_train_indices_list,
-    ) = extract_indices_and_results(feature_selection_result)
+    ) = _extract_indices_and_results(feature_selection_result)
 
+    # optimize number of neighbors
     for hyperparameter_k_neighbors in [3, 5]:
         # for hyperparameter_k_neighbors in [3, 5, 7, 9, 11]:
-        min_difference = np.asarray(range(1, 7, 1)) / 10
-        for delta in min_difference:
-            print(delta)
-            print(
-                validate_feature_subsets(
-                    feature_selection_result_dict,
-                    test_train_indices_list,
-                    clustered_data_df,
-                    hyperparameter_k_neighbors,
-                    delta,
-                    factor=1,
-                )
+        # min_difference = np.asarray(range(1, 7, 1)) / 10
+        # for delta in min_difference:
+        #     print(delta)
+        print(
+            evaluate_feature_selection_methods(
+                feature_selection_result_dict,
+                test_train_indices_list,
+                clustered_data_df,
+                hyperparameter_k_neighbors,
             )
+        )
 
     # feature_subsets = parallel_feature_subset_selection(clustered_data_df)
     # feature_subsets = joblib.load(settings.PATH_TO_RESULT)

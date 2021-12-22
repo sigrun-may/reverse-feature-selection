@@ -87,17 +87,27 @@ def calculate_r2_adjusted(
             for index, value in train_correlation_matrix[target_feature_name].items()
             if abs(value) > settings.CORRELATION_THRESHOLD_REGRESSION
         ]
-        if target_feature_name in correlated_features:
-            correlated_features.remove(target_feature_name)
+        correlated_feature_values = [
+            value
+            for index, value in train_correlation_matrix[target_feature_name].items()
+            if abs(value) > settings.CORRELATION_THRESHOLD_REGRESSION
+        ]
+        if len(correlated_feature_values) > 0:
+            min_correlated_feature = correlated_features[
+                correlated_feature_values.index(min(correlated_feature_values))
+            ]
+
+            if target_feature_name in correlated_features:
+                correlated_features.remove(target_feature_name)
+
+        # check if train would keep at least one feature after removing label and target_feature
+        if train_data_df.shape[1] - len(correlated_features) < 3:
+            # keep the feature with the lowest correlation to the target feature
+            correlated_features.remove(min_correlated_feature)
 
         if not include_label:
             # append label to the list of features to remove
             correlated_features.append("label")
-
-        # check if train would keep at least one feature
-        if train_data_df.shape[1] - len(correlated_features) == 0:
-            # keep the feature with the lowest correlation to the target feature
-            correlated_features.remove(np.min(np.abs(correlated_features)))
 
         # remove features correlated to the target_feature from test/ train data and the label if it is not included
         train_data_df.drop(columns=correlated_features, inplace=True)
@@ -105,12 +115,10 @@ def calculate_r2_adjusted(
         assert train_data_df.shape[1] == train.shape[1] - len(
             deselected_features
         ) - len(correlated_features)
-        assert train_data_df.shape[1] > 0
 
         assert test_data_df.shape[1] == test.shape[1] - len(deselected_features) - len(
             correlated_features
         )
-        assert test_data_df.shape[1] > 0
 
         # prepare train/ test data
         y_train = train_data_df[target_feature_name].values.reshape(-1, 1)
@@ -118,8 +126,9 @@ def calculate_r2_adjusted(
         x_test = test_data_df.drop(columns=target_feature_name).values
         true_y.extend(test_data_df[target_feature_name].values)
 
+        assert x_train.shape[1] >= 1
         # build LASSO model
-        lasso = celer.Lasso(alpha=alpha, prune=True, verbose=0)
+        lasso = celer.Lasso(alpha=alpha, verbose=0)
         lasso.fit(x_train, y_train)
 
         # sklearn lasso
