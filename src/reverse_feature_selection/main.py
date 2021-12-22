@@ -3,8 +3,10 @@ from typing import Dict, Tuple, List, Union
 import joblib
 import pandas as pd
 import numpy as np
-from joblib import Parallel, delayed
-from sklearn.model_selection import LeaveOneOut
+from joblib import Parallel, delayed, Memory
+from sklearn.model_selection import LeaveOneOut, StratifiedKFold
+from sklearn.utils.multiclass import unique_labels
+from sklearn.datasets import load_breast_cancer
 
 import settings
 import weighted_knn
@@ -12,159 +14,234 @@ from preprocessing import cluster_data, yeo_johnson_transform_test_train_splits
 import standard_lasso_feature_selection
 import reverse_lasso_feature_selection
 import rf_feature_selection
+from sklearn.metrics import (
+    accuracy_score,
+    matthews_corrcoef,
+    f1_score,
+    balanced_accuracy_score,
+    mutual_info_score,
+)
 
-
-def parse_data(number_of_features: int, path: str) -> pd.DataFrame:
-    data = pd.read_csv(path)
-    data = data.iloc[:, :number_of_features]
-    print(data.shape)
-    return data
-
-
-def evaluate_selected_features(
-    all_feature_subsets: List[Dict[str, float]]
-) -> Tuple[set, set]:
-    intersection_of_features = union_of_features = set(all_feature_subsets[0].keys())
-    for i in range(len(all_feature_subsets) - 1):
-        feature_set = set(all_feature_subsets[i + 1].keys())
-        intersection_of_features = intersection_of_features.intersection(feature_set)
-        union_of_features = union_of_features.union(feature_set)
-    return union_of_features, intersection_of_features
-
-
-def select_feature_subset(
-    data: pd.DataFrame, train_indices, outer_cv_loop_iteration: int
-):
-    print(
-        "iteration: ",
-        outer_cv_loop_iteration,
-        " #############################################################",
-    )
-    # load or generate transformed and standardized train test splits with respective train correlation matrix
-    transformed_data_path_iteration = (
-        f"{settings.DIRECTORY_FOR_PICKLED_FILES}/{settings.EXPERIMENT_NAME}/"
-        f"transformed_test_train_splits_dict_{outer_cv_loop_iteration}.pkl"
-    )
-    preprocessed_data_dict = yeo_johnson_transform_test_train_splits(
-        settings.N_FOLDS_INNER_CV, data.iloc[train_indices, :], None
-    )
-
-    # TODO pickle feature subsets
-    selected_feature_subset = {
-        "standard_lasso": standard_lasso_feature_selection.select_features(
-            preprocessed_data_dict, outer_cv_loop_iteration
-        ),
-        "reverse_lasso": reverse_lasso_feature_selection.select_features(
-            preprocessed_data_dict, outer_cv_loop_iteration
-        ),
-        "random_forest": rf_feature_selection.select_features(
-            preprocessed_data_dict, outer_cv_loop_iteration
-        ),
-    }
-    # print(selected_features)
-    # selected_features = select_features(preprocessed_data_dict)
-    # selected_features = selection_method_rf(preprocessed_data_dict)
-
-    # # append metrics to overall result for outer cross-validation
-    # for selection_method, selected_features in metrics_dict.items():
-    #     r = validation_metrics_dict.get(selection_method, [])
-    #     r.append(selected_features)
-    #     validation_metrics_dict[selection_method] = r
-
-    return selected_feature_subset
-
+from src.reverse_feature_selection.misc import (
+    parse_data,
+    extract_indices_and_results,
+    validate_feature_subsets, load_or_generate_feature_subsets_old,
+)
 
 if __name__ == "__main__":
-    # data_df1 = parse_data(settings.NUMBER_OF_FEATURES, settings.INPUT_DATA_PATH)
-    # data_df1.iloc[:, 1:].to_csv("../../data/small_50.csv", index=False)
-    data_df = parse_data(settings.NUMBER_OF_FEATURES, settings.INPUT_DATA_PATH)
-    clustered_data_df, cluster_dict = cluster_data(data_df)
-
+    # X, y = load_breast_cancer(return_X_y=True, as_frame=True)
+    # data_df = pd.DataFrame()
+    # data_df["label"] = y
+    # data_df = data_df.join(X)
+    input_data_df = parse_data(settings.NUMBER_OF_FEATURES, settings.INPUT_DATA_PATH)
+    clustered_data_df, cluster_dict = cluster_data(input_data_df)
+    # # clustered_data_df.to_csv('clustered_1200.csv', index = False)
+    # # clustered_data_df = pd.read_csv("clustered_1200.csv")
+    # #
     # outer cross-validation to validate selected feature subsets
-    loo = LeaveOneOut()
-    feature_subsets = Parallel(n_jobs=settings.N_JOBS, verbose=5)(
-        delayed(select_feature_subset)(
-            clustered_data_df,
-            train_indices,
-            outer_cv_loop_iteration,
-        )
-        for outer_cv_loop_iteration, (train_indices, test_index) in enumerate(
-            loo.split(clustered_data_df)
-        )
-    )
-    # if settings.SAVE_RESULT:
-    # print(feature_subsets)
-    joblib.dump(feature_subsets, settings.PATH_TO_RESULT, compress=("gzip", 3))
-
-    # print(feature_subset)
-
-    # for feature_subset in feature_subsets:
-    #     metrics = Parallel(n_jobs=settings.N_JOBS, verbose=5)(
-    #         delayed(weighted_knn.validate_feature_subset)(
-    #             test=clustered_data_df.iloc[test_index, :],
-    #             train=clustered_data_df.iloc[train_indices, :],
-    #             selected_features=feature_subset,
-    #             number_of_neighbors=3,  # TODO intern optimieren
-    #         )
-    #         for index, (train_indices, test_index) in enumerate(
-    #             loo.split(clustered_data_df)
-    #         )
-    #     )
-
-    # # outer cross-validation to validate feature subsets
     # loo = LeaveOneOut()
-    # feature_subsets = []
-    # validation_metrics_dict = {}
-    # for index, (train_indices, test_index) in enumerate(loo.split(clustered_data_df)):
-    #     # load or generate transformed and standardized train test splits with respective train correlation matrix
-    #     transformed_data_path_iteration = (
-    #         f"{settings.DIRECTORY_FOR_PICKLED_FILES}/{settings.EXPERIMENT_NAME}/"
-    #         f"transformed_test_train_splits_dict_{str(index)}.pkl"
+    # fold_splitter = StratifiedKFold(n_splits=settings.N_FOLDS_OUTER_CV)
+    # feature_subsets = Parallel(n_jobs=settings.N_JOBS, verbose=5)(
+    #     delayed(select_feature_subset)(
+    #         clustered_data_df,
+    #         train_indices,
+    #         test_indices,
+    #         outer_cv_loop_iteration,
     #     )
-    #     preprocessed_data_dict = yeo_johnson_transform_test_train_splits(
-    #         settings.N_FOLDS_INNER_CV, clustered_data_df.iloc[train_indices, :], None
+    #     for outer_cv_loop_iteration, (train_indices, test_indices) in enumerate(
+    #         # loo.split(clustered_data_df)
+    #         fold_splitter.split(
+    #             clustered_data_df.iloc[:, 1:], clustered_data_df["label"]
+    #         )
     #     )
-    #
-    #     selected_features = select_features(preprocessed_data_dict)
-    #     # selected_features = selection_method_reverse_lasso(preprocessed_data_dict)
-    #     # selected_features = selection_method_rf(preprocessed_data_dict)
-    #     feature_subsets.append(selected_features)
-    #
-    #     metrics_dict = weighted_knn.validate_feature_subset(
-    #         test=clustered_data_df.iloc[test_index, :],
-    #         train=clustered_data_df[selected_features.keys()].iloc[
-    #             train_indices, :
-    #         ],
-    #         selected_features=selected_features,
-    #         number_of_neighbors=3,
-    #     )
-    #
-    #     # append metrics to overall result for outer cross-validation
-    #     for selection_method, selected_features in metrics_dict.items():
-    #         r = validation_metrics_dict.get(selection_method, [])
-    #         r.append(selected_features)
-    #         validation_metrics_dict[selection_method] = r
+    # )
+    # # if settings.SAVE_RESULT:
+    # joblib.dump(feature_subsets, settings.PATH_TO_RESULT, compress=("gzip", 3))
+    # feature_selection_result = load_or_generate_feature_subsets(clustered_data_df)
+    feature_selection_result = load_or_generate_feature_subsets_old(clustered_data_df)
 
-    # validation_metrics_dict = {
-    #     selection_method: np.mean(selected_features) for selection_method, selected_features in validation_metrics_dict.items()
-    # }
-    # rewrite data structure
-    feature_selection_result_dict = {}
-    for feature_subset in feature_subsets:
-        for selection_method, selected_features in feature_subset.items():
-            selected_feature_subset_list = feature_selection_result_dict.get(
-                selection_method, []
+    (
+        feature_selection_result_dict,
+        test_train_indices_list,
+    ) = extract_indices_and_results(feature_selection_result)
+
+    for hyperparameter_k_neighbors in [3, 5]:
+        # for hyperparameter_k_neighbors in [3, 5, 7, 9, 11]:
+        min_difference = np.asarray(range(1, 7, 1)) / 10
+        for delta in min_difference:
+            print(delta)
+            print(
+                validate_feature_subsets(
+                    feature_selection_result_dict,
+                    test_train_indices_list,
+                    clustered_data_df,
+                    hyperparameter_k_neighbors,
+                    delta,
+                    factor=1,
+                )
             )
-            selected_feature_subset_list.append(selected_features)
-            feature_selection_result_dict[
-                selection_method
-            ] = selected_feature_subset_list
 
-    for (
-        feature_selection_method,
-        selected_feature_subsets,
-    ) in feature_selection_result_dict.items():
-        union, intersect = evaluate_selected_features(selected_feature_subsets)
-        print(feature_selection_method, ": ")
-        print("union_of_features: ", union)
-        print("intersection_of_features: ", intersect)
+    # feature_subsets = parallel_feature_subset_selection(clustered_data_df)
+    # feature_subsets = joblib.load(settings.PATH_TO_RESULT)
+    # # outer cross-validation to validate selected feature subsets
+    # loo = LeaveOneOut()
+    # predicted_classes = Parallel(n_jobs=1, verbose=5)(
+    #     delayed(weighted_knn.validate)(
+    #         clustered_data_df.iloc[test_indices, :],
+    #         clustered_data_df.iloc[train_indices, :],
+    #         feature_subsets[outer_cv_loop_iteration]["random_forest"],
+    #         5,
+    #     )
+    #     for outer_cv_loop_iteration, (train_indices, test_indices) in enumerate(
+    #         loo.split(clustered_data_df)
+    #     )
+    # )
+    # print(predicted_classes)
+    # true_classes = list(clustered_data_df["label"])
+    # print(
+    #     "matthews",
+    #     matthews_corrcoef(true_classes, predicted_classes),
+    #     "accuracy",
+    #     accuracy_score(true_classes, predicted_classes),
+    #     "f1_score",
+    #     f1_score(true_classes, predicted_classes),
+    #     "balanced_accuracy_score",
+    #     balanced_accuracy_score(true_classes, predicted_classes),
+    # )
+    #  # Only use the labels that appear in the data
+    # classes = unique_labels(true_classes, predicted_classes)
+    # plotter.plot_confusion_matrix(true_classes, predicted_classes, classes, True, title=None, cmap=pyplot.cm.Blues)
+    # # pyplot.savefig(settings['EXPERIMENT_NAME'] + '.png')
+    # pyplot.show()
+
+    # # rewrite data structure
+    # feature_selection_result_dict = {}
+    # test_train_indices_list = []
+    # for feature_subset, test_indices, train_indices in feature_subsets:
+    #     test_train_indices_list.append((test_indices, train_indices))
+    #     for selection_method, selected_features in feature_subset.items():
+    #         selected_feature_subset_list = feature_selection_result_dict.get(
+    #             selection_method, []
+    #         )
+    #         selected_feature_subset_list.append(selected_features)
+    #         feature_selection_result_dict[
+    #             selection_method
+    #         ] = selected_feature_subset_list
+    # assert len(test_train_indices_list) == settings.N_FOLDS_OUTER_CV
+
+    matthews_list = []
+    balanced_accuracy_score_list = []
+    number_of_features = []
+    # for hyper_k in [3, 5, 7, 9, 11]:
+    #     min_difference = np.asarray(range(1, 70, 1)) / 100
+    #     for d in min_difference:
+    #         print(d)
+
+    # matthews_list = []
+    # balanced_accuracy_score_list = []
+    # number_of_features = []
+    # for hyper_k in [3, 5, 7, 9, 11]:
+    #     min_difference = np.asarray(range(1, 70, 1)) / 100
+    #     for d in min_difference:
+    #         print(d)
+    #         for (
+    #             feature_selection_method,
+    #             selected_feature_subsets,
+    #         ) in feature_selection_result_dict.items():
+    #             if feature_selection_method == "reverse_lasso":
+    #                 union, intersect = evaluate_selected_features(selected_feature_subsets)
+    #                 print("##############################", feature_selection_method, ": ")
+    #                 print("union_of_features: ")
+    #                 print(len(union), union)
+    #                 # evaluate_proportion_of_selected_features(union)
+    #                 print("intersection_of_features: ")
+    #                 print(len(intersect), intersect)
+    #                 # evaluate_proportion_of_selected_features(intersect)
+    #
+    #                 temp_selected_feature_subsets = []
+    #                 if feature_selection_method == "reverse_lasso":
+    #                     for feature_subset in selected_feature_subsets:
+    #                         subset = {}
+    #                         for feature in feature_subset.keys():
+    #                             if (
+    #                                 feature_subset[feature][1]
+    #                                 >= feature_subset[feature][0] + d
+    #                             ):
+    #                                 subset[feature] = (
+    #                                     feature_subset[feature][1]
+    #                                     - feature_subset[feature][0]
+    #                                 )
+    #                         temp_selected_feature_subsets.append(subset)
+    #                     selected_feature_subsets = temp_selected_feature_subsets
+    #
+    #                     union2, intersect2 = evaluate_selected_features(
+    #                         selected_feature_subsets
+    #                     )
+    #                     print(d, "union:", len(union2), union2)
+    #                     print(d, "intersection:", len(intersect2), intersect2)
+    #                     number_of_features.append(len(intersect2))
+    #
+    #                 intersect_dict_list = []
+    #                 # Iterate over all the items in dictionary and filter items which has even keys
+    #                 for k in range(len(test_train_indices_list)):
+    #                     intersect_dict = dict()
+    #                     for (key, value) in selected_feature_subsets[k].items():
+    #                         # Check if key is even then add pair to new dictionary
+    #                         if key in intersect:
+    #                             intersect_dict[key] = value
+    #                     intersect_dict_list.append(intersect_dict)
+    #
+    #                 # outer cross-validation to validate selected feature subsets
+    #                 # loo = LeaveOneOut()
+    #                 results = Parallel(n_jobs=1, verbose=5)(
+    #                     delayed(weighted_knn.validate)(
+    #                         clustered_data_df.iloc[test_indices, :],
+    #                         clustered_data_df.iloc[train_indices, :],
+    #                         # intersect,
+    #                         intersect_dict_list[outer_cv_loop_iteration],
+    #                         hyper_k,
+    #                     )
+    #                     for outer_cv_loop_iteration, (
+    #                         test_indices,
+    #                         train_indices,
+    #                     ) in enumerate(test_train_indices_list)
+    #                 )
+    #                 assert len(results) == len(test_train_indices_list)
+    #
+    #                 # flatten lists of results from k-fold cross-validation
+    #                 predicted_classes = []
+    #                 true_classes = []
+    #                 for predicted_classes_sublist, true_classes_sublist in results:
+    #                     predicted_classes.extend(predicted_classes_sublist)
+    #                     true_classes.extend(true_classes_sublist)
+    #                 # predicted_classes = [
+    #                 #     item[0] for sublist in results for item in sublist
+    #                 # ]
+    #                 assert len(predicted_classes) == data_df.shape[0]
+    #                 if feature_selection_method == "reverse_lasso":
+    #                     matthews_list.append(
+    #                         matthews_corrcoef(true_classes, predicted_classes)
+    #                     )
+    #                     balanced_accuracy_score_list.append(
+    #                         balanced_accuracy_score(true_classes, predicted_classes)
+    #                     )
+    #                 # print(predicted_classes)
+    #                 # print(true_classes)
+    #                 print(
+    #                     "matthews",
+    #                     matthews_corrcoef(true_classes, predicted_classes),
+    #                     "accuracy",
+    #                     accuracy_score(true_classes, predicted_classes),
+    #                     "f1_score",
+    #                     f1_score(true_classes, predicted_classes),
+    #                     "balanced_accuracy_score",
+    #                     balanced_accuracy_score(true_classes, predicted_classes),
+    #                 )
+    # print("matthews:")
+    # print(max(matthews_list))
+    # print(matthews_list)
+    # print(list(zip(matthews_list, number_of_features)))
+    # print("balanced_accuracy_score:")
+    # print(max(balanced_accuracy_score_list))
+    # print(balanced_accuracy_score_list)
+    # print(list(zip(balanced_accuracy_score_list, number_of_features)))

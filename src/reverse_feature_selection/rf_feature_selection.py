@@ -22,13 +22,13 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop):
         # if "random" in target_feature_name or "pseudo" in target_feature_name:
         #     trial.study.stop()
 
-        if trial.number >= 10:
-            try:
-                trial.study.best_value
-            except:
-                # print('no results for more than 10 trials')
-                # print(target_feature_name)
-                trial.study.stop()
+        # if trial.number >= 10:
+        #     try:
+        #         trial.study.best_value
+        #     except:
+        #         # print('no results for more than 10 trials')
+        #         # print(target_feature_name)
+        #         trial.study.stop()
 
         validation_metric_history = []
         all_shap_values = []
@@ -84,10 +84,10 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop):
                 parameters,
                 train_data,
                 valid_sets=[test_data],
-                verbose_eval=False,
+                verbose_eval=0,
             )
 
-            if cv_pruner.check_no_features_selected(
+            if cv_pruner.no_features_selected(
                 model.feature_importance(importance_type="gain")
             ):
                 raise TrialPruned()
@@ -96,12 +96,12 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop):
                 model.best_score["valid_0"]["binary_logloss"]
             )
 
-            if cv_pruner.check_against_threshold(
+            if cv_pruner.should_prune_against_threshold(
                 current_step_of_complete_nested_cross_validation=fold_index,
                 folds_outer_cv=train_data_df.shape[0] + test_data_df.shape[0],  # loo
                 folds_inner_cv=settings.N_FOLDS_INNER_CV,
                 validation_metric_history=validation_metric_history,
-                threshold_for_pruning=0.3,
+                threshold_for_pruning=0.55,
                 direction_to_optimize_is_minimize=True,
                 optimal_metric=0,
                 method=Method.OPTIMAL_METRIC,
@@ -126,7 +126,7 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop):
         return trim_mean(validation_metric_history, proportiontocut=0.2)
 
     # try:
-    #     optuna.study.delete_study(f"{target_feature_name}_iteration_{test_index}", storage = "sqlite:///optuna_db.db")
+    #     optuna.study.delete_study(f"{target_feature_name}_iteration_{test_indices}", storage = "sqlite:///optuna_db.db")
     # except:
     #     print("new study")
 
@@ -137,9 +137,6 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop):
         direction="minimize",
         sampler=TPESampler(
             multivariate=True,
-            n_startup_trials=3,
-            constant_liar=True,
-            warn_independent_sampling=False,
         ),
         pruner=pruners.SuccessiveHalvingPruner(
             min_resource="auto",
@@ -151,19 +148,22 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop):
     # optuna.logging.set_verbosity(optuna.logging.ERROR)
     study.optimize(
         optuna_objective,
-        # n_trials = 40,
-        n_trials=15,
-        n_jobs=1,
+        n_trials=settings.NUMBER_OF_TRIALS,
     )
-    relevant_features_dict = dict(
-        label=(0, 0, study.best_trial.user_attrs["shap_values"])
-    )
-    intermediate_result = dict(relevant_features_dict=relevant_features_dict)
-    intermediate_result["test_train_indices"] = {}
+    # relevant_features_dict = dict(
+    #     label=(0, 0, study.best_trial.user_attrs["shap_values"])
+    # )
+    # intermediate_result = dict(relevant_features_dict=relevant_features_dict)
+    # intermediate_result["test_train_indices"] = {}
     # return study.best_trial.user_attrs["label_coefficients"]
-    return dict(
-        zip(
-            study.best_trial.user_attrs["selected_features"],
-            study.best_trial.user_attrs["shap_values"],
+
+    # check if study.best_value is available and at least one trial was completed
+    try:
+        return dict(
+            zip(
+                study.best_trial.user_attrs["selected_features"],
+                study.best_trial.user_attrs["shap_values"],
+            )
         )
-    )
+    except:
+        return {"NONE": 0}

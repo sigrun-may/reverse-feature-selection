@@ -12,7 +12,7 @@ import shap
 import numpy as np
 from sklearn.metrics import r2_score
 import settings
-from study_pruner import study_pruner
+import study_pruner
 
 
 def calculate_adjusted_r2(y, predicted_y, number_of_coefficients):
@@ -58,7 +58,9 @@ def select_features(
     def optuna_objective(trial):
         """Optimize regularization parameter alpha for lasso regression."""
 
-        study_pruner(trial, epsilon=0.0005, warm_up_steps=10, patience=15)
+        # study_pruner.study_patience_pruner(
+        #     trial, epsilon=0.0005, warm_up_steps=10, patience=10
+        # )
         # # if "random" in target_feature_name or "pseudo" in target_feature_name:
         # #     trial.study.stop()
         #
@@ -108,9 +110,7 @@ def select_features(
         transformed_data = preprocessed_data_dict["transformed_data"]
 
         # cross validation for the optimization of alpha
-        for fold_index, (test, train, train_correlation_matrix_complete) in enumerate(
-            transformed_data
-        ):
+        for test, train, train_correlation_matrix_complete in transformed_data:
             # TODO pandas notwendig?
             train_data_df = pd.DataFrame(train, columns=feature_names)
             test_data_df = pd.DataFrame(test, columns=feature_names)
@@ -123,10 +123,7 @@ def select_features(
 
             # build LASSO model
             lasso = celer.Lasso(
-                alpha=trial.suggest_loguniform("alpha", 0.001, 5.0),
-                fit_intercept=True,
-                positive=False,
-                prune=True,
+                alpha=trial.suggest_loguniform("alpha", 0.01, 5.0),
                 verbose=0,
             )
             lasso.fit(x_train, y_train)
@@ -164,10 +161,19 @@ def select_features(
         trial.set_user_attr("shap_values", nonzero_shap_values)
         trial.set_user_attr("selected_features", selected_features)
         # r2 = r2_score(true_y, predicted_y_proba)
-        return calculate_adjusted_r2(true_y, predicted_y, number_of_coefficients)
+
+        # assume n = number of samples , p = number of independent variables
+        # adjusted_r2 = 1-(1-R2)*(n-1)/(n-p-1)
+        sample_size = len(true_y)
+        adjusted_r2 = 1 - (
+            ((1 - r2_score(true_y, predicted_y)) * (sample_size - 1))
+            / (sample_size - (np.median(number_of_coefficients)) - 1)
+        )
+        return r2_score(true_y, predicted_y)
+        # return calculate_adjusted_r2(true_y, predicted_y, number_of_coefficients)
 
     # try:
-    #     optuna.study.delete_study(f"{target_feature_name}_iteration_{test_index}", storage = "sqlite:///optuna_db.db")
+    #     optuna.study.delete_study(f"{target_feature_name}_iteration_{test_indices}", storage = "sqlite:///optuna_db.db")
     # except:
     #     print("new study")
 
@@ -177,16 +183,13 @@ def select_features(
         study_name=f"standard_lasso_iteration_{test_index}",
         direction="maximize",
         sampler=TPESampler(
-            multivariate=False,
             n_startup_trials=3,
-            constant_liar=True,  # ??
         ),
     )
     # optuna.logging.set_verbosity(optuna.logging.ERROR)
     study.optimize(
         optuna_objective,
         n_trials=settings.NUMBER_OF_TRIALS,
-        n_jobs=settings.N_JOBS,
     )
 
     return dict(

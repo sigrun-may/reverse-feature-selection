@@ -20,8 +20,9 @@ def calculate_adjusted_r2(y, predicted_y, number_of_coefficients):
     sample_size = len(y)
 
     # adjusted_r2 = 1 - (1 - r2) * (sample_size - 1) / (sample_size - (np.max(number_of_coefficients)) - 1)
-    adjusted_r2 = 1 - (1 - r2) * (sample_size - 1) / (
-        sample_size - (np.median(number_of_coefficients)) - 1
+    adjusted_r2 = 1 - (
+        ((1 - r2) * (sample_size - 1))
+        / (sample_size - (np.median(number_of_coefficients)) - 1)
     )
 
     # Adj r2 = 1-(1-R2)*(n-1)/(n-p-1)
@@ -118,7 +119,7 @@ def calculate_r2_adjusted(
         true_y.extend(test_data_df[target_feature_name].values)
 
         # build LASSO model
-        lasso = celer.Lasso(alpha=alpha, fit_intercept=True, positive=False, prune=True)
+        lasso = celer.Lasso(alpha=alpha, prune=True, verbose=0)
         lasso.fit(x_train, y_train)
 
         # sklearn lasso
@@ -140,16 +141,21 @@ def calculate_r2_adjusted(
         # predict y_test
         predicted_y.extend(lasso.predict(x_test))
 
-    if include_label:  # TODO prüfen, ob das noch gebraucht wird
-        trial.set_user_attr("label_coefficients", label_coefficients)
-
     # assume n = number of samples , p = number of independent variables
     # adjusted_r2 = 1-(1-R2)*(n-1)/(n-p-1)
     sample_size = len(true_y)
-    adjusted_r2 = 1 - (1 - r2_score(true_y, predicted_y)) * (sample_size - 1) / (
-        sample_size - (np.median(number_of_coefficients_list)) - 1
+    adjusted_r2 = 1 - (
+        ((1 - r2_score(true_y, predicted_y)) * (sample_size - 1))
+        / (sample_size - np.median(number_of_coefficients_list) - 1)
     )
-    return adjusted_r2
+    if include_label:  # TODO prüfen, ob das noch gebraucht wird
+        trial.set_user_attr("label_coefficients", label_coefficients)
+        # trial.set_user_attr("r2_score", r2_score(true_y, predicted_y))
+        trial.set_user_attr(
+            "median_number_of_features_in_model", np.median(number_of_coefficients_list)
+        )
+    # return adjusted_r2
+    return r2_score(true_y, predicted_y)
 
 
 def optimize(
@@ -161,10 +167,12 @@ def optimize(
     """Optimize regularization parameter alpha for lasso regression."""
 
     def optuna_objective(trial):
-        study_pruner.study_pruner(trial, epsilon=0.0005, warm_up_steps=10, patience=15)
+        study_pruner.study_no_trial_completed_pruner(trial, warm_up_steps=10)
+        # study_pruner.study_no_improvement_pruner(trial, epsilon=0.001, warm_up_steps=10,
+        # number_of_similar_best_values = 5)
 
         return calculate_r2_adjusted(
-            alpha=trial.suggest_loguniform("alpha", 0.001, 5.0),
+            alpha=trial.suggest_discrete_uniform("alpha", 0.001, 2.0, 0.001),
             target_feature_name=target_feature_name,
             deselected_features=deselected_features,
             data_dict=transformed_test_train_splits_dict,
@@ -173,7 +181,7 @@ def optimize(
         )
 
     # try:
-    #     optuna.study.delete_study(f"{target_feature_name}_iteration_{test_index}", storage = "sqlite:///optuna_db.db")
+    #     optuna.study.delete_study(f"{target_feature_name}_iteration_{test_indices}", storage = "sqlite:///optuna_db.db")
     # except:
     #     print("new study")
 
@@ -183,22 +191,18 @@ def optimize(
         study_name=f"{target_feature_name}_iteration_{outer_cv_loop}",
         direction="maximize",  # The higher the corrected R², the better the model fits the data.
         sampler=TPESampler(
-            multivariate=False,
             n_startup_trials=3,
-            constant_liar=True,
         ),
     )
-    # optuna.logging.set_verbosity(optuna.logging.ERROR)
+    optuna.logging.set_verbosity(optuna.logging.ERROR)
     study.optimize(
         optuna_objective,
         # n_trials = 40,
         n_trials=settings.NUMBER_OF_TRIALS,
-        n_jobs=settings.N_JOBS,
     )
-
-    if study.best_value > 0:
-        fig = optuna.visualization.plot_optimization_history(study)
-        fig.show()
+    # if study.best_value > 0:
+    #     fig = optuna.visualization.plot_optimization_history(study)
+    #     fig.show()
 
     # check if study.best_value is available and at least one trial was completed
     try:
@@ -215,6 +219,13 @@ def optimize(
         transformed_test_train_splits_dict,
         include_label=False,
         trial=None,
+    )
+    print(
+        target_feature_name,
+        study.best_value,
+        r2_adjusted,
+        # study.best_trial.user_attrs["r2_score"],
+        study.best_trial.user_attrs["median_number_of_features_in_model"],
     )
     return (
         r2_adjusted,

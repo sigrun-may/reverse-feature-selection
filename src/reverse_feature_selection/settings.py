@@ -3,24 +3,27 @@ import os
 ########################################################
 # Settings
 ########################################################
-N_JOBS_PREPROCESSING = 1  # number of parallel threads
+N_JOBS_PREPROCESSING = 5  # number of parallel threads
 N_JOBS = 1
 N_FOLDS_INNER_CV = 10
-# INPUT_DATA_PATH = "input_data/colon.csv"
+N_FOLDS_OUTER_CV = 20
+INPUT_DATA_PATH = "../../data/colon.csv"
+# INPUT_DATA_PATH = "C:/Users/sma19/PycharmProjects/pruner/data/leukemia.csv"
 # INPUT_DATA_PATH = 'input_data/leukemia.csv'
 # INPUT_DATA_PATH = "input_data/lasso_data.csv"
-INPUT_DATA_PATH = "../../data/huge_data.csv"
+# INPUT_DATA_PATH = "../../data/huge_data.csv"
 # INPUT_DATA_PATH = "../../data/small_50.csv"
 DIRECTORY_FOR_PICKLED_FILES = "../../pickled_files"
-NUMBER_OF_FEATURES = 200
+NUMBER_OF_FEATURES = 2001
 # EXPERIMENT_NAME = "artificial_5000_10_fold"
-EXPERIMENT_NAME = f"test_{NUMBER_OF_FEATURES}_{N_FOLDS_INNER_CV}_fold"
-NUMBER_OF_TRIALS = 20
+EXPERIMENT_NAME = f"colon_{NUMBER_OF_FEATURES}_{N_FOLDS_INNER_CV}_inner_folds_{N_FOLDS_OUTER_CV}_outer_folds"
+NUMBER_OF_TRIALS = 40
 PATIENCE_BEFORE_PRUNING_OF_STUDY = 10
-CORRELATION_THRESHOLD_CLUSTER = 0.85
-CORRELATION_THRESHOLD_REGRESSION = 0.3
+CORRELATION_THRESHOLD_CLUSTER = 0.8
+CORRELATION_THRESHOLD_REGRESSION = 0.1
 N_NEIGHBORS = 5
 SAVE_RESULT = False
+RESULT_DIRECTORY = "../../results/"
 PATH_TO_RESULT = f"../../results/{EXPERIMENT_NAME}_threshold_{CORRELATION_THRESHOLD_REGRESSION}_{CORRELATION_THRESHOLD_CLUSTER}.pkl.gz"
 # PATH_TO_RESULT = f"/vol/projects/smay/develop/reverse_lasso_feature_selection/results/{EXPERIMENT_NAME}_threshold_{CORRELATION_THRESHOLD_REGRESSION}_{CORRELATION_THRESHOLD_CLUSTER}.pkl.gz"
 
