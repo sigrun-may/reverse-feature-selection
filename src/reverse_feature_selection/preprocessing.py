@@ -9,6 +9,18 @@ from joblib import Parallel, delayed
 import settings
 
 
+def parse_data(number_of_features: int, path: str) -> pd.DataFrame:
+    data = pd.read_csv(path)
+    # indices = [0]
+    # random_numbers = range(70, 120, 1)
+    # indices.extend(random_numbers)
+    # print(indices)
+    # data = data.iloc[:, indices]
+    # data = data.iloc[:, :number_of_features]
+    print(data.shape)
+    return data
+
+
 def yeo_johnson_transform_test_train_splits(
     num_inner_folds: int,
     data_df: pd.DataFrame,
