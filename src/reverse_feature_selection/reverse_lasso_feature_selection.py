@@ -8,7 +8,7 @@ import settings
 import celer
 
 #
-import study_pruner
+import optuna_study_pruner
 
 
 def calculate_adjusted_r2(y, predicted_y, number_of_coefficients):
@@ -176,9 +176,18 @@ def optimize(
     """Optimize regularization parameter alpha for lasso regression."""
 
     def optuna_objective(trial):
-        study_pruner.study_no_trial_completed_pruner(trial, warm_up_steps=10)
-        # study_pruner.study_no_improvement_pruner(trial, epsilon=0.001, warm_up_steps=10,
-        # number_of_similar_best_values = 5)
+        optuna_study_pruner.study_no_trial_completed_pruner(trial, warm_up_steps=20)
+        optuna_study_pruner.study_no_improvement_pruner(
+            trial,
+            epsilon=0.001,
+            warm_up_steps=20,
+            number_of_similar_best_values=5,
+            threshold=0.1,
+        )
+
+        optuna_study_pruner.insufficient_results_study_pruner(
+            trial, warm_up_steps=20, threshold=0.05
+        )
 
         return calculate_r2_adjusted(
             alpha=trial.suggest_discrete_uniform("alpha", 0.001, 2.0, 0.001),
@@ -198,12 +207,13 @@ def optimize(
         # storage = "sqlite:///optuna_test.db",
         # load_if_exists = True,
         study_name=f"{target_feature_name}_iteration_{outer_cv_loop}",
-        direction="maximize",  # The higher the corrected R², the better the model fits the data.
+        direction="maximize",
+        # The higher the corrected R², the better the model fits the data.
         sampler=TPESampler(
             n_startup_trials=3,
         ),
     )
-    optuna.logging.set_verbosity(optuna.logging.ERROR)
+    # optuna.logging.set_verbosity(optuna.logging.ERROR)
     study.optimize(
         optuna_objective,
         # n_trials = 40,
@@ -244,7 +254,6 @@ def optimize(
 
 
 def select_features(transformed_test_train_splits_dict, outer_cv_loop_iteration):
-
     # calculate relevance for each feature
     deselected_features_list = []
     selected_features_dict = {}
