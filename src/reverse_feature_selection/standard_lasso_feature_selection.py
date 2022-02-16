@@ -12,7 +12,7 @@ import shap
 import numpy as np
 from sklearn.metrics import r2_score
 import settings
-import study_pruner
+import optuna_study_pruner
 
 
 def calculate_adjusted_r2(y, predicted_y, number_of_coefficients):
@@ -58,12 +58,11 @@ def select_features(
     def optuna_objective(trial):
         """Optimize regularization parameter alpha for lasso regression."""
 
-        # study_pruner.study_patience_pruner(
-        #     trial, epsilon=0.0005, warm_up_steps=10, patience=10
-        # )
-        # # if "random" in target_feature_name or "pseudo" in target_feature_name:
-        # #     trial.study.stop()
-        #
+        if optuna_study_pruner.study_patience_pruner(
+            trial, epsilon=0.0005, warm_up_steps=20, patience=5
+        ):
+            print("study stopped")
+
         # # pruning of complete study
         # if trial.number >= settings.PATIENCE_BEFORE_PRUNING_OF_STUDY:
         #     try:
@@ -144,6 +143,8 @@ def select_features(
             cumulated_shap_values = np.stack(np.abs(shap_values.values), axis=0)
             all_shap_values.append(cumulated_shap_values)
             sum_of_all_shap_values.append(np.sum(cumulated_shap_values, axis=0))
+            # TODO count selection for each feature per fold/ per fold and
+            #   sample (Robustness)
 
             # TODO unterschied coeff zu stacked SHAP
 
