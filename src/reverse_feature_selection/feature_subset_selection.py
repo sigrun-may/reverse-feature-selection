@@ -1,7 +1,7 @@
 import joblib
 import pandas as pd
 from joblib import Parallel, delayed
-from sklearn.model_selection import LeaveOneOut
+from sklearn.model_selection import LeaveOneOut, StratifiedKFold
 
 import settings
 from preprocessing import yeo_johnson_transform_test_train_splits
@@ -13,20 +13,26 @@ from src.reverse_feature_selection import (
 
 
 def select_feature_subset(
-    data: pd.DataFrame, train_indices, test_indices, outer_cv_loop_iteration: int
+    data: pd.DataFrame,
+    remaining_data_indices,
+    test_indices,
+    outer_cv_loop_iteration: int,
 ):
     print(
         "iteration: ",
         outer_cv_loop_iteration,
         " #############################################################",
     )
-    # load or generate transformed and standardized train test splits with respective train correlation matrix
+    # TODO load or generate transformed and standardized train test splits
+    #  with respective train correlation matrix
     transformed_data_path_iteration = (
         f"{settings.DIRECTORY_FOR_PICKLED_FILES}/{settings.EXPERIMENT_NAME}/"
         f"transformed_test_train_splits_dict_{outer_cv_loop_iteration}.pkl"
     )
     preprocessed_data_dict = yeo_johnson_transform_test_train_splits(
-        settings.N_FOLDS_INNER_CV, data.iloc[train_indices, :], None
+        data_df=data.iloc[remaining_data_indices, :],
+        num_inner_folds=settings.N_FOLDS_INNER_CV,
+        path=None,
     )
 
     selected_feature_subset = {
@@ -50,7 +56,7 @@ def select_feature_subset(
     #     r.append(selected_features)
     #     validation_metrics_dict[selection_method] = r
 
-    return selected_feature_subset, test_indices, train_indices
+    return selected_feature_subset, test_indices, remaining_data_indices
 
 
 # @Memory(settings.RESULT_DIRECTORY, verbose=5)
@@ -58,7 +64,7 @@ def select_feature_subset(
 #     return parallel_feature_subset_selection(data_df)
 
 
-def load_or_generate_feature_subsets_old(data_df):
+def load_or_generate_feature_subsets(data_df):
     try:
         return joblib.load(settings.PATH_TO_RESULT)
     except:  # noqa
@@ -67,8 +73,10 @@ def load_or_generate_feature_subsets_old(data_df):
 
 def parallel_feature_subset_selection(data_df):
     # outer cross-validation to validate selected feature subsets
-    # fold_splitter = StratifiedKFold(n_splits=settings.N_FOLDS_OUTER_CV)
-    fold_splitter = LeaveOneOut()
+    fold_splitter = StratifiedKFold(
+        n_splits=settings.N_FOLDS_OUTER_CV, shuffle=True, random_state=42
+    )
+    # fold_splitter = LeaveOneOut()
     selected_subsets = Parallel(n_jobs=settings.N_JOBS, verbose=5)(
         delayed(select_feature_subset)(
             data_df,
