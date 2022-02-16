@@ -1,6 +1,6 @@
 from typing import Tuple, Dict, List, Union, Optional
 
-from sklearn.model_selection import KFold
+from sklearn.model_selection import KFold, StratifiedKFold
 from sklearn.preprocessing import PowerTransformer, StandardScaler
 import numpy as np
 import pandas as pd
@@ -16,36 +16,39 @@ def parse_data(number_of_features: int, path: str) -> pd.DataFrame:
     # indices.extend(random_numbers)
     # print(indices)
     # data = data.iloc[:, indices]
-    # data = data.iloc[:, :number_of_features]
+    data = data.iloc[:, :number_of_features]
     print(data.shape)
     return data
 
 
 def yeo_johnson_transform_test_train_splits(
-    num_inner_folds: int,
     data_df: pd.DataFrame,
-    path: Optional[str],
+    num_inner_folds: int = settings.N_FOLDS_INNER_CV,
+    path: Optional[str] = settings.PICKLED_FILES_PATH,
 ) -> Dict[str, List[Union[Tuple[np.array], str]]]:
     """
     Do test and train splits and transform (Yeo Johnson) them.
 
-    :param num_inner_folds: number of inner cross-validation folds
     :param data_df: original data
-    :param path: path to pickle transformed data
+    :param num_inner_folds: number of inner cross-validation folds
+    :param path: path to directory to pickle transformed data
     :return: the transformed data in selected_feature_subset_list dict with transformed test/train set for each sample and the column names
     """
 
-    k_fold = KFold(n_splits=num_inner_folds, shuffle=True, random_state=42)
+    # k_fold = KFold(n_splits=num_inner_folds, shuffle=True, random_state=42)
+    k_fold = StratifiedKFold(n_splits=num_inner_folds, shuffle=True, random_state=42)
     transformed_data = Parallel(n_jobs=settings.N_JOBS_PREPROCESSING, verbose=5)(
         delayed(transform_train_test_set)(train_index, test_index, data_df)
-        for sample_index, (train_index, test_index) in enumerate(k_fold.split(data_df))
+        for sample_index, (train_index, test_index) in enumerate(
+            k_fold.split(data_df.iloc[:, 1:], data_df["label"])
+        )
     )
     assert len(transformed_data) == settings.N_FOLDS_INNER_CV
 
     if path is not None:
         joblib.dump(
             {"transformed_data": transformed_data, "feature_names": data_df.columns},
-            path,
+            path + "/preprocessed_data.pkl",
         )
 
     return {"transformed_data": transformed_data, "feature_names": data_df.columns}
@@ -92,22 +95,22 @@ def get_cluster_dict(correlation_matrix, threshold, path):
             correlated_feature_names = _get_correlated_features(
                 target_feature_name, updated_correlation_matrix, threshold
             )
-        else:
-            continue
-        if len(correlated_feature_names) > 1:  # more than the initial feature?
-            clusters_list.append(correlated_feature_names)
+            if len(correlated_feature_names) > 1:  # more than the initial feature?
+                clusters_list.append(correlated_feature_names)
 
-            # remove features already assigned to another cluster from updated correlation matrix
-            updated_correlation_matrix.drop(
-                labels=correlated_feature_names, inplace=True
-            )
-            updated_correlation_matrix.drop(
-                labels=correlated_feature_names, axis=1, inplace=True
-            )
-            assert (
-                updated_correlation_matrix.shape[0]
-                == updated_correlation_matrix.shape[1]
-            )
+                # TODO else append to correlated features
+
+                # remove features already assigned to another cluster from updated correlation matrix
+                updated_correlation_matrix.drop(
+                    labels=correlated_feature_names, inplace=True
+                )
+                updated_correlation_matrix.drop(
+                    labels=correlated_feature_names, axis=1, inplace=True
+                )
+                assert (
+                    updated_correlation_matrix.shape[0]
+                    == updated_correlation_matrix.shape[1]
+                )
 
     # find cluster representatives:
     # the cluster member with the absolute highest correlation to all other cluster features
@@ -167,7 +170,7 @@ def cluster_data(data_df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, List[st
     for key, values in cluster_dict.items():
         # TODO dict ggf anders speichern: cluster and uncorrelated features
         if "uncorrelated_features" not in key:
-            clustered_data_df.insert(0, "cluster_" + key, data_df[key])
+            clustered_data_df.insert(0, f"cluster_{key}", data_df[key])
 
     clustered_data_df.insert(0, "label", data_df["label"])
 
