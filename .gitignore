@@ -1,3 +1,9 @@
+# own changes
+.idea/
+data/
+pickled_files/
+results/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
