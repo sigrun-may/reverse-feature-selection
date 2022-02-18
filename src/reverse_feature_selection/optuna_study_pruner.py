@@ -111,5 +111,5 @@ def study_no_improvement_pruner(
                 )
                 print(evaluation_metrics_of_completed_trials)
                 print(trial.number)
-                # trial.study.stop()
-                # raise optuna.TrialPruned()
+                trial.study.stop()
+                raise optuna.TrialPruned()

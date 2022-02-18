@@ -50,34 +50,35 @@ def calculate_r2_adjusted(
     # cross validation for the optimization of alpha
     for test, train, train_correlation_matrix_complete in transformed_data:
 
-        # remove irrelevant features from train_correlation_matrix
-        train_correlation_matrix = train_correlation_matrix_complete.drop(
-            labels=deselected_features,
-            axis=0,
-            inplace=False,
-        )
-        train_correlation_matrix.drop(
-            labels=deselected_features,
-            axis=1,
-            inplace=True,
-        )
-        assert (
-            train_correlation_matrix_complete.shape[1] - len(deselected_features)
-            == train_correlation_matrix.shape[1]
-        )
-        assert (
-            train_correlation_matrix_complete.shape[0] - len(deselected_features)
-            == train_correlation_matrix.shape[0]
-        )
-
-        # remove irrelevant features from test and train data
+        train_correlation_matrix = train_correlation_matrix_complete
+        # # remove irrelevant features from train_correlation_matrix
+        # train_correlation_matrix = train_correlation_matrix_complete.drop(
+        #     labels=deselected_features,
+        #     axis=0,
+        #     inplace=False,
+        # )
+        # train_correlation_matrix.drop(
+        #     labels=deselected_features,
+        #     axis=1,
+        #     inplace=True,
+        # )
+        # assert (
+        #     train_correlation_matrix_complete.shape[1] - len(deselected_features)
+        #     == train_correlation_matrix.shape[1]
+        # )
+        # assert (
+        #     train_correlation_matrix_complete.shape[0] - len(deselected_features)
+        #     == train_correlation_matrix.shape[0]
+        # )
+        #
+        # # remove irrelevant features from test and train data
         train_data_df = pd.DataFrame(train, columns=feature_names)
-        train_data_df.drop(columns=deselected_features, inplace=True)
-        assert train_data_df.shape[1] == train.shape[1] - len(deselected_features)
-
+        # train_data_df.drop(columns=deselected_features, inplace=True)
+        # assert train_data_df.shape[1] == train.shape[1] - len(deselected_features)
+        #
         test_data_df = pd.DataFrame(test, columns=feature_names)
-        test_data_df.drop(columns=deselected_features, inplace=True)
-        assert test_data_df.shape[1] == test.shape[1] - len(deselected_features)
+        # test_data_df.drop(columns=deselected_features, inplace=True)
+        # assert test_data_df.shape[1] == test.shape[1] - len(deselected_features)
 
         # How Correlations Influence Lasso Prediction, April 2012IEEE Transactions on Information Theory 59(3)
         # DOI: 10.1109/TIT.2012.2227680
@@ -112,13 +113,17 @@ def calculate_r2_adjusted(
         # remove features correlated to the target_feature from test/ train data and the label if it is not included
         train_data_df.drop(columns=correlated_features, inplace=True)
         test_data_df.drop(columns=correlated_features, inplace=True)
-        assert train_data_df.shape[1] == train.shape[1] - len(
-            deselected_features
-        ) - len(correlated_features)
+        # assert train_data_df.shape[1] == train.shape[1] - len(
+        #     deselected_features
+        # ) - len(correlated_features)
+        #
+        # assert test_data_df.shape[1] == test.shape[1] - len(deselected_features) - len(
+        #     correlated_features
+        # )
 
-        assert test_data_df.shape[1] == test.shape[1] - len(deselected_features) - len(
-            correlated_features
-        )
+        assert train_data_df.shape[1] == train.shape[1] - len(correlated_features)
+
+        assert test_data_df.shape[1] == test.shape[1] - len(correlated_features)
 
         # prepare train/ test data
         y_train = train_data_df[target_feature_name].values.reshape(-1, 1)
@@ -180,17 +185,17 @@ def optimize(
         optuna_study_pruner.study_no_improvement_pruner(
             trial,
             epsilon=0.001,
-            warm_up_steps=20,
+            warm_up_steps=30,
             number_of_similar_best_values=5,
             threshold=0.1,
         )
 
         optuna_study_pruner.insufficient_results_study_pruner(
-            trial, warm_up_steps=20, threshold=0.05
+            trial, warm_up_steps=30, threshold=0.05
         )
 
         return calculate_r2_adjusted(
-            alpha=trial.suggest_discrete_uniform("alpha", 0.001, 2.0, 0.001),
+            alpha=trial.suggest_discrete_uniform("alpha", 0.001, 1.0, 0.001),
             target_feature_name=target_feature_name,
             deselected_features=deselected_features,
             data_dict=transformed_test_train_splits_dict,

@@ -58,10 +58,18 @@ def select_features(
     def optuna_objective(trial):
         """Optimize regularization parameter alpha for lasso regression."""
 
-        if optuna_study_pruner.study_patience_pruner(
-            trial, epsilon=0.0005, warm_up_steps=20, patience=5
-        ):
-            print("study stopped")
+        # if optuna_study_pruner.study_patience_pruner(
+        #     trial, epsilon=0.001, warm_up_steps=20, patience=5
+        # ) or optuna_study_pruner.study_no_improvement_pruner(
+        #     trial,
+        #     epsilon=0.01,
+        #     warm_up_steps=30,
+        #     number_of_similar_best_values=5,
+        #     threshold=0.1,
+        # ):
+        #     print("study stopped")
+        #     trial.study.stop()
+        #     raise TrialPruned()
 
         # # pruning of complete study
         # if trial.number >= settings.PATIENCE_BEFORE_PRUNING_OF_STUDY:
@@ -122,7 +130,9 @@ def select_features(
 
             # build LASSO model
             lasso = celer.Lasso(
-                alpha=trial.suggest_loguniform("alpha", 0.01, 5.0),
+                #alpha=trial.suggest_loguniform("alpha", 0.01, 5.0),
+                alpha=trial.suggest_discrete_uniform("alpha", 0.001, 1.0,
+                                                     0.001),
                 verbose=0,
             )
             lasso.fit(x_train, y_train)

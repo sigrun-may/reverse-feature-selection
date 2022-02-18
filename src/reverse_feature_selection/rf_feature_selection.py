@@ -10,6 +10,7 @@ import shap
 from scipy.stats import trim_mean
 import cv_pruner
 from cv_pruner import Method
+import optuna_study_pruner
 
 import settings
 
@@ -18,6 +19,19 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop):
     """Optimize regularization parameter alpha for lasso regression."""
 
     def optuna_objective(trial):
+
+        # if optuna_study_pruner.study_patience_pruner(
+        #     trial, epsilon=0.001, warm_up_steps=20, patience=5
+        # ) or optuna_study_pruner.study_no_improvement_pruner(
+        #     trial,
+        #     epsilon=0.01,
+        #     warm_up_steps=30,
+        #     number_of_similar_best_values=5,
+        #     threshold=0.1,
+        # ):
+        #     print("study stopped")
+        #     trial.study.stop()
+        #     raise TrialPruned()
 
         # if "random" in target_feature_name or "pseudo" in target_feature_name:
         #     trial.study.stop()

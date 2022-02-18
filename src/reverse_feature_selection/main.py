@@ -54,5 +54,5 @@ if __name__ == "__main__":
         feature_selection_result_dict,
         test_train_indices_list,
         clustered_data_df,
-        k_neighbors=7,
+        k_neighbors=19,
     )

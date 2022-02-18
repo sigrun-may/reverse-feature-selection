@@ -62,12 +62,29 @@ def transform_train_test_set(train_index, test_index, data_df):
     unlabeled_data = data_df.values[:, 1:]
     label = data_df.values[:, 0]
 
+    # # workaround for https://github.com/scikit-learn/scikit-learn/issues/14959
+    # scaler = StandardScaler(with_std=False)
+    # scaled_train = scaler.fit_transform(unlabeled_data[train_index])
+    # scaled_test = scaler.transform(unlabeled_data[test_index])
+    #
+    # # transform and standardize test and train data
+    # power_transformer = PowerTransformer(
+    #     copy=True, method="yeo-johnson", standardize=True
+    # )
+    # train = power_transformer.fit_transform(scaled_train)
+    # test = power_transformer.transform(scaled_test)
+
     # transform and standardize test and train data
-    power_transformer = PowerTransformer(
-        copy=True, method="yeo-johnson", standardize=True
-    )
+    power_transformer = PowerTransformer(copy=True, method="box-cox", standardize=True)
     train = power_transformer.fit_transform(unlabeled_data[train_index])
     test = power_transformer.transform(unlabeled_data[test_index])
+
+    # # transform and standardize test and train data
+    # power_transformer = PowerTransformer(
+    #     copy=True, method="yeo-johnson", standardize=True
+    # )
+    # train = power_transformer.fit_transform(unlabeled_data[train_index])
+    # test = power_transformer.transform(unlabeled_data[test_index])
 
     assert test.shape == (len(test_index), unlabeled_data.shape[1])
     assert train.shape == (len(train_index), unlabeled_data.shape[1])

@@ -41,7 +41,7 @@ def _calculate_weights_for_reverse_lasso(
 
     for feature_subset in selected_feature_subsets:
         subset = {}
-        for feature, (r2_unlabeled, r2, label_coefficients) in feature_subset.items():
+        for feature, (r2_unlabeled, r2) in feature_subset.items():
             # TODO minimize and maximize unterscheiden
             # difference = r2 - r2_unlabeled
             # if difference > delta:
@@ -75,6 +75,7 @@ def classify_feature_subsets(
         test_indices,
         train_indices,
     ) in enumerate(test_train_indices_list):
+        assert len(test_indices) + len(train_indices) == data_df.shape[0]
         results.append(
             weighted_knn.validate(
                 data_df.iloc[test_indices, :],
@@ -130,58 +131,26 @@ def evaluate_feature_selection_methods(
     ) in feature_selection_result_dict.items():
         print("##############################", feature_selection_method, ": ")
         if feature_selection_method == "reverse_lasso":
-            # # optimize distance between the performance evaluation metrics of the selected features
-            # result_per_difference_dict = {}
-            # min_difference_delta_factor = list(
-            #     zip(
-            #         (np.asarray(range(1, 7, 1)) / 10),
-            #         np.ones_like(np.asarray(range(1, 7, 1))),
-            #     )
-            # )
-            # for delta, factor in min_difference_delta_factor:
-            #     reverse_selected_feature_subsets = _calculate_weights_for_reverse_lasso(
-            #         selected_feature_subsets, delta, factor
-            #     )
-            #     result_per_difference_dict[delta] = evaluate_selected_subsets(
-            #         data_df,
-            #         reverse_selected_feature_subsets,
-            #         test_train_indices_list,
-            #         k_neighbors,
-            #     )
-            # metrics_per_method_dict[
-            #     feature_selection_method
-            # ] = result_per_difference_dict
-
             selected_feature_subsets = _calculate_weights_for_reverse_lasso(
-                selected_feature_subsets, delta=0.1, factor=1.5
+                selected_feature_subsets, delta=0.0, factor=1
             )
-
-            # metrics_dict = evaluate_selected_subsets(
-            #     data_df, selected_feature_subsets_rev, test_train_indices_list,
-            #     k_neighbors
-            # )
-            # metrics_per_method_dict[feature_selection_method] = metrics_dict
-
-            # metrics_dict = evaluate_selected_subsets(
-            #     data_df,
-            #     _calculate_weights_for_reverse_lasso(selected_feature_subsets),
-            #     test_train_indices_list,
-            #     k_neighbors,
-            # )
-            # metrics_per_method_dict[feature_selection_method] = metrics_dict
-            # evaluate_selected_features(selected_feature_subsets)
-
-        # else:
-        metrics_dict = evaluate_selected_subsets(
-            data_df, selected_feature_subsets, test_train_indices_list, k_neighbors
+        # calculate performance evaluation metrics
+        predicted_classes, true_classes = classify_feature_subsets(
+            k_neighbors, test_train_indices_list, selected_feature_subsets, data_df
         )
-        metrics_per_method_dict[feature_selection_method] = metrics_dict
+        metrics_per_method_dict[feature_selection_method] = calculate_metrics(
+            predicted_classes, true_classes
+        )
 
-        union, intersect = evaluate_selected_features(selected_feature_subsets)
+        # evaluate robustness
+        evaluate_selected_features(selected_feature_subsets)
+
+        # rank selected features
         print(neue_methode(selected_feature_subsets))
-        feature_importance_robustness_dict = neue_methode(
-            selected_feature_subsets)
-        feature_importance_list = [(k, v) for k, v in feature_importance_robustness_dict.items()]
+        feature_importance_robustness_dict = neue_methode(selected_feature_subsets)
+        feature_importance_list = [
+            (k, v) for k, v in feature_importance_robustness_dict.items()
+        ]
 
         # getting length of list of tuples
         lst = len(feature_importance_list)
@@ -192,7 +161,6 @@ def evaluate_feature_selection_methods(
                     feature_importance_list[j] = feature_importance_list[j + 1]
                     feature_importance_list[j + 1] = temp
         print(feature_importance_list)
-        # print(feature_importance_list.sort(key = lambda x: x[1]))
 
     return metrics_per_method_dict
 
@@ -227,3 +195,7 @@ def evaluate_selected_subsets(
         k_neighbors, test_train_indices_list, selected_feature_subsets, data_df
     )
     return calculate_metrics(predicted_classes, true_classes)
+
+
+def evaluate_feature_selection_method():
+    return
