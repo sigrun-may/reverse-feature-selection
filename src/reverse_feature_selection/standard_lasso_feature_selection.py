@@ -130,9 +130,8 @@ def select_features(
 
             # build LASSO model
             lasso = celer.Lasso(
-                #alpha=trial.suggest_loguniform("alpha", 0.01, 5.0),
-                alpha=trial.suggest_discrete_uniform("alpha", 0.001, 1.0,
-                                                     0.001),
+                # alpha=trial.suggest_loguniform("alpha", 0.01, 5.0),
+                alpha=trial.suggest_discrete_uniform("alpha", 0.001, 1.0, 0.001),
                 verbose=0,
             )
             lasso.fit(x_train, y_train)

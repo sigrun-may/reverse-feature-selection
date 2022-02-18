@@ -47,6 +47,7 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop):
         validation_metric_history = []
         all_shap_values = []
         sum_of_all_shap_values = []
+        used_features_list = []
 
         feature_names = transformed_test_train_splits_dict["feature_names"].values
         transformed_data = transformed_test_train_splits_dict["transformed_data"]
@@ -125,9 +126,14 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop):
             explainer = shap.TreeExplainer(model)
             shap_values = explainer(x_train)
             raw_shap_values = np.abs(shap_values.values)[:, :, 0]
-            # cumulated_shap_values = np.stack(raw_shap_values, axis=0)
-            # all_shap_values.append(cumulated_shap_values)
-            sum_of_all_shap_values.append(np.sum(raw_shap_values, axis=0))
+            cumulated_shap_values = np.sum(raw_shap_values, axis=0)
+
+            # monitor robustness of selection
+            used_features = np.zeros_like(cumulated_shap_values)
+            used_features[cumulated_shap_values.nonzero()] = 1
+            used_features_list.append(used_features)
+
+            sum_of_all_shap_values.append(cumulated_shap_values)
 
         feature_idx = np.sum(np.array(sum_of_all_shap_values), axis=0)
         unlabeled_feature_names = feature_names[1:]
@@ -135,8 +141,14 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop):
         nonzero_shap_values = feature_idx[feature_idx.nonzero()]
         assert len(selected_features) == feature_idx.nonzero()[0].size
 
+        robustness_array = np.sum(np.array(used_features_list), axis = 0)
+        feature_robustness = robustness_array[robustness_array.nonzero()]
+        assert feature_robustness.shape == nonzero_shap_values.shape == \
+               selected_features.shape
+
         trial.set_user_attr("shap_values", nonzero_shap_values)
         trial.set_user_attr("selected_features", selected_features)
+        trial.set_user_attr("robustness", feature_robustness)
         return trim_mean(validation_metric_history, proportiontocut=0.2)
 
     # try:
@@ -176,7 +188,8 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop):
         return dict(
             zip(
                 study.best_trial.user_attrs["selected_features"],
-                study.best_trial.user_attrs["shap_values"],
+                zip(study.best_trial.user_attrs["shap_values"],
+                study.best_trial.user_attrs["robustness"])
             )
         )
     except:

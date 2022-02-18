@@ -3,10 +3,10 @@ from typing import Dict, Tuple
 
 import numpy as np
 import pandas as pd
-from sklearn.utils.multiclass import unique_labels
-from sklearn.preprocessing import PowerTransformer, minmax_scale
-from sklearn.metrics.pairwise import manhattan_distances
-
+from sklearn.preprocessing import PowerTransformer
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import log_loss
+from weighted_manhattan_distance import WeightedManhattanDistance
 
 import warnings
 
@@ -48,8 +48,6 @@ def validate(
     )
     assert scaled_train_data.shape[0] == train_data.shape[0]
 
-    # man = manhattan_distances(scaled_test_data, scaled_train_data, sum_over_features = False)
-
     weights = np.asarray(
         [
             selected_feature_subset[selected_feature]
@@ -58,6 +56,14 @@ def validate(
     )
     assert type(weights) == np.ndarray, type(weights)
     assert type(weights[0]) == np.float64, weights
+
+    knn_clf = KNeighborsClassifier(
+        n_neighbors=number_of_neighbors,
+        weights="distance",
+        metric=WeightedManhattanDistance(weights=weights),
+    )
+
+    knn_clf.fit(scaled_train_data, train["label"])
 
     classified_classes = []
     for i in range(scaled_test_data.shape[0]):
@@ -126,22 +132,12 @@ def validate(
 def validate_standard(
     test: pd.DataFrame,
     train: pd.DataFrame,
-    # selected_feature_subset,
     selected_feature_subset: Dict[str, float],
     number_of_neighbors: int,
 ) -> Tuple[list[int], list[int]]:
 
-    # test_data = test[selected_feature_subset.keys()].values
-    # train_data = train[selected_feature_subset.keys()].values
-    # assert test_data.size == len(selected_feature_subset.keys())
-
     test_data = test[selected_feature_subset]
     train_data = train[selected_feature_subset]
-    # assert test_data.size == len(selected_feature_subset)
-
-    # only use the labels that appear in the data
-    list_of_classes = np.unique(train["label"])
-    # number_of_samples = train_data.shape[0]
 
     # z transform to compare the distances
     powerTransformer = PowerTransformer(
@@ -167,40 +163,23 @@ def validate_standard(
     assert type(weights) == np.ndarray, type(weights)
     assert type(weights[0]) == np.float64, weights
 
-    classified_classes = []
-    for scaled_test_sample in scaled_test_data:
-        assert scaled_test_sample.size == scaled_test_data.shape[1]
-        # assert np.array_equal(scaled_test_sample, scaled_test_data[0, :])
-        labeled_distances_list = _get_distances(
-            scaled_test_sample, scaled_train_data, train["label"], weights
-        )
-        classified_classes.append(
-            _classify(labeled_distances_list, number_of_neighbors, list_of_classes)
-        )
-
-        # TODO return only classified classes to print or plot results?
-    assert len(classified_classes) == scaled_test_data.shape[0]
-    true_classes = list(test["label"])
-    return classified_classes, true_classes
-
-
-def _classify(labeled_distances_list, number_of_neighbors, list_of_classes):
-    ascending_labeled_distances_list = sort_list_of_tuples_by_first_value(
-        labeled_distances_list
+    knn_clf = KNeighborsClassifier(
+        n_neighbors=number_of_neighbors,
+        weights="distance",
+        metric=WeightedManhattanDistance(weights=weights),
+        algorithm="brute",
     )
-    nearest_neighbors = ascending_labeled_distances_list[:number_of_neighbors]
+    knn_clf.fit(scaled_train_data, train["label"])
+    # print(knn_clf.predict_proba(scaled_test_data))
+    # print(knn_clf.predict(scaled_test_data))
 
-    classes = []
-    for label, distance in nearest_neighbors:
-        classes.append(label)
+    classified_classes = knn_clf.predict(scaled_test_data)
+    class_probabilities = knn_clf.predict_proba(scaled_test_data)
+    true_classes = list(test["label"])
+    print(log_loss(true_classes, class_probabilities))
 
-    class_counts = []
-    for class_label in list_of_classes:
-        class_counts.append(sum(x == class_label for x in classes))
-
-    max_index = np.argmax(class_counts)
-    predicted_class = list_of_classes[max_index]
-    return predicted_class
+    assert len(classified_classes) == scaled_test_data.shape[0]
+    return classified_classes, true_classes
 
 
 def sort_list_of_tuples_by_first_value(list_to_be_sorted):
@@ -213,19 +192,3 @@ def sort_list_of_tuples_by_first_value(list_to_be_sorted):
                 list_to_be_sorted[j] = list_to_be_sorted[j + 1]
                 list_to_be_sorted[j + 1] = temp
     return list_to_be_sorted
-
-
-def _get_distances(scaled_test_sample, scaled_train_data, train_labels, weights):
-    assert scaled_test_sample.size == weights.size
-
-    labeled_weighted_distances = []
-    for scaled_train_sample, label in zip(scaled_train_data, train_labels):
-        assert scaled_test_sample.shape == scaled_train_sample.shape
-        # calculate weighted manhattan distance
-        distances = np.abs(scaled_train_sample - scaled_test_sample)
-        weighted_distances = distances * weights
-        distance = np.sum(weighted_distances)
-
-        labeled_weighted_distances.append((label, distance))
-    assert len(labeled_weighted_distances) == scaled_train_data.shape[0]
-    return labeled_weighted_distances

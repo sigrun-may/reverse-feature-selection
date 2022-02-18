@@ -77,7 +77,7 @@ def classify_feature_subsets(
     ) in enumerate(test_train_indices_list):
         assert len(test_indices) + len(train_indices) == data_df.shape[0]
         results.append(
-            weighted_knn.validate(
+            weighted_knn.validate_standard(
                 data_df.iloc[test_indices, :],
                 data_df.iloc[train_indices, :],
                 # intersect,
@@ -132,7 +132,7 @@ def evaluate_feature_selection_methods(
         print("##############################", feature_selection_method, ": ")
         if feature_selection_method == "reverse_lasso":
             selected_feature_subsets = _calculate_weights_for_reverse_lasso(
-                selected_feature_subsets, delta=0.0, factor=1
+                selected_feature_subsets, delta=0.15, factor=1
             )
         # calculate performance evaluation metrics
         predicted_classes, true_classes = classify_feature_subsets(
