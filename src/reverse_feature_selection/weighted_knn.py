@@ -1,5 +1,5 @@
 # coding: utf-8
-from typing import Dict
+from typing import Dict, Tuple
 
 import numpy as np
 import pandas as pd
@@ -16,22 +16,22 @@ warnings.filterwarnings("ignore")
 def validate(
     test: pd.DataFrame,
     train: pd.DataFrame,
-    selected_feature_subset,
-    # selected_feature_subset: Dict[str, float],
+    # selected_feature_subset,
+    selected_feature_subset: Dict[str, float],
     number_of_neighbors: int,
-) -> list[int]:
+) -> Tuple[list[int], list[int]]:
 
     # test_data = test[selected_feature_subset.keys()].values
     # train_data = train[selected_feature_subset.keys()].values
     # assert test_data.size == len(selected_feature_subset.keys())
 
-    test_data = test[selected_feature_subset].values
-    train_data = train[selected_feature_subset].values
+    test_data = test[selected_feature_subset]
+    train_data = train[selected_feature_subset]
     # assert test_data.size == len(selected_feature_subset)
 
     # only use the labels that appear in the data
     list_of_classes = np.unique(train["label"])
-    number_of_samples = train_data.shape[0]
+    # number_of_samples = train_data.shape[0]
 
     # z transform to compare the distances
     powerTransformer = PowerTransformer(
@@ -50,21 +50,26 @@ def validate(
 
     # man = manhattan_distances(scaled_test_data, scaled_train_data, sum_over_features = False)
 
+    weights = np.asarray(
+        [
+            selected_feature_subset[selected_feature]
+            for selected_feature in train_data.columns
+        ]
+    )
+    assert type(weights) == np.ndarray, type(weights)
+    assert type(weights[0]) == np.float64, weights
+
     classified_classes = []
     for i in range(scaled_test_data.shape[0]):
         test_sample = scaled_test_data[i, :]
 
         distance_to_each_class = []
         for class_number in list_of_classes:
-            all_sample_indices_from_class = train["label"].to_numpy() == class_number
-            all_samples_from_current_class = scaled_train_data[
-                all_sample_indices_from_class
-            ]
+            class_sample_mask = train["label"].to_numpy() == class_number
+            class_samples = scaled_train_data[class_sample_mask]
 
             weighted_distances = []
-            weights = np.asarray(list(selected_feature_subset.values()))
-            weights = minmax_scale(weights) + 1
-            for class_sample in all_samples_from_current_class:
+            for class_sample in class_samples:
                 # calculate weighted manhattan distance
                 weighted_distance = 0
                 for j in range(class_sample.size):
@@ -78,7 +83,7 @@ def validate(
                 # assert man == absolute_distance
                 # # weights = minmax_scale(weights)
                 # weighted_distance = absolute_distance  # * weights
-                weighted_distances.append(np.sum(weighted_distance))
+                weighted_distances.append(weighted_distance)
                 # weighted_distances.append(np.sum(np.absolute(class_sample - test_sample) * weights))
 
             nearest_neighbors = []

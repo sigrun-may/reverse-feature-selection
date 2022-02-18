@@ -42,7 +42,7 @@ if __name__ == "__main__":
     # clustered_data_df2, cluster_dict2 = cluster_data(clustered_data_df)
     # print("cluster shape 2", clustered_data_df2.shape)
 
-    # select feature subset
+    # select feature subsets
     feature_selection_result = load_or_generate_feature_subsets(clustered_data_df)
     (
         feature_selection_result_dict,

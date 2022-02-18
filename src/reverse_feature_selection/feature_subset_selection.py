@@ -1,3 +1,5 @@
+from typing import List, Tuple
+
 import joblib
 import pandas as pd
 from joblib import Parallel, delayed
@@ -23,6 +25,8 @@ def select_feature_subset(
         outer_cv_loop_iteration,
         " #############################################################",
     )
+    print("Type", type(test_indices))
+
     # TODO load or generate transformed and standardized train test splits
     #  with respective train correlation matrix
     transformed_data_path_iteration = (
@@ -71,13 +75,13 @@ def load_or_generate_feature_subsets(data_df):
         return parallel_feature_subset_selection(data_df)
 
 
-def parallel_feature_subset_selection(data_df):
+def parallel_feature_subset_selection(data_df) -> List[Tuple]:
     # outer cross-validation to validate selected feature subsets
     fold_splitter = StratifiedKFold(
         n_splits=settings.N_FOLDS_OUTER_CV, shuffle=True, random_state=42
     )
     # fold_splitter = LeaveOneOut()
-    selected_subsets = Parallel(n_jobs=settings.N_JOBS, verbose=5)(
+    selected_subsets_and_indices = Parallel(n_jobs=settings.N_JOBS, verbose=5)(
         delayed(select_feature_subset)(
             data_df,
             train_indices,
@@ -89,5 +93,7 @@ def parallel_feature_subset_selection(data_df):
         )
     )
     # if settings.SAVE_RESULT:
-    joblib.dump(selected_subsets, settings.PATH_TO_RESULT, compress=("gzip", 3))
-    return selected_subsets
+    joblib.dump(
+        selected_subsets_and_indices, settings.PATH_TO_RESULT, compress=("gzip", 3)
+    )
+    return selected_subsets_and_indices

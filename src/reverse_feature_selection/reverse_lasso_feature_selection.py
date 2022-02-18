@@ -276,8 +276,10 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop_iteration)
             selected_features_dict[target_feature_name] = (
                 r2_adjusted_unlabeled,
                 r2_adjusted,
-                label_coefficients_list,
             )
+            # selected_features_dict[target_feature_name] = (
+            #     r2_adjusted - r2_adjusted_unlabeled
+            # )
         else:
             # exclude irrelevant feature from training data
             deselected_features_list.append(target_feature_name)
