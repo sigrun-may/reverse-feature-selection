@@ -156,12 +156,12 @@ def validate_standard(
 
     weights = np.asarray(
         [
-            selected_feature_subset[selected_feature]
+            selected_feature_subset[selected_feature][0]
             for selected_feature in train_data.columns
         ]
     )
     assert type(weights) == np.ndarray, type(weights)
-    assert type(weights[0]) == np.float64, weights
+    # assert type(weights[0]) == np.float64, weights
 
     knn_clf = KNeighborsClassifier(
         n_neighbors=number_of_neighbors,

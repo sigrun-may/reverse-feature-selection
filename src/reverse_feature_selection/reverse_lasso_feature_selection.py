@@ -31,7 +31,7 @@ def calculate_adjusted_r2(y, predicted_y, number_of_coefficients):
     return adjusted_r2
 
 
-def calculate_r2_adjusted(
+def calculate_r2(
     alpha,
     target_feature_name,
     deselected_features,
@@ -45,6 +45,7 @@ def calculate_r2_adjusted(
     label_coefficients = []
 
     feature_names = data_dict["feature_names"].values
+    assert feature_names[0] == "label"
     transformed_data = data_dict["transformed_data"]
 
     # cross validation for the optimization of alpha
@@ -122,7 +123,6 @@ def calculate_r2_adjusted(
         # )
 
         assert train_data_df.shape[1] == train.shape[1] - len(correlated_features)
-
         assert test_data_df.shape[1] == test.shape[1] - len(correlated_features)
 
         # prepare train/ test data
@@ -143,6 +143,7 @@ def calculate_r2_adjusted(
         # save number of non zero coefficients to calculate r2 adjusted
         assert len(lasso.coef_) == x_train.shape[1]
         number_of_coefficients = sum(lasso.coef_ != 0.0)
+        # TODO still needed?
         number_of_coefficients_list.append(number_of_coefficients)
 
         if include_label:
@@ -150,6 +151,7 @@ def calculate_r2_adjusted(
             label_coefficient = lasso.coef_[0]
             if label_coefficient == 0:
                 raise TrialPruned()
+            # TODO still needed?
             label_coefficients.append(label_coefficient)
 
         # predict y_test
@@ -194,8 +196,9 @@ def optimize(
             trial, warm_up_steps=30, threshold=0.05
         )
 
-        return calculate_r2_adjusted(
-            alpha=trial.suggest_discrete_uniform("alpha", 0.001, 1.0, 0.001),
+        return calculate_r2(
+            # alpha=trial.suggest_discrete_uniform("alpha", 0.001, 1.0, 0.001),
+            alpha = trial.suggest_uniform("alpha", 0.01, 1.0),
             target_feature_name=target_feature_name,
             deselected_features=deselected_features,
             data_dict=transformed_test_train_splits_dict,
@@ -213,7 +216,7 @@ def optimize(
         # load_if_exists = True,
         study_name=f"{target_feature_name}_iteration_{outer_cv_loop}",
         direction="maximize",
-        # The higher the corrected R², the better the model fits the data.
+        # The higher R², the better the model fits the data.
         sampler=TPESampler(
             n_startup_trials=3,
         ),
@@ -236,7 +239,7 @@ def optimize(
         return 0, 0, None
 
     # calculate r2_adjusted adjusted without the label in the training data for the same alpha
-    r2_adjusted = calculate_r2_adjusted(
+    r2_adjusted = calculate_r2(
         study.best_params["alpha"],
         target_feature_name,
         deselected_features,
@@ -269,6 +272,7 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop_iteration)
             continue
 
         # get performance of target feature
+        # TODO label_coefficients_list needed?
         (r2_adjusted_unlabeled, r2_adjusted, label_coefficients_list,) = optimize(
             transformed_test_train_splits_dict,
             target_feature_name,

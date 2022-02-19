@@ -48,7 +48,7 @@ def _calculate_weights_for_reverse_lasso(
             #     subset[feature] = difference
 
             if (r2 > (r2_unlabeled + delta)) and (r2 > (r2_unlabeled * factor)):
-                subset[feature] = r2 - r2_unlabeled
+                subset[feature] = (r2 - r2_unlabeled, None)
         weighted_selected_feature_subsets.append(subset)
     return weighted_selected_feature_subsets
 
@@ -130,9 +130,12 @@ def evaluate_feature_selection_methods(
         selected_feature_subsets,
     ) in feature_selection_result_dict.items():
         print("##############################", feature_selection_method, ": ")
+        # if feature_selection_method == "standard_lasso":
+        #     continue
+
         if feature_selection_method == "reverse_lasso":
             selected_feature_subsets = _calculate_weights_for_reverse_lasso(
-                selected_feature_subsets, delta=0.15, factor=1
+                selected_feature_subsets, delta=0.6, factor=1
             )
         # calculate performance evaluation metrics
         predicted_classes, true_classes = classify_feature_subsets(
@@ -146,21 +149,21 @@ def evaluate_feature_selection_methods(
         evaluate_selected_features(selected_feature_subsets)
 
         # rank selected features
-        print(neue_methode(selected_feature_subsets))
-        feature_importance_robustness_dict = neue_methode(selected_feature_subsets)
-        feature_importance_list = [
-            (k, v) for k, v in feature_importance_robustness_dict.items()
-        ]
-
-        # getting length of list of tuples
-        lst = len(feature_importance_list)
-        for i in range(0, lst):
-            for j in range(0, lst - i - 1):
-                if feature_importance_list[j][1] < feature_importance_list[j + 1][1]:
-                    temp = feature_importance_list[j]
-                    feature_importance_list[j] = feature_importance_list[j + 1]
-                    feature_importance_list[j + 1] = temp
-        print(feature_importance_list)
+        # print(neue_methode(selected_feature_subsets))
+        # feature_importance_robustness_dict = neue_methode(selected_feature_subsets)
+        # feature_importance_list = [
+        #     (k, v) for k, v in feature_importance_robustness_dict.items()
+        # ]
+        #
+        # # getting length of list of tuples
+        # lst = len(feature_importance_list)
+        # for i in range(0, lst):
+        #     for j in range(0, lst - i - 1):
+        #         if feature_importance_list[j][1] < feature_importance_list[j + 1][1]:
+        #             temp = feature_importance_list[j]
+        #             feature_importance_list[j] = feature_importance_list[j + 1]
+        #             feature_importance_list[j + 1] = temp
+        # print(feature_importance_list)
 
     return metrics_per_method_dict
 
@@ -171,7 +174,7 @@ def neue_methode(all_feature_subsets: List[Dict[str, float]]):
         for k, v in feature_subset.items():
             if k not in d:
                 d[k] = (0.0, 0)
-            d[k] = (d[k][0] + v, d[k][1] + 1)
+            d[k] = (d[k][0] + v[0], d[k][1] + 1)
     return d
 
 

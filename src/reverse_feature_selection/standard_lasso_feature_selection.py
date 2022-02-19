@@ -45,7 +45,7 @@ def select_features(
     preprocessed_data_dict,
     test_index: int,
     # preprocessed_data_dict: Dict[str, List[Union[Tuple[Any], str]]],
-) -> Dict[str, float]:
+) -> dict[Any, tuple[str, tuple[float, int]]]:
     """Select feature subset for best value of regularization parameter alpha.
 
     Args:
@@ -112,13 +112,14 @@ def select_features(
         coefficients = []
         all_shap_values = []
         sum_of_all_shap_values = []
+        used_features_list = []
 
         feature_names = preprocessed_data_dict["feature_names"]
         transformed_data = preprocessed_data_dict["transformed_data"]
 
         # cross validation for the optimization of alpha
         for test, train, train_correlation_matrix_complete in transformed_data:
-            # TODO pandas notwendig?
+
             train_data_df = pd.DataFrame(train, columns=feature_names)
             test_data_df = pd.DataFrame(test, columns=feature_names)
 
@@ -130,8 +131,9 @@ def select_features(
 
             # build LASSO model
             lasso = celer.Lasso(
-                # alpha=trial.suggest_loguniform("alpha", 0.01, 5.0),
-                alpha=trial.suggest_discrete_uniform("alpha", 0.001, 1.0, 0.001),
+                alpha=trial.suggest_uniform("alpha", 0.01, 1.0),
+                # alpha=trial.suggest_discrete_uniform("alpha", 0.001, 1.0,
+                # 0.001),
                 verbose=0,
             )
             lasso.fit(x_train, y_train)
@@ -145,17 +147,18 @@ def select_features(
 
             # explain the model's predictions using SHAP
             explainer = shap.explainers.Linear(lasso, x_train)
-            shap_values = explainer(x_train)
+            shap_values = explainer(x_test)
             # shap.plots.heatmap(shap_values)
             # plt.show()
 
-            cumulated_shap_values = np.stack(np.abs(shap_values.values), axis=0)
-            all_shap_values.append(cumulated_shap_values)
-            sum_of_all_shap_values.append(np.sum(cumulated_shap_values, axis=0))
-            # TODO count selection for each feature per fold/ per fold and
-            #   sample (Robustness)
-
+            cumulated_shap_values = np.sum(np.abs(shap_values.values), axis=0)
+            sum_of_all_shap_values.append(cumulated_shap_values)
             # TODO unterschied coeff zu stacked SHAP
+
+            # monitor robustness of selection
+            used_features = np.zeros_like(cumulated_shap_values)
+            used_features[cumulated_shap_values.nonzero()] = 1
+            used_features_list.append(used_features)
 
             # predict y_test
             predicted_y_test = lasso.predict(x_test)
@@ -163,13 +166,22 @@ def select_features(
             predicted_y.extend(predicted_y_test)
 
         feature_idx = np.sum(np.array(sum_of_all_shap_values), axis=0)
-        feature_names = feature_names.drop(["label"])
-        selected_features = feature_names[feature_idx.nonzero()]
+        unlabeled_feature_names = feature_names.drop(["label"])
+        selected_features = unlabeled_feature_names[feature_idx.nonzero()]
         nonzero_shap_values = feature_idx[feature_idx.nonzero()]
         assert len(selected_features) == feature_idx.nonzero()[0].size
-        # trial.set_user_attr("label_coefficients", coefficients)
+
+        robustness_array = np.sum(np.array(used_features_list), axis=0)
+        feature_robustness = robustness_array[robustness_array.nonzero()]
+        assert (
+            feature_robustness.shape
+            == nonzero_shap_values.shape
+            == selected_features.shape
+        )
+
         trial.set_user_attr("shap_values", nonzero_shap_values)
         trial.set_user_attr("selected_features", selected_features)
+        trial.set_user_attr("robustness", feature_robustness)
         # r2 = r2_score(true_y, predicted_y_proba)
 
         # assume n = number of samples , p = number of independent variables
@@ -205,6 +217,9 @@ def select_features(
     return dict(
         zip(
             study.best_trial.user_attrs["selected_features"],
-            study.best_trial.user_attrs["shap_values"],
+            zip(
+                study.best_trial.user_attrs["shap_values"],
+                study.best_trial.user_attrs["robustness"],
+            ),
         )
     )

@@ -45,7 +45,6 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop):
         #         trial.study.stop()
 
         validation_metric_history = []
-        all_shap_values = []
         sum_of_all_shap_values = []
         used_features_list = []
 
@@ -56,7 +55,6 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop):
         for fold_index, (test, train, train_correlation_matrix_complete) in enumerate(
             transformed_data
         ):
-            # TODO pandas notwendig?
             train_data_df = pd.DataFrame(train, columns=feature_names)
             test_data_df = pd.DataFrame(test, columns=feature_names)
 
@@ -86,14 +84,11 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop):
                 verbose=-1,
             )
 
-            # num_leaves must be greater than 2^max_depth
+            # num_leaves must be smaller than 2^max_depth
+            # https://lightgbm.readthedocs.io/en/latest/Parameters-Tuning.html#tune-parameters-for-the-leaf-wise-best-first-tree
             max_num_leaves = 2 ** parameters["max_depth"] - 1
-            if max_num_leaves < 90:
-                parameters["num_leaves"] = trial.suggest_int(
-                    "num_leaves", 2, max_num_leaves
-                )
-            else:
-                parameters["num_leaves"] = trial.suggest_int("num_leaves", 2, 90)
+            max_num_leaves = min(max_num_leaves, 90)
+            parameters["num_leaves"] = trial.suggest_int("num_leaves", 2, max_num_leaves)
 
             model = lgb.train(
                 parameters,
@@ -124,7 +119,7 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop):
                 return trim_mean(validation_metric_history, proportiontocut=0.2)
 
             explainer = shap.TreeExplainer(model)
-            shap_values = explainer(x_train)
+            shap_values = explainer(x_test)
             raw_shap_values = np.abs(shap_values.values)[:, :, 0]
             cumulated_shap_values = np.sum(raw_shap_values, axis=0)
 
@@ -141,10 +136,13 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop):
         nonzero_shap_values = feature_idx[feature_idx.nonzero()]
         assert len(selected_features) == feature_idx.nonzero()[0].size
 
-        robustness_array = np.sum(np.array(used_features_list), axis = 0)
+        robustness_array = np.sum(np.array(used_features_list), axis=0)
         feature_robustness = robustness_array[robustness_array.nonzero()]
-        assert feature_robustness.shape == nonzero_shap_values.shape == \
-               selected_features.shape
+        assert (
+            feature_robustness.shape
+            == nonzero_shap_values.shape
+            == selected_features.shape
+        )
 
         trial.set_user_attr("shap_values", nonzero_shap_values)
         trial.set_user_attr("selected_features", selected_features)
@@ -188,8 +186,10 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop):
         return dict(
             zip(
                 study.best_trial.user_attrs["selected_features"],
-                zip(study.best_trial.user_attrs["shap_values"],
-                study.best_trial.user_attrs["robustness"])
+                zip(
+                    study.best_trial.user_attrs["shap_values"],
+                    study.best_trial.user_attrs["robustness"],
+                ),
             )
         )
     except:

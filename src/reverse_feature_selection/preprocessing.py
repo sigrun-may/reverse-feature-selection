@@ -16,6 +16,8 @@ def parse_data(number_of_features: int, path: str) -> pd.DataFrame:
     # indices.extend(random_numbers)
     # print(indices)
     # data = data.iloc[:, indices]
+    data = data.drop(labels=['bm_2', 'bm_3', 'bm_7', 'bm_8', 'bm_9', 'bm_10', 'bm_12', 'bm_18',
+       'bm_26'], axis = 1)
     data = data.iloc[:, :number_of_features]
     print(data.shape)
     return data
@@ -76,7 +78,9 @@ def transform_train_test_set(train_index, test_index, data_df):
 
     if np.min(unlabeled_data) > 0:
         # transform and standardize test and train data
-        power_transformer = PowerTransformer(copy=True, method="box-cox", standardize=True)
+        power_transformer = PowerTransformer(
+            copy=True, method="box-cox", standardize=True
+        )
         train = power_transformer.fit_transform(unlabeled_data[train_index])
         test = power_transformer.transform(unlabeled_data[test_index])
     else:

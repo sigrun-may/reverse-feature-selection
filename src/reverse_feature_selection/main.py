@@ -36,7 +36,8 @@ from src.reverse_feature_selection.validation import (
 
 if __name__ == "__main__":
     input_data_df = parse_data(settings.NUMBER_OF_FEATURES, settings.INPUT_DATA_PATH)
-    clustered_data_df, cluster_dict = cluster_data(input_data_df)
+    # clustered_data_df, cluster_dict = cluster_data(input_data_df)
+    clustered_data_df = input_data_df
     print("cluster shape", clustered_data_df.shape)
 
     # clustered_data_df2, cluster_dict2 = cluster_data(clustered_data_df)
@@ -54,5 +55,5 @@ if __name__ == "__main__":
         feature_selection_result_dict,
         test_train_indices_list,
         clustered_data_df,
-        k_neighbors=19,
+        k_neighbors=3,
     )
