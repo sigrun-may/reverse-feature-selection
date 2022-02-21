@@ -90,9 +90,16 @@ def classify_feature_subsets(
     # flatten lists of results from k-fold cross-validation
     predicted_classes = []
     true_classes = []
-    for predicted_classes_sublist, true_classes_sublist in results:
+    logloss_list = []
+    auc_list = []
+    for predicted_classes_sublist, true_classes_sublist, logloss, auc in results:
         predicted_classes.extend(predicted_classes_sublist)
         true_classes.extend(true_classes_sublist)
+        logloss_list.append(logloss)
+        auc_list.append(auc)
+
+    print("mean logloss: ", np.mean(logloss_list))
+    print("mean auc: ", np.mean(auc_list))
 
     return predicted_classes, true_classes
 
@@ -104,7 +111,7 @@ def calculate_metrics(predicted_classes, true_classes):
         "accuracy",
         accuracy_score(true_classes, predicted_classes),
         "f1_score",
-        f1_score(true_classes, predicted_classes),
+        f1_score(true_classes, predicted_classes, pos_label=0),
         "balanced_accuracy_score",
         balanced_accuracy_score(true_classes, predicted_classes),
     )
@@ -135,7 +142,7 @@ def evaluate_feature_selection_methods(
 
         if feature_selection_method == "reverse_lasso":
             selected_feature_subsets = _calculate_weights_for_reverse_lasso(
-                selected_feature_subsets, delta=0.6, factor=1
+                selected_feature_subsets, delta=0.0, factor=1
             )
         # calculate performance evaluation metrics
         predicted_classes, true_classes = classify_feature_subsets(

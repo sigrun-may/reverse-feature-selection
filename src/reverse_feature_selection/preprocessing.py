@@ -16,8 +16,8 @@ def parse_data(number_of_features: int, path: str) -> pd.DataFrame:
     # indices.extend(random_numbers)
     # print(indices)
     # data = data.iloc[:, indices]
-    data = data.drop(labels=['bm_2', 'bm_3', 'bm_7', 'bm_8', 'bm_9', 'bm_10', 'bm_12', 'bm_18',
-       'bm_26'], axis = 1)
+    # data = data.drop(labels=['bm_2', 'bm_3', 'bm_7', 'bm_8', 'bm_9', 'bm_10', 'bm_12', 'bm_18',
+    #    'bm_26'], axis = 1)
     data = data.iloc[:, :number_of_features]
     print(data.shape)
     return data

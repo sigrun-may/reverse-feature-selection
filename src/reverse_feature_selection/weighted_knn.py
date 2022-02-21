@@ -1,11 +1,11 @@
 # coding: utf-8
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Any, List
 
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import PowerTransformer
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import log_loss
+from sklearn.metrics import log_loss, roc_auc_score
 from weighted_manhattan_distance import WeightedManhattanDistance
 
 import warnings
@@ -59,7 +59,7 @@ def validate(
 
     knn_clf = KNeighborsClassifier(
         n_neighbors=number_of_neighbors,
-        weights="distance",
+        weights="uniform",
         metric=WeightedManhattanDistance(weights=weights),
     )
 
@@ -134,7 +134,7 @@ def validate_standard(
     train: pd.DataFrame,
     selected_feature_subset: Dict[str, float],
     number_of_neighbors: int,
-) -> Tuple[list[int], list[int]]:
+) -> tuple[Any, list[Any], float, float]:
 
     test_data = test[selected_feature_subset]
     train_data = train[selected_feature_subset]
@@ -177,9 +177,15 @@ def validate_standard(
     class_probabilities = knn_clf.predict_proba(scaled_test_data)
     true_classes = list(test["label"])
     print(log_loss(true_classes, class_probabilities))
+    print(roc_auc_score(true_classes, class_probabilities[:, 1]))
 
     assert len(classified_classes) == scaled_test_data.shape[0]
-    return classified_classes, true_classes
+    return (
+        classified_classes,
+        true_classes,
+        log_loss(true_classes, class_probabilities),
+        roc_auc_score(true_classes, class_probabilities[:, 1]),
+    )
 
 
 def sort_list_of_tuples_by_first_value(list_to_be_sorted):

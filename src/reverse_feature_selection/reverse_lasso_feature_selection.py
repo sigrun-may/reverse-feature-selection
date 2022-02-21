@@ -198,7 +198,7 @@ def optimize(
 
         return calculate_r2(
             # alpha=trial.suggest_discrete_uniform("alpha", 0.001, 1.0, 0.001),
-            alpha = trial.suggest_uniform("alpha", 0.01, 1.0),
+            alpha=trial.suggest_uniform("alpha", 0.01, 1.0),
             target_feature_name=target_feature_name,
             deselected_features=deselected_features,
             data_dict=transformed_test_train_splits_dict,

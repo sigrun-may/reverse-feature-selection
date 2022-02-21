@@ -88,7 +88,9 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop):
             # https://lightgbm.readthedocs.io/en/latest/Parameters-Tuning.html#tune-parameters-for-the-leaf-wise-best-first-tree
             max_num_leaves = 2 ** parameters["max_depth"] - 1
             max_num_leaves = min(max_num_leaves, 90)
-            parameters["num_leaves"] = trial.suggest_int("num_leaves", 2, max_num_leaves)
+            parameters["num_leaves"] = trial.suggest_int(
+                "num_leaves", 2, max_num_leaves
+            )
 
             model = lgb.train(
                 parameters,
@@ -129,6 +131,8 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop):
             used_features_list.append(used_features)
 
             sum_of_all_shap_values.append(cumulated_shap_values)
+            # sum_of_all_shap_values.append(model.feature_importance(
+            # importance_type = "gain"))
 
         feature_idx = np.sum(np.array(sum_of_all_shap_values), axis=0)
         unlabeled_feature_names = feature_names[1:]
