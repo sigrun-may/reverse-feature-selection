@@ -12,10 +12,8 @@ import cv_pruner
 from cv_pruner import Method
 import optuna_study_pruner
 
-import settings
 
-
-def select_features(transformed_test_train_splits_dict, outer_cv_loop):
+def select_features(transformed_test_train_splits_dict, outer_cv_loop, meta_data):
     """Optimize regularization parameter alpha for lasso regression."""
 
     def optuna_objective(trial):
@@ -45,7 +43,7 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop):
         #         trial.study.stop()
 
         validation_metric_history = []
-        sum_of_all_shap_values = []
+        summed_importances = []
         used_features_list = []
 
         feature_names = transformed_test_train_splits_dict["feature_names"].values
@@ -110,31 +108,38 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop):
 
             if cv_pruner.should_prune_against_threshold(
                 current_step_of_complete_nested_cross_validation=fold_index,
-                folds_outer_cv=train_data_df.shape[0] + test_data_df.shape[0],  # loo
-                folds_inner_cv=settings.N_FOLDS_INNER_CV,
+                folds_outer_cv=meta_data["cv"]["n_outer_folds"],
+                folds_inner_cv=meta_data["cv"]["n_inner_folds"],
                 validation_metric_history=validation_metric_history,
-                threshold_for_pruning=0.55,
+                threshold_for_pruning=meta_data["selection_method"]["rf"]["pruner_threshold"],
                 direction_to_optimize_is_minimize=True,
                 optimal_metric=0,
                 method=Method.OPTIMAL_METRIC,
             ):
                 return trim_mean(validation_metric_history, proportiontocut=0.2)
 
-            explainer = shap.TreeExplainer(model)
-            shap_values = explainer(x_test)
-            raw_shap_values = np.abs(shap_values.values)[:, :, 0]
-            cumulated_shap_values = np.sum(raw_shap_values, axis=0)
+            if (
+                meta_data["selection_method"]["rf"]["shap_test"] is None
+                and meta_data["selection_method"]["rf"]["shap_train"] is None
+            ):
+                cumulated_importances = model.feature_importance(importance_type="gain")
+            else:
+                explainer = shap.TreeExplainer(model)
+                if meta_data["selection_method"]["rf"]["shap_test"]:
+                    shap_values = explainer(x_test)
+
+                elif meta_data["selection_method"]["rf"]["shap_train"]:
+                    shap_values = explainer(x_train)
+                raw_shap_values = np.abs(shap_values.values)[:, :, 0]
+                cumulated_importances = np.sum(raw_shap_values, axis=0)
 
             # monitor robustness of selection
-            used_features = np.zeros_like(cumulated_shap_values)
-            used_features[cumulated_shap_values.nonzero()] = 1
+            used_features = np.zeros_like(cumulated_importances)
+            used_features[cumulated_importances.nonzero()] = 1
             used_features_list.append(used_features)
+            summed_importances.append(cumulated_importances)
 
-            sum_of_all_shap_values.append(cumulated_shap_values)
-            # sum_of_all_shap_values.append(model.feature_importance(
-            # importance_type = "gain"))
-
-        feature_idx = np.sum(np.array(sum_of_all_shap_values), axis=0)
+        feature_idx = np.sum(np.array(summed_importances), axis=0)
         unlabeled_feature_names = feature_names[1:]
         selected_features = unlabeled_feature_names[feature_idx.nonzero()]
         nonzero_shap_values = feature_idx[feature_idx.nonzero()]
@@ -176,7 +181,7 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop):
     # optuna.logging.set_verbosity(optuna.logging.ERROR)
     study.optimize(
         optuna_objective,
-        n_trials=settings.NUMBER_OF_TRIALS,
+        n_trials=meta_data["selection_method"]["rf"]["trials"],
     )
     # relevant_features_dict = dict(
     #     label=(0, 0, study.best_trial.user_attrs["shap_values"])

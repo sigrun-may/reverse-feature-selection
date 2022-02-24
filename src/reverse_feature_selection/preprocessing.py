@@ -6,51 +6,76 @@ import numpy as np
 import pandas as pd
 import joblib
 from joblib import Parallel, delayed
-import settings
 
 
-def parse_data(number_of_features: int, path: str) -> pd.DataFrame:
-    data = pd.read_csv(path)
+def parse_data(meta_data) -> pd.DataFrame:
+    data = pd.read_csv(meta_data["data"]["input_data_path"])
     # indices = [0]
     # random_numbers = range(70, 120, 1)
     # indices.extend(random_numbers)
     # print(indices)
     # data = data.iloc[:, indices]
-    # data = data.drop(labels=['bm_2', 'bm_3', 'bm_7', 'bm_8', 'bm_9', 'bm_10', 'bm_12', 'bm_18',
-    #    'bm_26'], axis = 1)
-    data = data.iloc[:, :number_of_features]
+    print(data.shape)
+    if meta_data["data"]["excluded_features"]:
+        data = data.drop(labels=meta_data["data"]["excluded_features"], axis=1)
+        print(
+            data.shape,
+            f" excluded "
+            f"{len(meta_data['data']['excluded_features'])} "
+            f"features: {meta_data['data']['excluded_features']}",
+        )
+    if meta_data["data"]["number_of_features"] is not None:
+        data = data.iloc[:, : meta_data["data"]["number_of_features"]]
     print(data.shape)
     return data
 
 
 def yeo_johnson_transform_test_train_splits(
     data_df: pd.DataFrame,
-    num_inner_folds: int = settings.N_FOLDS_INNER_CV,
-    path: Optional[str] = settings.PICKLED_FILES_PATH,
+    outer_cv_loop_iteration: int,
+    meta_data: Dict,
 ) -> Dict[str, List[Union[Tuple[np.array], str]]]:
     """
-    Do test and train splits and transform (Yeo Johnson) them.
 
-    :param data_df: original data
-    :param num_inner_folds: number of inner cross-validation folds
-    :param path: path to directory to pickle transformed data
-    :return: the transformed data in selected_feature_subset_list dict with transformed test/train set for each sample and the column names
+    Args:
+        data_df: original data
+        outer_cv_loop_iteration:
+        meta_data:
+
+    Returns:
+        Dict with transformed test/train sets and respective column names
+
     """
+    # """
+    # Do test and train splits and transform (Yeo Johnson) them.
+    #
+    # :param data_df: original data
+    # :param num_inner_folds: number of inner cross-validation folds
+    # :param path: path to directory to pickle transformed data
+    # :return: the transformed data in selected_feature_subset_list dict with transformed test/train set for each sample and the column names
+    #
+    # Args:
+    #     outer_cv_loop_iteration:
+    # """
 
     # k_fold = KFold(n_splits=num_inner_folds, shuffle=True, random_state=42)
-    k_fold = StratifiedKFold(n_splits=num_inner_folds, shuffle=True, random_state=42)
-    transformed_data = Parallel(n_jobs=settings.N_JOBS_PREPROCESSING, verbose=5)(
+    k_fold = StratifiedKFold(
+        n_splits=meta_data["cv"]["n_inner_folds"], shuffle=True, random_state=42
+    )
+    transformed_data = Parallel(
+        n_jobs=meta_data["parallel"]["n_jobs_preprocessing"], verbose=5
+    )(
         delayed(transform_train_test_set)(train_index, test_index, data_df)
         for sample_index, (train_index, test_index) in enumerate(
             k_fold.split(data_df.iloc[:, 1:], data_df["label"])
         )
     )
-    assert len(transformed_data) == settings.N_FOLDS_INNER_CV
+    assert len(transformed_data) == meta_data["cv"]["n_inner_folds"]
 
-    if path is not None:
+    if meta_data["path_preprocessed_data"] is not None:
         joblib.dump(
             {"transformed_data": transformed_data, "feature_names": data_df.columns},
-            path + "/preprocessed_data.pkl",
+            f"{meta_data['path_preprocessed_data']}_{outer_cv_loop_iteration}.pkl",
         )
 
     return {"transformed_data": transformed_data, "feature_names": data_df.columns}
@@ -67,7 +92,7 @@ def transform_train_test_set(train_index, test_index, data_df):
     # # workaround for https://github.com/scikit-learn/scikit-learn/issues/14959
     # scaler = StandardScaler(with_std=False)
     # scaled_train = scaler.fit_transform(unlabeled_data[train_index])
-    # scaled_test = scaler.transform(unlabeled_data[test_index])
+    # scaled_test = scaler.transform(unlabeled_data[outer_cv_loop])
     #
     # # transform and standardize test and train data
     # power_transformer = PowerTransformer(
@@ -101,7 +126,7 @@ def transform_train_test_set(train_index, test_index, data_df):
     #     copy=True, method="yeo-johnson", standardize=True
     # )
     # train = power_transformer.fit_transform(unlabeled_data[train_index])
-    # test = power_transformer.transform(unlabeled_data[test_index])
+    # test = power_transformer.transform(unlabeled_data[outer_cv_loop])
 
     assert test.shape == (len(test_index), unlabeled_data.shape[1])
     assert train.shape == (len(train_index), unlabeled_data.shape[1])
@@ -117,7 +142,7 @@ def transform_train_test_set(train_index, test_index, data_df):
     return test_data, train_data, train_correlation_matrix
 
 
-def get_cluster_dict(correlation_matrix, threshold, path):
+def get_cluster_dict(correlation_matrix, meta_data):
     updated_correlation_matrix = correlation_matrix.copy()
 
     # find clusters and uncorrelated_features
@@ -127,7 +152,9 @@ def get_cluster_dict(correlation_matrix, threshold, path):
         # Is the target feature already assigned to another cluster?
         if target_feature_name in updated_correlation_matrix.columns:
             correlated_feature_names = _get_correlated_features(
-                target_feature_name, updated_correlation_matrix, threshold
+                target_feature_name,
+                updated_correlation_matrix,
+                meta_data["data"]["cluster_correlation_threshold"],
             )
             if len(correlated_feature_names) > 1:  # more than the initial feature?
                 clusters_list.append(correlated_feature_names)
@@ -156,7 +183,7 @@ def get_cluster_dict(correlation_matrix, threshold, path):
         clusters_dict[cluster_representative] = cluster
 
     clusters_dict["uncorrelated_features"] = updated_correlation_matrix.columns
-    joblib.dump(clusters_dict, path, compress=("gzip", 3))
+    joblib.dump(clusters_dict, meta_data["cluster_dict_path"], compress=("gzip", 3))
 
     for k, v in clusters_dict.items():
         print(k, v)
@@ -164,19 +191,24 @@ def get_cluster_dict(correlation_matrix, threshold, path):
     return clusters_dict
 
 
-def cluster_data(data_df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, List[str]]]:
+def cluster_data(
+    data_df: pd.DataFrame, meta_data
+) -> Tuple[pd.DataFrame, Dict[str, List[str]]]:
     ########################################################
     # Cluster correlated features
     ########################################################
     # load or generate correlation matrix
-    correlation_matrix_path = f"{settings.PICKLED_FILES_PATH}/correlation_matrix.pkl.gz"
     try:
-        correlation_matrix = joblib.load(correlation_matrix_path)
+        correlation_matrix = joblib.load(meta_data["correlation_matrix_path"])
         # joblib.load('klkhlh')
     except:
         unlabeled_data_df = data_df.iloc[:, 1:]
         correlation_matrix = unlabeled_data_df.corr(method="spearman")
-        joblib.dump(correlation_matrix, correlation_matrix_path, compress=("gzip", 3))
+        joblib.dump(
+            correlation_matrix,
+            meta_data["correlation_matrix_path"],
+            compress=("gzip", 3),
+        )
     assert (
         correlation_matrix.shape[0]
         == correlation_matrix.shape[1]
@@ -184,16 +216,11 @@ def cluster_data(data_df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, List[st
     )
 
     # load or calculate clusters
-    cluster_dict_path = f"{settings.PICKLED_FILES_PATH}/clusters.pkl.gz"
     try:
-        cluster_dict = joblib.load(cluster_dict_path)
+        cluster_dict = joblib.load(meta_data["cluster_dict_path"])
         # joblib.load('klkhlh')
     except:
-        cluster_dict = get_cluster_dict(
-            correlation_matrix,
-            settings.CORRELATION_THRESHOLD_CLUSTER,
-            cluster_dict_path,
-        )
+        cluster_dict = get_cluster_dict(correlation_matrix, meta_data)
 
     print(cluster_dict)
     print(len(cluster_dict.keys()))

@@ -4,11 +4,11 @@ import optuna
 from optuna import TrialPruned
 from optuna.samplers import TPESampler
 from sklearn.metrics import r2_score
-import settings
 import celer
 
 #
 import optuna_study_pruner
+from utils import sort_list_of_tuples_by_index
 
 
 def calculate_adjusted_r2(y, predicted_y, number_of_coefficients):
@@ -38,11 +38,13 @@ def calculate_r2(
     data_dict,
     include_label,
     trial,
+    meta_data,
 ):
     predicted_y = []
     true_y = []
     number_of_coefficients_list = []
     label_coefficients = []
+    r2_list = []
 
     feature_names = data_dict["feature_names"].values
     assert feature_names[0] == "label"
@@ -52,68 +54,71 @@ def calculate_r2(
     for test, train, train_correlation_matrix_complete in transformed_data:
 
         train_correlation_matrix = train_correlation_matrix_complete
-        # # remove irrelevant features from train_correlation_matrix
-        # train_correlation_matrix = train_correlation_matrix_complete.drop(
-        #     labels=deselected_features,
-        #     axis=0,
-        #     inplace=False,
-        # )
-        # train_correlation_matrix.drop(
-        #     labels=deselected_features,
-        #     axis=1,
-        #     inplace=True,
-        # )
-        # assert (
-        #     train_correlation_matrix_complete.shape[1] - len(deselected_features)
-        #     == train_correlation_matrix.shape[1]
-        # )
-        # assert (
-        #     train_correlation_matrix_complete.shape[0] - len(deselected_features)
-        #     == train_correlation_matrix.shape[0]
-        # )
-        #
-        # # remove irrelevant features from test and train data
         train_data_df = pd.DataFrame(train, columns=feature_names)
-        # train_data_df.drop(columns=deselected_features, inplace=True)
-        # assert train_data_df.shape[1] == train.shape[1] - len(deselected_features)
-        #
         test_data_df = pd.DataFrame(test, columns=feature_names)
-        # test_data_df.drop(columns=deselected_features, inplace=True)
-        # assert test_data_df.shape[1] == test.shape[1] - len(deselected_features)
+
+        # remove irrelevant features from train_correlation_matrix
+        if meta_data["selection_method"]["reverse_lasso"]["remove_deselected"]:
+            train_correlation_matrix = train_correlation_matrix_complete.drop(
+                labels=deselected_features,
+                axis=0,
+                inplace=False,
+            )
+            train_correlation_matrix.drop(
+                labels=deselected_features,
+                axis=1,
+                inplace=True,
+            )
+            assert (
+                train_correlation_matrix_complete.shape[1] - len(deselected_features)
+                == train_correlation_matrix.shape[1]
+            )
+            assert (
+                train_correlation_matrix_complete.shape[0] - len(deselected_features)
+                == train_correlation_matrix.shape[0]
+            )
+
+            # remove irrelevant features from test and train data
+            train_data_df.drop(columns=deselected_features, inplace=True)
+            assert train_data_df.shape[1] == train.shape[1] - len(deselected_features)
+
+            test_data_df.drop(columns=deselected_features, inplace=True)
+            assert test_data_df.shape[1] == test.shape[1] - len(deselected_features)
 
         # How Correlations Influence Lasso Prediction, April 2012IEEE Transactions on Information Theory 59(3)
         # DOI: 10.1109/TIT.2012.2227680
         # find features correlated to the target_feature from test/ train data
         correlated_features = [
-            index
-            for index, value in train_correlation_matrix[target_feature_name].items()
-            if abs(value) > settings.CORRELATION_THRESHOLD_REGRESSION
+            (feature, correlation_coefficient)
+            for feature, correlation_coefficient in train_correlation_matrix[
+                target_feature_name
+            ].items()
+            if abs(correlation_coefficient)
+            > meta_data["selection_method"]["reverse_lasso"]["correlation_threshold"]
         ]
-        correlated_feature_values = [
-            value
-            for index, value in train_correlation_matrix[target_feature_name].items()
-            if abs(value) > settings.CORRELATION_THRESHOLD_REGRESSION
-        ]
-        if len(correlated_feature_values) > 0:
-            min_correlated_feature = correlated_features[
-                correlated_feature_values.index(min(correlated_feature_values))
-            ]
-
-            if target_feature_name in correlated_features:
-                correlated_features.remove(target_feature_name)
 
         # check if train would keep at least one feature after removing label and target_feature
         if train_data_df.shape[1] - len(correlated_features) < 3:
             # keep the feature with the lowest correlation to the target feature
+            sorted_correlated_features = sort_list_of_tuples_by_index(
+                correlated_features, index=1, ascending=True
+            )
+            min_correlated_feature = sorted_correlated_features[0][0]
             correlated_features.remove(min_correlated_feature)
+
+        correlated_feature_names = list(map(list, zip(*correlated_features)))[0]
+
+        # if len(correlated_features) > 0:
+        #     if target_feature_name in correlated_feature_names:
+        correlated_feature_names.remove(target_feature_name)
 
         if not include_label:
             # append label to the list of features to remove
-            correlated_features.append("label")
+            correlated_feature_names.append("label")
 
         # remove features correlated to the target_feature from test/ train data and the label if it is not included
-        train_data_df.drop(columns=correlated_features, inplace=True)
-        test_data_df.drop(columns=correlated_features, inplace=True)
+        train_data_df.drop(columns=correlated_feature_names, inplace=True)
+        test_data_df.drop(columns=correlated_feature_names, inplace=True)
         # assert train_data_df.shape[1] == train.shape[1] - len(
         #     deselected_features
         # ) - len(correlated_features)
@@ -122,13 +127,14 @@ def calculate_r2(
         #     correlated_features
         # )
 
-        assert train_data_df.shape[1] == train.shape[1] - len(correlated_features)
-        assert test_data_df.shape[1] == test.shape[1] - len(correlated_features)
+        assert train_data_df.shape[1] == train.shape[1] - len(correlated_feature_names)
+        assert test_data_df.shape[1] == test.shape[1] - len(correlated_feature_names)
 
         # prepare train/ test data
         y_train = train_data_df[target_feature_name].values.reshape(-1, 1)
         x_train = train_data_df.drop(columns=target_feature_name)
         x_test = test_data_df.drop(columns=target_feature_name).values
+        y_test = test_data_df[target_feature_name].values
         true_y.extend(test_data_df[target_feature_name].values)
 
         assert x_train.shape[1] >= 1
@@ -156,6 +162,7 @@ def calculate_r2(
 
         # predict y_test
         predicted_y.extend(lasso.predict(x_test))
+        r2_list.append(r2_score(y_test, lasso.predict(x_test)))
 
     # assume n = number of samples , p = number of independent variables
     # adjusted_r2 = 1-(1-R2)*(n-1)/(n-p-1)
@@ -171,7 +178,8 @@ def calculate_r2(
             "median_number_of_features_in_model", np.median(number_of_coefficients_list)
         )
     # return adjusted_r2
-    return r2_score(true_y, predicted_y)
+    # return r2_score(true_y, predicted_y)
+    return np.mean(r2_list)
 
 
 def optimize(
@@ -179,21 +187,23 @@ def optimize(
     target_feature_name,
     deselected_features,
     outer_cv_loop,
+    meta_data,
 ):
     """Optimize regularization parameter alpha for lasso regression."""
 
     def optuna_objective(trial):
-        optuna_study_pruner.study_no_trial_completed_pruner(trial, warm_up_steps=20)
+        optuna_study_pruner.study_no_trial_completed_pruner(trial,
+                                                            warm_up_steps=10)
         optuna_study_pruner.study_no_improvement_pruner(
             trial,
             epsilon=0.001,
-            warm_up_steps=30,
+            warm_up_steps=10,
             number_of_similar_best_values=5,
             threshold=0.1,
         )
 
         optuna_study_pruner.insufficient_results_study_pruner(
-            trial, warm_up_steps=30, threshold=0.05
+            trial, warm_up_steps=10, threshold=0.05
         )
 
         return calculate_r2(
@@ -204,6 +214,7 @@ def optimize(
             data_dict=transformed_test_train_splits_dict,
             include_label=True,
             trial=trial,
+            meta_data=meta_data,
         )
 
     # try:
@@ -221,11 +232,22 @@ def optimize(
             n_startup_trials=3,
         ),
     )
+
+    reverse_lasso = (
+        dict(
+            trials=20,
+            pruner_patience=None,
+            pruner_threshold=0.1,
+            threshold_correlations=0.2,
+            remove_deselected=False,
+        ),
+    )
+
     # optuna.logging.set_verbosity(optuna.logging.ERROR)
     study.optimize(
         optuna_objective,
         # n_trials = 40,
-        n_trials=settings.NUMBER_OF_TRIALS,
+        n_trials=meta_data["selection_method"]["reverse_lasso"]["trials"],
     )
     # if study.best_value > 0:
     #     fig = optuna.visualization.plot_optimization_history(study)
@@ -238,30 +260,33 @@ def optimize(
     except:
         return 0, 0, None
 
-    # calculate r2_adjusted adjusted without the label in the training data for the same alpha
-    r2_adjusted = calculate_r2(
+    # calculate r2 without the label in the training data for the same alpha
+    r2 = calculate_r2(
         study.best_params["alpha"],
         target_feature_name,
         deselected_features,
         transformed_test_train_splits_dict,
         include_label=False,
         trial=None,
+        meta_data=meta_data,
     )
     print(
         target_feature_name,
         study.best_value,
-        r2_adjusted,
+        r2,
         # study.best_trial.user_attrs["r2_score"],
         study.best_trial.user_attrs["median_number_of_features_in_model"],
     )
     return (
-        r2_adjusted,
+        r2,
         study.best_value,
         study.best_trial.user_attrs["label_coefficients"],
     )
 
 
-def select_features(transformed_test_train_splits_dict, outer_cv_loop_iteration):
+def select_features(
+    transformed_test_train_splits_dict, outer_cv_loop_iteration, meta_data
+):
     # calculate relevance for each feature
     deselected_features_list = []
     selected_features_dict = {}
@@ -278,6 +303,7 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop_iteration)
             target_feature_name,
             deselected_features_list,
             outer_cv_loop=outer_cv_loop_iteration,
+            meta_data=meta_data,
         )
 
         if r2_adjusted_unlabeled < r2_adjusted:

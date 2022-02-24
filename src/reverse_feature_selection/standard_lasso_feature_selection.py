@@ -11,7 +11,6 @@ import shap
 
 import numpy as np
 from sklearn.metrics import r2_score
-import settings
 import optuna_study_pruner
 
 
@@ -43,14 +42,15 @@ def calculate_adjusted_r2(y, predicted_y, number_of_coefficients):
 
 def select_features(
     preprocessed_data_dict,
-    test_index: int,
+    outer_cv_loop: int,
+    meta_data,
     # preprocessed_data_dict: Dict[str, List[Union[Tuple[Any], str]]],
 ) -> dict[Any, tuple[str, tuple[float, int]]]:
     """Select feature subset for best value of regularization parameter alpha.
 
     Args:
         preprocessed_data_dict: yj +pearson train data
-        test_index: test index of outer cross-validation loop
+        outer_cv_loop: test index of outer cross-validation loop
 
     Returns: selected features + weights
     """
@@ -111,8 +111,9 @@ def select_features(
         number_of_coefficients = []
         coefficients = []
         all_shap_values = []
-        sum_of_all_shap_values = []
+        summed_importances = []
         used_features_list = []
+        r2_list = []
 
         feature_names = preprocessed_data_dict["feature_names"]
         transformed_data = preprocessed_data_dict["transformed_data"]
@@ -127,6 +128,7 @@ def select_features(
             y_train = train_data_df["label"].values.reshape(-1, 1)
             x_train = train_data_df.drop(columns="label")
             x_test = test_data_df.drop(columns="label").values
+            y_test = test_data_df["label"].values
             true_y.extend(test_data_df["label"].values)
 
             # build LASSO model
@@ -145,27 +147,35 @@ def select_features(
 
             number_of_coefficients.append(sum(lasso.coef_ != 0.0))
 
-            # explain the model's predictions using SHAP
-            explainer = shap.explainers.Linear(lasso, x_train)
-            shap_values = explainer(x_test)
-            # shap.plots.heatmap(shap_values)
-            # plt.show()
+            if (
+                meta_data["selection_method"]["lasso"]["shap_test"] is None
+                and meta_data["selection_method"]["lasso"]["shap_train"] is None
+            ):
+                cumulated_importances = lasso.coef_
+            else:
+                explainer = shap.explainers.Linear(lasso, x_train)
+                if meta_data["selection_method"]["lasso"]["shap_test"]:
+                    shap_values = explainer(x_test)
 
-            cumulated_shap_values = np.sum(np.abs(shap_values.values), axis=0)
-            sum_of_all_shap_values.append(cumulated_shap_values)
+                elif meta_data["selection_method"]["lasso"]["shap_train"]:
+                    shap_values = explainer(x_train)
+                cumulated_importances = np.sum(np.abs(shap_values.values), axis=0)
+
+            summed_importances.append(cumulated_importances)
             # TODO unterschied coeff zu stacked SHAP
 
             # monitor robustness of selection
-            used_features = np.zeros_like(cumulated_shap_values)
-            used_features[cumulated_shap_values.nonzero()] = 1
+            used_features = np.zeros_like(cumulated_importances)
+            used_features[cumulated_importances.nonzero()] = 1
             used_features_list.append(used_features)
 
             # predict y_test
             predicted_y_test = lasso.predict(x_test)
             # predicted_y.append(predicted_y_test[0])
+            r2_list.append(r2_score(y_test, predicted_y_test))
             predicted_y.extend(predicted_y_test)
 
-        feature_idx = np.sum(np.array(sum_of_all_shap_values), axis=0)
+        feature_idx = np.sum(np.array(summed_importances), axis=0)
         unlabeled_feature_names = feature_names.drop(["label"])
         selected_features = unlabeled_feature_names[feature_idx.nonzero()]
         nonzero_shap_values = feature_idx[feature_idx.nonzero()]
@@ -191,7 +201,8 @@ def select_features(
             ((1 - r2_score(true_y, predicted_y)) * (sample_size - 1))
             / (sample_size - (np.median(number_of_coefficients)) - 1)
         )
-        return r2_score(true_y, predicted_y)
+        return np.mean(r2_list)
+        # return r2_score(true_y, predicted_y)
         # return calculate_adjusted_r2(true_y, predicted_y, number_of_coefficients)
 
     # try:
@@ -202,7 +213,7 @@ def select_features(
     study = optuna.create_study(
         # storage = "sqlite:///optuna_test.db",
         # load_if_exists = True,
-        study_name=f"standard_lasso_iteration_{test_index}",
+        study_name=f"standard_lasso_iteration_{outer_cv_loop}",
         direction="maximize",
         sampler=TPESampler(
             n_startup_trials=3,
@@ -211,7 +222,7 @@ def select_features(
     # optuna.logging.set_verbosity(optuna.logging.ERROR)
     study.optimize(
         optuna_objective,
-        n_trials=settings.NUMBER_OF_TRIALS,
+        n_trials=meta_data["selection_method"]["lasso"]["trials"],
     )
 
     return dict(

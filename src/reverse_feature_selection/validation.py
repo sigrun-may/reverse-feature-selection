@@ -11,8 +11,6 @@ from sklearn.metrics import (
 from src.reverse_feature_selection import weighted_knn
 from src.reverse_feature_selection.misc import evaluate_selected_features
 
-import settings
-
 
 def _extract_indices_and_results(feature_selection_result):
     # rewrite data structure

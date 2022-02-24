@@ -186,15 +186,3 @@ def validate_standard(
         log_loss(true_classes, class_probabilities),
         roc_auc_score(true_classes, class_probabilities[:, 1]),
     )
-
-
-def sort_list_of_tuples_by_first_value(list_to_be_sorted):
-    # getting length of list of tuples
-    lst = len(list_to_be_sorted)
-    for i in range(0, lst):
-        for j in range(0, lst - i - 1):
-            if list_to_be_sorted[j][1] > list_to_be_sorted[j + 1][1]:
-                temp = list_to_be_sorted[j]
-                list_to_be_sorted[j] = list_to_be_sorted[j + 1]
-                list_to_be_sorted[j + 1] = temp
-    return list_to_be_sorted
