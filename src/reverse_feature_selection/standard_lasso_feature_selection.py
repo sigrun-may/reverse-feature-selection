@@ -45,7 +45,7 @@ def select_features(
     outer_cv_loop: int,
     meta_data,
     # preprocessed_data_dict: Dict[str, List[Union[Tuple[Any], str]]],
-) -> dict[Any, tuple[str, tuple[float, int]]]:
+) -> Tuple[dict[Any, tuple[str, tuple[float, int]]], Any, Any]:
     """Select feature subset for best value of regularization parameter alpha.
 
     Args:
@@ -138,7 +138,7 @@ def select_features(
                 # 0.001),
                 verbose=0,
             )
-            lasso.fit(x_train, y_train)
+            lasso.fit(x_train.values, y_train)
             coefficients.append(lasso.coef_)
 
             # sklearn lasso
@@ -191,7 +191,9 @@ def select_features(
 
         trial.set_user_attr("shap_values", nonzero_shap_values)
         trial.set_user_attr("selected_features", selected_features)
-        trial.set_user_attr("robustness", feature_robustness)
+        trial.set_user_attr("robustness_selected_features", feature_robustness)
+        trial.set_user_attr("robustness_all_features", robustness_array)
+        trial.set_user_attr("feature_importances", np.array(used_features_list))
         # r2 = r2_score(true_y, predicted_y_proba)
 
         # assume n = number of samples , p = number of independent variables
@@ -219,18 +221,23 @@ def select_features(
             n_startup_trials=3,
         ),
     )
-    # optuna.logging.set_verbosity(optuna.logging.ERROR)
+    if meta_data["parallel"]["cluster"]:  # deactivate logging on cluster
+        optuna.logging.set_verbosity(optuna.logging.ERROR)
     study.optimize(
         optuna_objective,
         n_trials=meta_data["selection_method"]["lasso"]["trials"],
     )
 
-    return dict(
-        zip(
-            study.best_trial.user_attrs["selected_features"],
+    return (
+        dict(
             zip(
-                study.best_trial.user_attrs["shap_values"],
-                study.best_trial.user_attrs["robustness"],
-            ),
-        )
+                study.best_trial.user_attrs["selected_features"],
+                zip(
+                    study.best_trial.user_attrs["shap_values"],
+                    study.best_trial.user_attrs["robustness_selected_features"],
+                ),
+            )
+        ),
+        study.best_trial.user_attrs["robustness_all_features"],
+        study.best_trial.user_attrs["feature_importances"],
     )

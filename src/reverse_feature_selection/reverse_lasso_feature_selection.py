@@ -140,7 +140,7 @@ def calculate_r2(
         assert x_train.shape[1] >= 1
         # build LASSO model
         lasso = celer.Lasso(alpha=alpha, verbose=0)
-        lasso.fit(x_train, y_train)
+        lasso.fit(x_train.values, y_train)
 
         # sklearn lasso
         # lasso = Lasso(alpha = alpha, fit_intercept = True, positive = False)
@@ -192,8 +192,7 @@ def optimize(
     """Optimize regularization parameter alpha for lasso regression."""
 
     def optuna_objective(trial):
-        optuna_study_pruner.study_no_trial_completed_pruner(trial,
-                                                            warm_up_steps=10)
+        optuna_study_pruner.study_no_trial_completed_pruner(trial, warm_up_steps=10)
         optuna_study_pruner.study_no_improvement_pruner(
             trial,
             epsilon=0.001,
@@ -242,8 +241,8 @@ def optimize(
             remove_deselected=False,
         ),
     )
-
-    # optuna.logging.set_verbosity(optuna.logging.ERROR)
+    if meta_data["parallel"]["cluster"]:  # deactivate logging on cluster
+        optuna.logging.set_verbosity(optuna.logging.ERROR)
     study.optimize(
         optuna_objective,
         # n_trials = 40,
@@ -289,6 +288,7 @@ def select_features(
 ):
     # calculate relevance for each feature
     deselected_features_list = []
+    robustness_vector = []
     selected_features_dict = {}
     for target_feature_name in transformed_test_train_splits_dict["feature_names"]:
 
@@ -312,11 +312,17 @@ def select_features(
                 r2_adjusted_unlabeled,
                 r2_adjusted,
             )
+            robustness_vector.append(1)
             # selected_features_dict[target_feature_name] = (
             #     r2_adjusted - r2_adjusted_unlabeled
             # )
         else:
             # exclude irrelevant feature from training data
             deselected_features_list.append(target_feature_name)
+            robustness_vector.append(0)
 
-    return selected_features_dict
+    assert (
+        len(robustness_vector)
+        == len(transformed_test_train_splits_dict["feature_names"]) - 1
+    )  # exclude the label
+    return selected_features_dict, np.array(robustness_vector)

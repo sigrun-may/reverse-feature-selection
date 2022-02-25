@@ -57,13 +57,17 @@ if __name__ == "__main__":
     feature_selection_result = load_or_generate_feature_subsets(data_df, meta_data)
     (
         feature_selection_result_dict,
+        robustness_dict,
+        binary_selections_dict,
         test_train_indices_list,
     ) = _extract_indices_and_results(feature_selection_result)
 
     # validate feature subsets
     metrics_per_method_dict = evaluate_feature_selection_methods(
         feature_selection_result_dict,
+        robustness_dict,
+        binary_selections_dict,
         test_train_indices_list,
         data_df,
-        k_neighbors=5,
+        meta_data,
     )

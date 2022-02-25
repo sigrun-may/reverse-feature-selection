@@ -94,7 +94,6 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop, meta_data
                 parameters,
                 train_data,
                 valid_sets=[test_data],
-                verbose_eval=0,
             )
 
             if cv_pruner.no_features_selected(
@@ -111,7 +110,9 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop, meta_data
                 folds_outer_cv=meta_data["cv"]["n_outer_folds"],
                 folds_inner_cv=meta_data["cv"]["n_inner_folds"],
                 validation_metric_history=validation_metric_history,
-                threshold_for_pruning=meta_data["selection_method"]["rf"]["pruner_threshold"],
+                threshold_for_pruning=meta_data["selection_method"]["rf"][
+                    "pruner_threshold"
+                ],
                 direction_to_optimize_is_minimize=True,
                 optimal_metric=0,
                 method=Method.OPTIMAL_METRIC,
@@ -133,11 +134,12 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop, meta_data
                 raw_shap_values = np.abs(shap_values.values)[:, :, 0]
                 cumulated_importances = np.sum(raw_shap_values, axis=0)
 
+            summed_importances.append(cumulated_importances)
+
             # monitor robustness of selection
             used_features = np.zeros_like(cumulated_importances)
             used_features[cumulated_importances.nonzero()] = 1
             used_features_list.append(used_features)
-            summed_importances.append(cumulated_importances)
 
         feature_idx = np.sum(np.array(summed_importances), axis=0)
         unlabeled_feature_names = feature_names[1:]
@@ -155,7 +157,9 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop, meta_data
 
         trial.set_user_attr("shap_values", nonzero_shap_values)
         trial.set_user_attr("selected_features", selected_features)
-        trial.set_user_attr("robustness", feature_robustness)
+        trial.set_user_attr("robustness_selected_features", feature_robustness)
+        trial.set_user_attr("robustness_all_features", robustness_array)
+        trial.set_user_attr("feature_importances", np.array(used_features_list))
         return trim_mean(validation_metric_history, proportiontocut=0.2)
 
     # try:
@@ -178,7 +182,9 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop, meta_data
             bootstrap_count=0,
         ),
     )
-    # optuna.logging.set_verbosity(optuna.logging.ERROR)
+    if meta_data["parallel"]["cluster"]:  # deactivate logging on cluster
+        optuna.logging.set_verbosity(optuna.logging.ERROR)
+
     study.optimize(
         optuna_objective,
         n_trials=meta_data["selection_method"]["rf"]["trials"],
@@ -192,14 +198,18 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop, meta_data
 
     # check if study.best_value is available and at least one trial was completed
     try:
-        return dict(
-            zip(
-                study.best_trial.user_attrs["selected_features"],
+        return (
+            dict(
                 zip(
-                    study.best_trial.user_attrs["shap_values"],
-                    study.best_trial.user_attrs["robustness"],
-                ),
-            )
+                    study.best_trial.user_attrs["selected_features"],
+                    zip(
+                        study.best_trial.user_attrs["shap_values"],
+                        study.best_trial.user_attrs["robustness_selected_features"],
+                    ),
+                )
+            ),
+            study.best_trial.user_attrs["robustness_all_features"],
+            study.best_trial.user_attrs["feature_importances"],
         )
     except:
         return {"NONE": 0}
