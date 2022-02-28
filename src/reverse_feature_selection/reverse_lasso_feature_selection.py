@@ -97,16 +97,22 @@ def calculate_r2(
             > meta_data["selection_method"]["reverse_lasso"]["correlation_threshold"]
         ]
 
+        correlated_feature_names = list(map(list, zip(*correlated_features)))[0]
+
         # check if train would keep at least one feature after removing label and target_feature
         if train_data_df.shape[1] - len(correlated_features) < 3:
+
+            absolute_correlations = [
+                (feature_name, abs(correlation_coefficient))
+                for feature_name, correlation_coefficient in correlated_features
+            ]
             # keep the feature with the lowest correlation to the target feature
             sorted_correlated_features = sort_list_of_tuples_by_index(
-                correlated_features, index=1, ascending=True
+                absolute_correlations, index=1, ascending=True
             )
             min_correlated_feature = sorted_correlated_features[0][0]
-            correlated_features.remove(min_correlated_feature)
-
-        correlated_feature_names = list(map(list, zip(*correlated_features)))[0]
+            correlated_feature_names.remove(min_correlated_feature)
+            assert len(absolute_correlations) - 1 == len(correlated_feature_names)
 
         # if len(correlated_features) > 0:
         #     if target_feature_name in correlated_feature_names:

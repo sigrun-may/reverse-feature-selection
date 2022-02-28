@@ -3,6 +3,7 @@
 data/
 pickled_files/
 results/
+experiments/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -136,3 +137,4 @@ dmypy.json
 /.idea/modules.xml
 /.idea/inspectionProfiles/profiles_settings.xml
 /.idea/reverse_feature_selection.iml
+/experiments/

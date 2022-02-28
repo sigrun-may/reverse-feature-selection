@@ -25,7 +25,6 @@ def select_feature_subset(
         outer_cv_loop_iteration,
         " #############################################################",
     )
-    print("Type", type(test_indices))
 
     preprocessed_data_dict = yeo_johnson_transform_test_train_splits(
         data_df=data.iloc[remaining_data_indices, :],

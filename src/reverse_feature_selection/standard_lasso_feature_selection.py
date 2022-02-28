@@ -108,12 +108,12 @@ def select_features(
 
         predicted_y = []
         true_y = []
-        number_of_coefficients = []
-        coefficients = []
         all_shap_values = []
         summed_importances = []
         used_features_list = []
         r2_list = []
+        coefficients_list = []
+        shap_values_list = []
 
         feature_names = preprocessed_data_dict["feature_names"]
         transformed_data = preprocessed_data_dict["transformed_data"]
@@ -139,13 +139,10 @@ def select_features(
                 verbose=0,
             )
             lasso.fit(x_train.values, y_train)
-            coefficients.append(lasso.coef_)
 
             # sklearn lasso
             # lasso = Lasso(alpha = alpha, fit_intercept = True, positive = False)
             # lasso.fit(np.asfortranarray(x_train), y_train)
-
-            number_of_coefficients.append(sum(lasso.coef_ != 0.0))
 
             if (
                 meta_data["selection_method"]["lasso"]["shap_test"] is None
@@ -170,10 +167,10 @@ def select_features(
             used_features_list.append(used_features)
 
             # predict y_test
-            predicted_y_test = lasso.predict(x_test)
+            # predicted_y_test =
             # predicted_y.append(predicted_y_test[0])
-            r2_list.append(r2_score(y_test, predicted_y_test))
-            predicted_y.extend(predicted_y_test)
+            r2_list.append(r2_score(y_test, lasso.predict(x_test)))
+            # predicted_y.extend(predicted_y_test)
 
         feature_idx = np.sum(np.array(summed_importances), axis=0)
         unlabeled_feature_names = feature_names.drop(["label"])
@@ -194,6 +191,8 @@ def select_features(
         trial.set_user_attr("robustness_selected_features", feature_robustness)
         trial.set_user_attr("robustness_all_features", robustness_array)
         trial.set_user_attr("feature_importances", np.array(used_features_list))
+        trial.set_user_attr("shap_values_train", np.array(used_features_list))
+        trial.set_user_attr("shap_values_test", np.array(used_features_list))
         # r2 = r2_score(true_y, predicted_y_proba)
 
         # assume n = number of samples , p = number of independent variables

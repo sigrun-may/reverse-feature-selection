@@ -73,7 +73,7 @@ def _extract_indices_and_results_reverse(feature_selection_result):
     return result_dict, test_train_indices
 
 
-def _calculate_weights_for_reverse_lasso(
+def _calculate_weights_reverse_feature_selection(
     selected_feature_subsets, delta=None, factor=None
 ):
     weighted_selected_feature_subsets = []
@@ -184,36 +184,41 @@ def evaluate_feature_selection_methods(
         selected_feature_subsets,
     ) in feature_selection_result_dict.items():
         print("##############################", feature_selection_method, ": ")
-        # if feature_selection_method == "standard_lasso":
-        #     continue
+
+        assert (
+            len(robustness_dict[feature_selection_method])
+            == len(meta_data["data"]["columns"]) - 1  # remove label count
+        )
 
         if "reverse" in feature_selection_method:
-            selected_feature_subsets = _calculate_weights_for_reverse_lasso(
-                selected_feature_subsets, delta=0.0, factor=1
+            selected_feature_subsets = _calculate_weights_reverse_feature_selection(
+                selected_feature_subsets,
+                delta=meta_data["validation"]["delta"],
+                factor=meta_data["validation"]["factor"],
             )
             subset_vector = [len(subset) for subset in selected_feature_subsets]
-            print('stab_rev:',
-                get_stability(
-                    robustness_dict[feature_selection_method],
-                    subset_vector,
-                    number_of_folds=meta_data["cv"]["n_outer_folds"],
-                    number_of_features=len(meta_data["data"]["columns"]) - 1,
-                    # remove label count
-                )
-            )
+            assert len(subset_vector) == meta_data["cv"]["n_outer_folds"]  # lambda
+
         else:
-            subset_vector = np.sum(binary_selections_dict[
-                                       feature_selection_method], axis = 1)
-            print('stab:',
-                get_stability(
-                    robustness_dict[feature_selection_method],
-                    subset_vector,
-                    number_of_folds=meta_data["cv"]["n_outer_folds"]
-                    * meta_data["cv"]["n_inner_folds"],
-                    number_of_features=len(meta_data["data"]["columns"]) - 1,
-                    # remove label count
-                )
+            assert (
+                binary_selections_dict[feature_selection_method].shape[1]
+                == len(meta_data["data"]["columns"]) - 1
             )
+            subset_vector = np.sum(
+                binary_selections_dict[feature_selection_method], axis=1
+            )
+            assert subset_vector.ndim == 1
+            assert (
+                len(subset_vector)
+                == meta_data["cv"]["n_outer_folds"] * meta_data["cv"]["n_inner_folds"]
+            )  # lambda
+        print(
+            "stab:",
+            get_stability(
+                robustness_dict[feature_selection_method],
+                subset_vector,
+            ),
+        )
 
         # calculate performance evaluation metrics
         predicted_classes, true_classes = classify_feature_subsets(

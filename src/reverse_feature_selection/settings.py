@@ -40,7 +40,7 @@ def get_meta_data():
     ########################################################
     # Settings
     ########################################################
-    experiment_id = "t_0"
+    experiment_id = id_t
     print(experiment_id)
     data_name = "artificial1"
 
@@ -70,19 +70,21 @@ def get_meta_data():
             "bm_28",
             "bm_29",
         ],
-        cluster_correlation_threshold=None,
-        number_of_features=100,
+        # excluded_features=None,
+        cluster_correlation_threshold=0.8,
+        number_of_features=500,
         number_of_samples=None,
     )
     selection_method = dict(
         rf=dict(
-            trials=50,
+            trials=40,
             pruner_threshold=0.2,
             path_mlFlow=None,
             shap_train=False,
             shap_test=True,
+            extra_trees=True,
         ),
-        lasso=dict(trials=50, pruner=10, shap_train=False, shap_test=True),
+        lasso=dict(trials=40, pruner=10, shap_train=False, shap_test=True),
         reverse_lasso=dict(
             trials=20,
             pruner_patience=None,
@@ -94,12 +96,12 @@ def get_meta_data():
     meta_data = dict(
         experiment_id=experiment_id,
         experiment_path=experiment_path,
-        commit="2ce586dfec72ee84bbd9fc8fbab7843ad2d127e8",
+        commit="446b6a809f139842b698ad1cd5e63cd5ed8653b5",
         data=data,
         cv=dict(n_outer_folds=6, n_inner_folds=5),
         parallel=dict(n_jobs_preprocessing=1, n_jobs_cv=5, cluster=True),
         selection_method=selection_method,
-        validation=dict(k_neighbors=5, knn_method="distance", delta=0.2, factor=1),
+        validation=dict(k_neighbors=5, knn_method="distance", delta=0.0, factor=1),
         path_selected_subsets=f"{experiment_path}/selected_subsets.pkl.gz",
         path_validation=f"{experiment_path}/validation.pkl.gz",
         path_preprocessed_data=None,

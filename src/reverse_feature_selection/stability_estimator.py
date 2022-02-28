@@ -1,12 +1,15 @@
 from typing import List, Dict, Tuple
 
 
-def get_stability(
-    robustness_vector, subset_vector, number_of_folds, number_of_features
-):
-    # subset_vector = [len(subset) for subset in all_feature_subsets]  # lambda
+def get_stability(robustness_vector, subset_vector):
+    # assert len(subset_vector) == number_of_folds  # lambda
+    # assert (
+    #     len(robustness_vector) == number_of_features
+    # ), f"{len(robustness_vector)}, {number_of_features}"
+    number_of_features = len(robustness_vector)
+    number_of_folds = len(subset_vector)
 
-    stability = 0
+    stability = 0.0
     count_k = 0
     for k in range(1, number_of_folds + 1):
         count_k += 1
@@ -19,7 +22,7 @@ def get_stability(
             * _subset_size_stability(subset_vector, number_of_features, k)
         ) / subset_vector[k - 1]
 
-    stability = stability * (1 / (number_of_folds**2))
+    stability = stability / (number_of_folds**2)
 
     assert count_k == number_of_folds
     return stability

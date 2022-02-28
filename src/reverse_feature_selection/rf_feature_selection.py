@@ -75,7 +75,7 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop, meta_data
                 max_depth=trial.suggest_int("max_depth", 2, 20),
                 bagging_fraction=trial.suggest_uniform("bagging_fraction", 0.1, 1.0),
                 bagging_freq=trial.suggest_int("bagging_freq", 1, 10),
-                extra_trees=True,
+                extra_trees=meta_data["selection_method"]["rf"]["extra_trees"],
                 objective="binary",
                 metric="binary_logloss",
                 boosting_type="rf",
@@ -89,11 +89,12 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop, meta_data
             parameters["num_leaves"] = trial.suggest_int(
                 "num_leaves", 2, max_num_leaves
             )
-
+            evals_result = {}
             model = lgb.train(
                 parameters,
                 train_data,
                 valid_sets=[test_data],
+                callbacks=[lgb.record_evaluation(evals_result)],
             )
 
             if cv_pruner.no_features_selected(
@@ -103,6 +104,10 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop, meta_data
 
             validation_metric_history.append(
                 model.best_score["valid_0"]["binary_logloss"]
+            )
+            assert (
+                model.best_score["valid_0"]["binary_logloss"]
+                == evals_result["valid_0"]["binary_logloss"][-1]
             )
 
             if cv_pruner.should_prune_against_threshold(

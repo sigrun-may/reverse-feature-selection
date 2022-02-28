@@ -8,14 +8,21 @@ import joblib
 from joblib import Parallel, delayed
 
 
-def parse_data(meta_data) -> pd.DataFrame:
-    data = pd.read_csv(meta_data["data"]["input_data_path"])
+def get_data(meta_data) -> pd.DataFrame:
     # indices = [0]
     # random_numbers = range(70, 120, 1)
     # indices.extend(random_numbers)
     # print(indices)
     # data = data.iloc[:, indices]
-    print(data.shape)
+
+    # print(f"perfect features: '{utils.get_well_separated_data(data_df)}")
+    # scores, min, max = filter_methods.get_scores(data_df.iloc[:, :50])
+    # print(utils.sort_list_of_tuples_by_index(scores))
+    # print(f"good features (max, min): "
+    #       f"'{filter_methods.get_scores(data_df.iloc[:, :50])}")
+
+    data = pd.read_csv(meta_data["data"]["input_data_path"])
+    print("input data shape:", data.shape)
     if meta_data["data"]["excluded_features"]:
         data = data.drop(labels=meta_data["data"]["excluded_features"], axis=1)
         print(
@@ -24,9 +31,22 @@ def parse_data(meta_data) -> pd.DataFrame:
             f"{len(meta_data['data']['excluded_features'])} "
             f"features: {meta_data['data']['excluded_features']}",
         )
+    if meta_data["data"]["cluster_correlation_threshold"]:
+        data, cluster_dict = cluster_data(data, meta_data)
+        print("clustered data shape", data.shape)
+
     if meta_data["data"]["number_of_features"] is not None:
-        data = data.iloc[:, : meta_data["data"]["number_of_features"]]
-    print(data.shape)
+        if data.shape[1] > meta_data["data"]["number_of_features"]:
+            data = data.iloc[:, : meta_data["data"]["number_of_features"]]
+            assert len(data.columns) == meta_data["data"]["number_of_features"]
+        else:
+            print(
+                f"Data shape after clustering is {data.shape}. It is not "
+                f"possible to select "
+                f'{meta_data["data"]["number_of_features"]} features.'
+            )
+
+    print("data shape:", data.shape)
     return data
 
 
