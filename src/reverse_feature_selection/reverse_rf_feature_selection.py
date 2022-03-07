@@ -4,7 +4,7 @@ import optuna
 from optuna import TrialPruned
 from optuna.samplers import TPESampler
 from sklearn.metrics import r2_score
-import celer
+from sklearn.ensemble import RandomForestRegressor
 
 #
 import optuna_study_pruner
@@ -32,7 +32,7 @@ def calculate_adjusted_r2(y, predicted_y, number_of_coefficients):
 
 
 def calculate_r2(
-    alpha,
+    parameters,
     target_feature_name,
     deselected_features,
     data_dict,
@@ -139,54 +139,48 @@ def calculate_r2(
         # prepare train/ test data
         y_train = train_data_df[target_feature_name].values.reshape(-1, 1)
         x_train = train_data_df.drop(columns=target_feature_name)
-        x_test = test_data_df.drop(columns=target_feature_name).values
-        y_test = test_data_df[target_feature_name].values
+        x_test = test_data_df.drop(columns=target_feature_name)
+        y_test = test_data_df[target_feature_name]
         true_y.extend(test_data_df[target_feature_name].values)
 
         assert x_train.shape[1] >= 1
-        # build LASSO model
-        lasso = celer.Lasso(alpha=alpha, verbose=0)
-        lasso.fit(x_train.values, y_train)
+
+        # build model
+        regr = RandomForestRegressor(
+            max_depth=4,
+            criterion="absolute_error",
+            min_impurity_decrease=parameters["min_impurity_decrease"],
+        )
+        regr.fit(x_train, np.ravel(y_train))
 
         # sklearn lasso
         # lasso = Lasso(alpha = alpha, fit_intercept = True, positive = False)
         # lasso.fit(np.asfortranarray(x_train), y_train)
 
         # save number of non zero coefficients to calculate r2 adjusted
-        assert len(lasso.coef_) == x_train.shape[1]
-        number_of_coefficients = sum(lasso.coef_ != 0.0)
+        assert len(regr.feature_importances_) == x_train.shape[1]
+        number_of_coefficients = sum(regr.feature_importances_ != 0.0)
         # TODO still needed?
         number_of_coefficients_list.append(number_of_coefficients)
 
         if include_label:
             # prune trials if label coefficient is zero
-            label_coefficient = lasso.coef_[0]
+            label_coefficient = regr.feature_importances_[0]
             if label_coefficient == 0:
                 raise TrialPruned()
             # TODO still needed?
             label_coefficients.append(label_coefficient)
 
         # predict y_test
-        predicted_y.extend(lasso.predict(x_test))
-        r2_list.append(r2_score(y_test, lasso.predict(x_test)))
+        predicted_y.extend(regr.predict(x_test))
+        r2_list.append(r2_score(y_test, regr.predict(x_test)))
 
-    # assume n = number of samples , p = number of independent variables
-    # adjusted_r2 = 1-(1-R2)*(n-1)/(n-p-1)
-    sample_size = len(true_y)
-    adjusted_r2 = 1 - (
-        ((1 - r2_score(true_y, predicted_y)) * (sample_size - 1))
-        / (sample_size - np.median(number_of_coefficients_list) - 1)
-    )
     if include_label:  # TODO prüfen, ob das noch gebraucht wird
         trial.set_user_attr("label_coefficients", label_coefficients)
         # trial.set_user_attr("r2_score", r2_score(true_y, predicted_y))
         trial.set_user_attr(
             "median_number_of_features_in_model", np.median(number_of_coefficients_list)
         )
-    # return adjusted_r2
-    return r2_score(true_y, predicted_y)
-    # return np.mean(r2_list)
-
     # # return adjusted_r2
     # r2 = r2_score(true_y, predicted_y)
     # if r2 < 0:
@@ -199,6 +193,8 @@ def calculate_r2(
     #     / (sample_size - np.median(number_of_coefficients_list) - 1)
     # )
     # return adjusted_r2
+    return r2_score(true_y, predicted_y)
+    # return np.mean(r2_list)
 
 
 def optimize(
@@ -211,22 +207,27 @@ def optimize(
     """Optimize regularization parameter alpha for lasso regression."""
 
     def optuna_objective(trial):
-        optuna_study_pruner.study_no_trial_completed_pruner(trial, warm_up_steps=10)
-        optuna_study_pruner.study_no_improvement_pruner(
-            trial,
-            epsilon=0.001,
-            warm_up_steps=10,
-            number_of_similar_best_values=5,
-            threshold=0.1,
-        )
+        # optuna_study_pruner.study_no_trial_completed_pruner(trial, warm_up_steps=10)
+        # optuna_study_pruner.study_no_improvement_pruner(
+        #     trial,
+        #     epsilon=0.001,
+        #     warm_up_steps=10,
+        #     number_of_similar_best_values=5,
+        #     threshold=0.1,
+        # )
 
         optuna_study_pruner.insufficient_results_study_pruner(
-            trial, warm_up_steps=10, threshold=0.05
+            trial, warm_up_steps=15, threshold=0.05
+        )
+        # if 'random' in target_feature_name:
+        #     return 0
+
+        parameters = dict(
+            min_impurity_decrease=trial.suggest_uniform("min_impurity_decrease", 0.0, 3)
         )
 
         return calculate_r2(
-            # alpha=trial.suggest_discrete_uniform("alpha", 0.001, 1.0, 0.001),
-            alpha=trial.suggest_uniform("alpha", 0.01, 1.0),
+            parameters=parameters,
             target_feature_name=target_feature_name,
             deselected_features=deselected_features,
             data_dict=transformed_test_train_splits_dict,
@@ -246,19 +247,6 @@ def optimize(
         study_name=f"{target_feature_name}_iteration_{outer_cv_loop}",
         direction="maximize",
         # The higher R², the better the model fits the data.
-        sampler=TPESampler(
-            n_startup_trials=3,
-        ),
-    )
-
-    reverse_lasso = (
-        dict(
-            trials=20,
-            pruner_patience=None,
-            pruner_threshold=0.1,
-            threshold_correlations=0.2,
-            remove_deselected=False,
-        ),
     )
     if meta_data["parallel"]["cluster"]:  # deactivate logging on cluster
         optuna.logging.set_verbosity(optuna.logging.ERROR)
@@ -267,9 +255,10 @@ def optimize(
         # n_trials = 40,
         n_trials=meta_data["selection_method"]["reverse_lasso"]["trials"],
     )
-    # if study.best_value > 0:
-    #     fig = optuna.visualization.plot_optimization_history(study)
-    #     fig.show()
+    # # if study.best_value > 0:
+    # #     fig = optuna.visualization.plot_optimization_history(study)
+    # #     fig.show()
+    #
 
     # check if study.best_value is available and at least one trial was completed
     try:
@@ -280,7 +269,7 @@ def optimize(
 
     # calculate r2 without the label in the training data for the same alpha
     r2 = calculate_r2(
-        study.best_params["alpha"],
+        study.best_params,
         target_feature_name,
         deselected_features,
         transformed_test_train_splits_dict,
@@ -295,10 +284,17 @@ def optimize(
         # study.best_trial.user_attrs["r2_score"],
         study.best_trial.user_attrs["median_number_of_features_in_model"],
     )
+
+    # check if study.best_value is available and at least one trial was completed
+    try:
+        if study.best_value <= 0:  # Was r2 adjusted greater than zero?
+            return 0, 0
+    except:
+        return 0, 0
+
     return (
-        r2,
         study.best_value,
-        # study.best_trial.user_attrs["label_coefficients"],
+        r2,
     )
 
 
@@ -317,7 +313,7 @@ def select_features(
 
         # get performance of target feature
         # TODO label_coefficients_list needed?
-        r2_adjusted_unlabeled, r2_adjusted = optimize(
+        r2_adjusted, r2_adjusted_unlabeled = optimize(
             transformed_test_train_splits_dict,
             target_feature_name,
             deselected_features_list,

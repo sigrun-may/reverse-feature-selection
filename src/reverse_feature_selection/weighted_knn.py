@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import PowerTransformer
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import log_loss, roc_auc_score
+from sklearn.metrics import log_loss, roc_auc_score, matthews_corrcoef, classification_report
 from weighted_manhattan_distance import WeightedManhattanDistance
 
 import warnings
@@ -130,6 +130,66 @@ def validate(
 
 
 def validate_standard(
+    test_data,
+    train_data,
+    number_of_neighbors: int,
+    weights
+) -> tuple[Any, list[Any], float, float]:
+
+    # # z transform to compare the distances
+    # powerTransformer = PowerTransformer(
+    #     copy=True, method="yeo-johnson", standardize=True
+    # )
+    # scaled_train_data = powerTransformer.fit_transform(train_data)
+    # scaled_test_data = powerTransformer.transform(test_data)
+    #
+    # assert (
+    #     scaled_train_data.shape[1]
+    #     == train_data.shape[1]
+    #     == scaled_test_data.shape[1]
+    #     == test_data.shape[1]
+    # )
+    # assert scaled_train_data.shape[0] == train_data.shape[0]
+
+    # weights = np.asarray(
+    #     [
+    #         selected_feature_subset[selected_feature][0]
+    #         for selected_feature in train_data.columns
+    #     ]
+    # )
+    # weights = weights / np.sum(weights)
+    # assert np.sum(weights) == 1
+    # assert type(weights) == np.ndarray, type(weights)
+    # # assert type(weights[0]) == np.float64, weights
+
+    knn_clf = KNeighborsClassifier(
+        n_neighbors=number_of_neighbors,
+        weights="distance",
+        metric=WeightedManhattanDistance(weights=weights),
+        algorithm="brute",
+    )
+    knn_clf.fit(train_data.iloc[:, 1:], train_data["label"])
+    # print(knn_clf.predict_proba(scaled_test_data))
+    # print(knn_clf.predict(scaled_test_data))
+
+    classified_classes = knn_clf.predict(test_data.iloc[:, 1:])
+    class_probabilities = knn_clf.predict_proba(test_data.iloc[:, 1:])
+    true_classes = list(test_data["label"])
+    print('log_loss', log_loss(true_classes, class_probabilities))
+    print('roc', roc_auc_score(true_classes, class_probabilities[:, 1]))
+    print('mathews', matthews_corrcoef(true_classes, classified_classes))
+    # print(classification_report(true_classes, classified_classes))
+
+    assert len(classified_classes) == test_data.shape[0]
+    return (
+        classified_classes,
+        true_classes,
+        log_loss(true_classes, class_probabilities),
+        roc_auc_score(true_classes, class_probabilities[:, 1]),
+    )
+
+
+def _validate_standard(
     test: pd.DataFrame,
     train: pd.DataFrame,
     selected_feature_subset: Dict[str, float],
@@ -160,6 +220,8 @@ def validate_standard(
             for selected_feature in train_data.columns
         ]
     )
+    weights = weights / np.sum(weights)
+    assert np.sum(weights) == 1
     assert type(weights) == np.ndarray, type(weights)
     # assert type(weights[0]) == np.float64, weights
 

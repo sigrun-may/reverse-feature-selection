@@ -8,7 +8,7 @@ import joblib
 from joblib import Parallel, delayed
 
 
-def get_data(meta_data) -> pd.DataFrame:
+def get_data(meta_data_dict) -> pd.DataFrame:
     # indices = [0]
     # random_numbers = range(70, 120, 1)
     # indices.extend(random_numbers)
@@ -21,29 +21,29 @@ def get_data(meta_data) -> pd.DataFrame:
     # print(f"good features (max, min): "
     #       f"'{filter_methods.get_scores(data_df.iloc[:, :50])}")
 
-    data = pd.read_csv(meta_data["data"]["input_data_path"])
+    data = pd.read_csv(meta_data_dict["data"]["input_data_path"])
     print("input data shape:", data.shape)
-    if meta_data["data"]["excluded_features"]:
-        data = data.drop(labels=meta_data["data"]["excluded_features"], axis=1)
+    if meta_data_dict["data"]["excluded_features"]:
+        data = data.drop(labels=meta_data_dict["data"]["excluded_features"], axis=1)
         print(
             data.shape,
             f" excluded "
-            f"{len(meta_data['data']['excluded_features'])} "
-            f"features: {meta_data['data']['excluded_features']}",
+            f"{len(meta_data_dict['data']['excluded_features'])} "
+            f"features: {meta_data_dict['data']['excluded_features']}",
         )
-    if meta_data["data"]["cluster_correlation_threshold"]:
-        data, cluster_dict = cluster_data(data, meta_data)
+    if meta_data_dict["data"]["cluster_correlation_threshold"]:
+        data, cluster_dict = cluster_data(data, meta_data_dict)
         print("clustered data shape", data.shape)
 
-    if meta_data["data"]["number_of_features"] is not None:
-        if data.shape[1] > meta_data["data"]["number_of_features"]:
-            data = data.iloc[:, : meta_data["data"]["number_of_features"]]
-            assert len(data.columns) == meta_data["data"]["number_of_features"]
+    if meta_data_dict["data"]["number_of_features"] is not None:
+        if data.shape[1] > meta_data_dict["data"]["number_of_features"]:
+            data = data.iloc[:, : meta_data_dict["data"]["number_of_features"]]
+            assert len(data.columns) == meta_data_dict["data"]["number_of_features"]
         else:
             print(
                 f"Data shape after clustering is {data.shape}. It is not "
                 f"possible to select "
-                f'{meta_data["data"]["number_of_features"]} features.'
+                f'{meta_data_dict["data"]["number_of_features"]} features.'
             )
 
     print("data shape:", data.shape)
@@ -101,7 +101,7 @@ def yeo_johnson_transform_test_train_splits(
     return {"transformed_data": transformed_data, "feature_names": data_df.columns}
 
 
-def transform_train_test_set(train_index, test_index, data_df):
+def transform_train_test_set(train_index, test_index, data_df, correlation_matrix=True):
     assert not data_df.isnull().values.any(), "Missing values" + data_df.head()
 
     # remove label for transformation
@@ -154,7 +154,10 @@ def transform_train_test_set(train_index, test_index, data_df):
     # calculate correlation matrix for train data
     train_pd = pd.DataFrame(train, columns=data_df.columns[1:])
     assert not train_pd.isnull().values.any()
-    train_correlation_matrix = train_pd.corr(method="pearson")
+
+    train_correlation_matrix = None
+    if correlation_matrix:
+        train_correlation_matrix = train_pd.corr(method="pearson")
 
     # add label to transformed data TODO: pandas
     train_data = np.column_stack((label[train_index], train))

@@ -13,7 +13,7 @@ from cv_pruner import Method
 import optuna_study_pruner
 
 
-def select_features(transformed_test_train_splits_dict, outer_cv_loop, meta_data):
+def select_features(preprocessed_data_dict, outer_cv_loop, meta_data, extra_trees):
     """Optimize regularization parameter alpha for lasso regression."""
 
     def optuna_objective(trial):
@@ -34,20 +34,12 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop, meta_data
         # if "random" in target_feature_name or "pseudo" in target_feature_name:
         #     trial.study.stop()
 
-        # if trial.number >= 10:
-        #     try:
-        #         trial.study.best_value
-        #     except:
-        #         # print('no results for more than 10 trials')
-        #         # print(target_feature_name)
-        #         trial.study.stop()
-
         validation_metric_history = []
-        summed_importances = []
-        used_features_list = []
+        feature_importances_list = []
+        shap_values_list = []
 
-        feature_names = transformed_test_train_splits_dict["feature_names"].values
-        transformed_data = transformed_test_train_splits_dict["transformed_data"]
+        feature_names = preprocessed_data_dict["feature_names"].values
+        transformed_data = preprocessed_data_dict["transformed_data"]
 
         # cross validation for the optimization of alpha
         for fold_index, (test, train, train_correlation_matrix_complete) in enumerate(
@@ -75,11 +67,12 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop, meta_data
                 max_depth=trial.suggest_int("max_depth", 2, 20),
                 bagging_fraction=trial.suggest_uniform("bagging_fraction", 0.1, 1.0),
                 bagging_freq=trial.suggest_int("bagging_freq", 1, 10),
-                extra_trees=meta_data["selection_method"]["rf"]["extra_trees"],
+                extra_trees=extra_trees,
                 objective="binary",
                 metric="binary_logloss",
                 boosting_type="rf",
                 verbose=-1,
+                silent=True,
             )
 
             # num_leaves must be smaller than 2^max_depth
@@ -89,12 +82,12 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop, meta_data
             parameters["num_leaves"] = trial.suggest_int(
                 "num_leaves", 2, max_num_leaves
             )
-            evals_result = {}
+
             model = lgb.train(
                 parameters,
                 train_data,
                 valid_sets=[test_data],
-                callbacks=[lgb.record_evaluation(evals_result)],
+                callbacks=[lgb.record_evaluation({})],  # stop verbose
             )
 
             if cv_pruner.no_features_selected(
@@ -104,10 +97,6 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop, meta_data
 
             validation_metric_history.append(
                 model.best_score["valid_0"]["binary_logloss"]
-            )
-            assert (
-                model.best_score["valid_0"]["binary_logloss"]
-                == evals_result["valid_0"]["binary_logloss"][-1]
             )
 
             if cv_pruner.should_prune_against_threshold(
@@ -124,47 +113,62 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop, meta_data
             ):
                 return trim_mean(validation_metric_history, proportiontocut=0.2)
 
-            if (
-                meta_data["selection_method"]["rf"]["shap_test"] is None
-                and meta_data["selection_method"]["rf"]["shap_train"] is None
-            ):
-                cumulated_importances = model.feature_importance(importance_type="gain")
-            else:
-                explainer = shap.TreeExplainer(model)
-                if meta_data["selection_method"]["rf"]["shap_test"]:
-                    shap_values = explainer(x_test)
+            feature_importances_list.append(
+                model.feature_importance(importance_type="gain")
+            )
 
-                elif meta_data["selection_method"]["rf"]["shap_train"]:
-                    shap_values = explainer(x_train)
-                raw_shap_values = np.abs(shap_values.values)[:, :, 0]
-                cumulated_importances = np.sum(raw_shap_values, axis=0)
+            # calculate shap values
+            explainer = shap.TreeExplainer(model)
+            shap_values = explainer(x_test)
+            raw_shap_values = np.abs(shap_values.values)[:, :, 0]
+            shap_values_list.append(np.sum(raw_shap_values, axis=0))
 
-            summed_importances.append(cumulated_importances)
-
-            # monitor robustness of selection
-            used_features = np.zeros_like(cumulated_importances)
-            used_features[cumulated_importances.nonzero()] = 1
-            used_features_list.append(used_features)
-
-        feature_idx = np.sum(np.array(summed_importances), axis=0)
-        unlabeled_feature_names = feature_names[1:]
-        selected_features = unlabeled_feature_names[feature_idx.nonzero()]
-        nonzero_shap_values = feature_idx[feature_idx.nonzero()]
-        assert len(selected_features) == feature_idx.nonzero()[0].size
-
-        robustness_array = np.sum(np.array(used_features_list), axis=0)
-        feature_robustness = robustness_array[robustness_array.nonzero()]
-        assert (
-            feature_robustness.shape
-            == nonzero_shap_values.shape
-            == selected_features.shape
+        trial.set_user_attr("shap_values", np.array(shap_values_list))
+        trial.set_user_attr(
+            "macro_feature_importances", np.array(feature_importances_list)
         )
 
-        trial.set_user_attr("shap_values", nonzero_shap_values)
-        trial.set_user_attr("selected_features", selected_features)
-        trial.set_user_attr("robustness_selected_features", feature_robustness)
-        trial.set_user_attr("robustness_all_features", robustness_array)
-        trial.set_user_attr("feature_importances", np.array(used_features_list))
+        #     if (
+        #         meta_data_dict["selection_method"]["rf"]["shap_test"] is None
+        #         and meta_data_dict["selection_method"]["rf"]["shap_train"] is None
+        #     ):
+        #         cumulated_importances = model.feature_importance(importance_type="gain")
+        #     else:
+        #         explainer = shap.TreeExplainer(model)
+        #         if meta_data_dict["selection_method"]["rf"]["shap_test"]:
+        #             shap_values = explainer(x_test)
+        #
+        #         elif meta_data_dict["selection_method"]["rf"]["shap_train"]:
+        #             shap_values = explainer(x_train)
+        #         raw_shap_values = np.abs(shap_values.values)[:, :, 0]
+        #         cumulated_importances = np.sum(raw_shap_values, axis=0)
+        #
+        #     summed_importances.append(cumulated_importances)
+        #
+        #     # monitor robustness of selection
+        #     used_features = np.zeros_like(cumulated_importances)
+        #     used_features[cumulated_importances.nonzero()] = 1
+        #     used_features_list.append(used_features)
+        #
+        # feature_idx = np.sum(np.array(summed_importances), axis=0)
+        # unlabeled_feature_names = feature_names[1:]
+        # selected_features = unlabeled_feature_names[feature_idx.nonzero()]
+        # nonzero_shap_values = feature_idx[feature_idx.nonzero()]
+        # assert len(selected_features) == feature_idx.nonzero()[0].size
+        #
+        # robustness_array = np.sum(np.array(used_features_list), axis=0)
+        # feature_robustness = robustness_array[robustness_array.nonzero()]
+        # assert (
+        #     feature_robustness.shape
+        #     == nonzero_shap_values.shape
+        #     == selected_features.shape
+        # )
+        # trial.set_user_attr("shap_values", nonzero_shap_values)
+        # trial.set_user_attr("selected_features", selected_features)
+        # trial.set_user_attr("robustness_selected_features", feature_robustness)
+        # trial.set_user_attr("robustness_all_features", robustness_array)
+        # trial.set_user_attr("feature_importances", np.array(used_features_list))
+
         return trim_mean(validation_metric_history, proportiontocut=0.2)
 
     # try:
@@ -201,20 +205,41 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop, meta_data
     # intermediate_result["test_train_indices"] = {}
     # return study.best_trial.user_attrs["label_coefficients"]
 
+    remain_data = preprocessed_data_dict["transformed_remain_data"]
+    model_all = lgb.train(
+        study.best_params,
+        lgb.Dataset(remain_data[:, 1:], label=remain_data[:, 0]),
+        callbacks=[lgb.record_evaluation({})],  # stop verbose
+    )
+    micro_feature_importance = np.abs(
+        model_all.feature_importance(importance_type="gain")
+    )
+
     # check if study.best_value is available and at least one trial was completed
     try:
-        return (
-            dict(
-                zip(
-                    study.best_trial.user_attrs["selected_features"],
-                    zip(
-                        study.best_trial.user_attrs["shap_values"],
-                        study.best_trial.user_attrs["robustness_selected_features"],
-                    ),
-                )
-            ),
-            study.best_trial.user_attrs["robustness_all_features"],
-            study.best_trial.user_attrs["feature_importances"],
-        )
+        return {
+            "shap_values": study.best_trial.user_attrs["shap_values"],
+            "macro_feature_importances": study.best_trial.user_attrs[
+                "macro_feature_importances"
+            ],
+            "micro_feature_importance": micro_feature_importance,
+        }
     except:
         return {"NONE": 0}
+
+    # try:
+    #     return (
+    #         dict(
+    #             zip(
+    #                 study.best_trial.user_attrs["selected_features"],
+    #                 zip(
+    #                     study.best_trial.user_attrs["shap_values"],
+    #                     study.best_trial.user_attrs["robustness_selected_features"],
+    #                 ),
+    #             )
+    #         ),
+    #         study.best_trial.user_attrs["robustness_all_features"],
+    #         study.best_trial.user_attrs["feature_importances"],
+    #     )
+    # except:
+    #     return {"NONE": 0}

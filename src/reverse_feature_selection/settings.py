@@ -42,7 +42,8 @@ def get_meta_data():
     ########################################################
     experiment_id = id_t
     print(experiment_id)
-    data_name = "artificial1"
+    # data_name = "artificial1"
+    data_name = "colon"
 
     print(experiment_id)
     folder = dict(data="../../data", experiments="../../experiments")
@@ -53,43 +54,41 @@ def get_meta_data():
         meta_data_path=f"{folder['data']}/{data_name}.pkl",
         clustered_data_path=f"{folder['data']}/{data_name}_clustered.csv",
         columns=None,
-        excluded_features=[
-            "bm_0",
-            "bm_1",
-            "bm_2",
-            "bm_3",
-            "bm_4",
-            "bm_5",
-            "bm_6",
-            "bm_7",
-            "bm_8",
-            "bm_9",
-            "bm_14",
-            "bm_17",
-            "bm_24",
-            "bm_28",
-            "bm_29",
-        ],
-        # excluded_features=None,
+        # excluded_features=[
+        #     "bm_0",
+        #     "bm_1",
+        #     "bm_2",
+        #     "bm_3",
+        #     "bm_4",
+        #     "bm_5",
+        #     "bm_6",
+        #     "bm_7",
+        #     "bm_8",
+        #     "bm_9",
+        #     "bm_14",
+        #     "bm_17",
+        #     "bm_24",
+        #     "bm_28",
+        #     "bm_29",
+        # ],
+        excluded_features=None,
         cluster_correlation_threshold=0.8,
-        number_of_features=500,
+        number_of_features=None,
         number_of_samples=None,
     )
     selection_method = dict(
         rf=dict(
             trials=40,
-            pruner_threshold=0.2,
+            pruner_threshold=0.5,
             path_mlFlow=None,
-            shap_train=False,
-            shap_test=True,
             extra_trees=True,
         ),
-        lasso=dict(trials=40, pruner=10, shap_train=False, shap_test=True),
+        lasso=dict(trials=40, pruner=15),
         reverse_lasso=dict(
-            trials=20,
+            trials=30,
             pruner_patience=None,
-            pruner_threshold=0.1,
-            correlation_threshold=0.2,
+            pruner_threshold=0.45,
+            correlation_threshold=0.1,
             remove_deselected=False,
         ),
     )
@@ -98,7 +97,7 @@ def get_meta_data():
         experiment_path=experiment_path,
         commit="446b6a809f139842b698ad1cd5e63cd5ed8653b5",
         data=data,
-        cv=dict(n_outer_folds=6, n_inner_folds=5),
+        cv=dict(n_outer_folds=5, n_inner_folds=4),
         parallel=dict(n_jobs_preprocessing=1, n_jobs_cv=5, cluster=True),
         selection_method=selection_method,
         validation=dict(k_neighbors=5, knn_method="distance", delta=0.0, factor=1),
@@ -106,7 +105,7 @@ def get_meta_data():
         path_validation=f"{experiment_path}/validation.pkl.gz",
         path_preprocessed_data=None,
         # path_preprocessed_data=f
-        # "{experiment_path}/preprocessed_data/transformed_test_train_splits_dict",
+        # "{experiment_path}/preprocessed_data/preprocessed_data_dict",
         correlation_matrix_path=f"{folder['data']}/"
         f"{data_name}_correlation_matrix.pkl.gz",
         cluster_dict_path=f"{folder['data']}/" f"{data_name}_clusters.pkl.gz",
@@ -133,7 +132,16 @@ def get_meta_data():
             print(f"Directory {experiment_path}/preprocessed_data already exists")
             pass
 
+    # TODO: load meta_data if experiments already exists
+
     save_meta_data(meta_data)
+    return meta_data
+
+
+def get_old_meta_data(experiment_id):
+    experiment_path = f"../../experiments/{experiment_id}"
+    with open(f"{experiment_path}/meta_data.yaml", "r") as file:
+        meta_data = yaml.safe_load(file)
     return meta_data
 
 
@@ -142,7 +150,7 @@ def save_meta_data(meta_data):
     sqllite_mydict[meta_data["experiment_id"]] = meta_data
     sqllite_mydict.close()
 
-    # Write a YAML representation of meta_data
+    # Write a YAML representation of meta_data_dict
     with open(f"{meta_data['experiment_path']}/meta_data.yaml", "w+") as fp:
         yaml.dump(meta_data, fp, allow_unicode=True, default_flow_style=False)
 

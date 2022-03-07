@@ -1,6 +1,7 @@
 from ctypes import Union
 from typing import Dict, List, Tuple, Any
 
+import math
 from optuna.samplers import TPESampler
 from optuna import TrialPruned
 import optuna
@@ -12,32 +13,7 @@ import shap
 import numpy as np
 from sklearn.metrics import r2_score
 import optuna_study_pruner
-
-
-def calculate_adjusted_r2(y, predicted_y, number_of_coefficients):
-    # calculate the coefficient of determination, r2:
-    # The proportion of the variance in the dependent variable that is predictable from the independent variable(s).
-    # It provides selected_feature_subset_list measure of how well observed outcomes are replicated by the model, based on the proportion of total
-    # variation of outcomes explained by the model
-    r2 = r2_score(y, predicted_y)
-    # print('r2:', r2)
-
-    samplesize = len(y)
-    # print('number_of_coefficients', number_of_coefficients)
-    # adjusted_r2 = 1 - (1 - r2) * (samplesize - 1) / (samplesize - (np.max(number_of_coefficients)) - 1)
-    adjusted_r2 = 1 - (1 - r2) * (samplesize - 1) / (
-        samplesize - (np.median(number_of_coefficients)) - 1
-    )
-    # print('adjusted_r2: ', adjusted_r2)
-
-    # R2 gibt den Prozentsatz der Streuung der Antwortvariablen an, der durch das Modell erklärt wird. Der Wert wird wie
-    # folgt berechnet: 1 minus das Verhältnis zwischen der Summe der quadrierten Fehler (Streuung, die durch das Modell
-    # nicht erklärt wird) zur Gesamtsumme der Quadrate (Gesamtstreuung im Modell).
-
-    # Adj r2 = 1-(1-R2)*(n-1)/(n-p-1)
-    # assume n = number of sample size , p = number of independent variables
-    # Je höher das korrigierte R², desto besser passt das Modell auf die Daten.
-    return adjusted_r2
+import cv_pruner
 
 
 def select_features(
@@ -45,7 +21,7 @@ def select_features(
     outer_cv_loop: int,
     meta_data,
     # preprocessed_data_dict: Dict[str, List[Union[Tuple[Any], str]]],
-) -> Tuple[dict[Any, tuple[str, tuple[float, int]]], Any, Any]:
+):
     """Select feature subset for best value of regularization parameter alpha.
 
     Args:
@@ -71,55 +47,17 @@ def select_features(
         #     trial.study.stop()
         #     raise TrialPruned()
 
-        # # pruning of complete study
-        # if trial.number >= settings.PATIENCE_BEFORE_PRUNING_OF_STUDY:
-        #     try:
-        #         # check if any trial was completed and not pruned
-        #         _ = trial.study.best_value
-        #     except:
-        #         trial.study.stop()
-        #
-        # #  adapt TPE sampler to suggest new parameter, when suggested parameter is repeated
-        # alphas_history = []
-        # for _trial in study.trials:
-        #     if _trial.user_attrs:
-        #         alphas_history.append(_trial.user_attrs["alpha"])
-        #
-        # alpha = trial.suggest_discrete_uniform("alpha", -5.0, 5.0, 0.01)
-        # alpha = trial.suggest_loguniform("alpha", 0.001, 5.0)
-        # # print(alphas_history)
-        # alpha = trial.suggest_int("alpha", 1, 101, log=True) / 100
-        # if alpha in alphas_history:
-        #     # print('alpha', alpha)
-        #     alpha = trial.suggest_int("beta", 1, 101, log=True) / 100
-        #     # print('alpha_beta', alpha)
-        # if alpha in alphas_history:
-        #     # print('alpha', alpha)
-        #     alpha = trial.suggest_int("gamma", 1, 101, log=True) / 100
-        #     # print('alpha_gamma', alpha)
-        #
-        # # prune study when alpha is repeated
-        # if alpha in alphas_history:
-        #     print("repeated alpha: ", alpha, "in trial ", trial.number)
-        #     raise TrialPruned()
-        #
-        # # save calculated alpha
-        # trial.set_user_attr("alpha", alpha)
-
         predicted_y = []
         true_y = []
-        all_shap_values = []
-        summed_importances = []
-        used_features_list = []
-        r2_list = []
         coefficients_list = []
         shap_values_list = []
+        alpha = trial.suggest_uniform("alpha", 0.01, 1.0)
 
         feature_names = preprocessed_data_dict["feature_names"]
         transformed_data = preprocessed_data_dict["transformed_data"]
 
         # cross validation for the optimization of alpha
-        for test, train, train_correlation_matrix_complete in transformed_data:
+        for test, train, _ in transformed_data:
 
             train_data_df = pd.DataFrame(train, columns=feature_names)
             test_data_df = pd.DataFrame(test, columns=feature_names)
@@ -133,7 +71,7 @@ def select_features(
 
             # build LASSO model
             lasso = celer.Lasso(
-                alpha=trial.suggest_uniform("alpha", 0.01, 1.0),
+                alpha=alpha,
                 # alpha=trial.suggest_discrete_uniform("alpha", 0.001, 1.0,
                 # 0.001),
                 verbose=0,
@@ -141,68 +79,84 @@ def select_features(
             lasso.fit(x_train.values, y_train)
 
             # sklearn lasso
-            # lasso = Lasso(alpha = alpha, fit_intercept = True, positive = False)
+            # lasso = Lasso(alpha = trial.suggest_uniform("alpha", 0.01, 1.0), fit_intercept = True, positive = False)
             # lasso.fit(np.asfortranarray(x_train), y_train)
+            if cv_pruner.no_features_selected(lasso.coef_):
+                raise TrialPruned()
 
-            if (
-                meta_data["selection_method"]["lasso"]["shap_test"] is None
-                and meta_data["selection_method"]["lasso"]["shap_train"] is None
-            ):
-                cumulated_importances = lasso.coef_
-            else:
-                explainer = shap.explainers.Linear(lasso, x_train)
-                if meta_data["selection_method"]["lasso"]["shap_test"]:
-                    shap_values = explainer(x_test)
+            coefficients_list.append(np.abs(lasso.coef_))
 
-                elif meta_data["selection_method"]["lasso"]["shap_train"]:
-                    shap_values = explainer(x_train)
-                cumulated_importances = np.sum(np.abs(shap_values.values), axis=0)
+            predicted_y_test = lasso.predict(x_test)
+            predicted_y.extend(predicted_y_test)
 
-            summed_importances.append(cumulated_importances)
-            # TODO unterschied coeff zu stacked SHAP
+            explainer = shap.explainers.Linear(lasso, x_train)
+            shap_values = explainer(x_test)
+            mean_shap_values = np.mean(np.abs(shap_values.values), axis=0)
+            shap_values_list.append(mean_shap_values)
 
-            # monitor robustness of selection
-            used_features = np.zeros_like(cumulated_importances)
-            used_features[cumulated_importances.nonzero()] = 1
-            used_features_list.append(used_features)
+        assert len(shap_values_list) == len(coefficients_list)
+        trial.set_user_attr("shap_values", np.array(shap_values_list))
+        trial.set_user_attr("macro_feature_importances", np.array(coefficients_list))
 
-            # predict y_test
-            # predicted_y_test =
-            # predicted_y.append(predicted_y_test[0])
-            r2_list.append(r2_score(y_test, lasso.predict(x_test)))
-            # predicted_y.extend(predicted_y_test)
-
-        feature_idx = np.sum(np.array(summed_importances), axis=0)
-        unlabeled_feature_names = feature_names.drop(["label"])
-        selected_features = unlabeled_feature_names[feature_idx.nonzero()]
-        nonzero_shap_values = feature_idx[feature_idx.nonzero()]
-        assert len(selected_features) == feature_idx.nonzero()[0].size
-
-        robustness_array = np.sum(np.array(used_features_list), axis=0)
-        feature_robustness = robustness_array[robustness_array.nonzero()]
-        assert (
-            feature_robustness.shape
-            == nonzero_shap_values.shape
-            == selected_features.shape
-        )
-
-        trial.set_user_attr("shap_values", nonzero_shap_values)
-        trial.set_user_attr("selected_features", selected_features)
-        trial.set_user_attr("robustness_selected_features", feature_robustness)
-        trial.set_user_attr("robustness_all_features", robustness_array)
-        trial.set_user_attr("feature_importances", np.array(used_features_list))
-        trial.set_user_attr("shap_values_train", np.array(used_features_list))
-        trial.set_user_attr("shap_values_test", np.array(used_features_list))
-        # r2 = r2_score(true_y, predicted_y_proba)
-
-        # assume n = number of samples , p = number of independent variables
-        # adjusted_r2 = 1-(1-R2)*(n-1)/(n-p-1)
-        sample_size = len(true_y)
-        adjusted_r2 = 1 - (
-            ((1 - r2_score(true_y, predicted_y)) * (sample_size - 1))
-            / (sample_size - (np.median(number_of_coefficients)) - 1)
-        )
-        return np.mean(r2_list)
+        #     if (
+        #         meta_data["selection_method"]["lasso"]["shap_test"] is None
+        #         and meta_data["selection_method"]["lasso"]["shap_train"] is None
+        #     ):
+        #         cumulated_importances = lasso.coef_
+        #     else:
+        #         explainer = shap.explainers.Linear(lasso, x_train)
+        #         if meta_data["selection_method"]["lasso"]["shap_test"]:
+        #             shap_values = explainer(x_test)
+        #
+        #         elif meta_data["selection_method"]["lasso"]["shap_train"]:
+        #             shap_values = explainer(x_train)
+        #         cumulated_importances = np.sum(np.abs(shap_values.values), axis=0)
+        #
+        #     summed_importances.append(cumulated_importances)
+        #     # TODO unterschied coeff zu stacked SHAP
+        #
+        #     # monitor robustness of selection
+        #     used_features = np.zeros_like(cumulated_importances)
+        #     used_features[cumulated_importances.nonzero()] = 1
+        #     used_features_list.append(used_features)
+        #
+        #     # predict y_test
+        #     # predicted_y_test =
+        #     # predicted_y.append(predicted_y_test[0])
+        #     r2_list.append(r2_score(y_test, lasso.predict(x_test)))
+        #     # predicted_y.extend(predicted_y_test)
+        #
+        # feature_idx = np.sum(np.array(summed_importances), axis=0)
+        # unlabeled_feature_names = feature_names.drop(["label"])
+        # selected_features = unlabeled_feature_names[feature_idx.nonzero()]
+        # nonzero_shap_values = feature_idx[feature_idx.nonzero()]
+        # assert len(selected_features) == feature_idx.nonzero()[0].size
+        #
+        # robustness_array = np.sum(np.array(used_features_list), axis=0)
+        # feature_robustness = robustness_array[robustness_array.nonzero()]
+        # assert (
+        #     feature_robustness.shape
+        #     == nonzero_shap_values.shape
+        #     == selected_features.shape
+        # )
+        #
+        # trial.set_user_attr("shap_values", nonzero_shap_values)
+        # trial.set_user_attr("selected_features", selected_features)
+        # trial.set_user_attr("robustness_selected_features", feature_robustness)
+        # trial.set_user_attr("robustness_all_features", robustness_array)
+        # trial.set_user_attr("feature_importances", np.array(used_features_list))
+        # trial.set_user_attr("shap_values_train", np.array(used_features_list))
+        # trial.set_user_attr("shap_values_test", np.array(used_features_list))
+        # # r2 = r2_score(true_y, predicted_y_proba)
+        #
+        # # assume n = number of samples , p = number of independent variables
+        # # adjusted_r2 = 1-(1-R2)*(n-1)/(n-p-1)
+        # sample_size = len(true_y)
+        # adjusted_r2 = 1 - (
+        #     ((1 - r2_score(true_y, predicted_y)) * (sample_size - 1))
+        #     / (sample_size - (np.median(number_of_coefficients)) - 1)
+        # )
+        return r2_score(true_y, predicted_y)
         # return r2_score(true_y, predicted_y)
         # return calculate_adjusted_r2(true_y, predicted_y, number_of_coefficients)
 
@@ -222,21 +176,46 @@ def select_features(
     )
     if meta_data["parallel"]["cluster"]:  # deactivate logging on cluster
         optuna.logging.set_verbosity(optuna.logging.ERROR)
+
     study.optimize(
         optuna_objective,
         n_trials=meta_data["selection_method"]["lasso"]["trials"],
     )
-
-    return (
-        dict(
-            zip(
-                study.best_trial.user_attrs["selected_features"],
-                zip(
-                    study.best_trial.user_attrs["shap_values"],
-                    study.best_trial.user_attrs["robustness_selected_features"],
-                ),
-            )
-        ),
-        study.best_trial.user_attrs["robustness_all_features"],
-        study.best_trial.user_attrs["feature_importances"],
+    # build LASSO model
+    lasso_all = celer.Lasso(
+        alpha=study.best_params["alpha"],
+        # alpha=trial.suggest_discrete_uniform("alpha", 0.001, 1.0,
+        # 0.001),
+        verbose=0,
     )
+    remain_data = preprocessed_data_dict["transformed_remain_data"]
+    lasso_all.fit(remain_data[:, 1:], remain_data[:, 0])
+    if np.sum(np.abs(lasso_all.coef_)) > 0:
+        micro_feature_importance = np.abs(lasso_all.coef_)
+    else:
+        micro_feature_importance = None
+
+    # TODO check if study.best_value is available and at least one trial was completed
+    return {
+        "shap_values": study.best_trial.user_attrs["shap_values"],
+        "macro_feature_importances": study.best_trial.user_attrs[
+            "macro_feature_importances"
+        ],
+        "micro_feature_importance": micro_feature_importance,
+    }
+
+    # trial.set_user_attr("shap_values", np.array(shap_values_list))
+    # trial.set_user_attr("feature_importances", np.array(coefficients_list))
+    # return (
+    #     dict(
+    #         zip(
+    #             study.best_trial.user_attrs["selected_features"],
+    #             zip(
+    #                 study.best_trial.user_attrs["shap_values"],
+    #                 study.best_trial.user_attrs["robustness_selected_features"],
+    #             ),
+    #         )
+    #     ),
+    #     study.best_trial.user_attrs["robustness_all_features"],
+    #     study.best_trial.user_attrs["feature_importances"],
+    # )

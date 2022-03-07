@@ -1,11 +1,15 @@
 from typing import List, Dict, Tuple
+import numpy as np
 
 
-def get_stability(robustness_vector, subset_vector):
+def get_stability(used_features_matrix):
     # assert len(subset_vector) == number_of_folds  # lambda
     # assert (
     #     len(robustness_vector) == number_of_features
     # ), f"{len(robustness_vector)}, {number_of_features}"
+    robustness_vector = used_features_matrix.sum(axis = 0)
+    subset_vector = used_features_matrix.sum(axis = 1)
+
     number_of_features = len(robustness_vector)
     number_of_folds = len(subset_vector)
 
@@ -21,6 +25,9 @@ def get_stability(robustness_vector, subset_vector):
             * list(robustness_vector).count(k)
             * _subset_size_stability(subset_vector, number_of_features, k)
         ) / subset_vector[k - 1]
+        if np.isnan(stability):
+            print('stability is nan')
+            return 0
 
     stability = stability / (number_of_folds**2)
 
