@@ -5,7 +5,12 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import PowerTransformer
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import log_loss, roc_auc_score, matthews_corrcoef, classification_report
+from sklearn.metrics import (
+    log_loss,
+    roc_auc_score,
+    matthews_corrcoef,
+    classification_report,
+)
 from weighted_manhattan_distance import WeightedManhattanDistance
 
 import warnings
@@ -132,9 +137,9 @@ def validate(
 def validate_standard(
     test_data,
     train_data,
-    number_of_neighbors: int,
-    weights
-) -> tuple[Any, list[Any], float, float]:
+    weights,
+    meta_data,
+):
 
     # # z transform to compare the distances
     # powerTransformer = PowerTransformer(
@@ -164,7 +169,7 @@ def validate_standard(
 
     knn_clf = KNeighborsClassifier(
         n_neighbors=number_of_neighbors,
-        weights="distance",
+        weights=meta_data["validation"]["knn_method"],
         metric=WeightedManhattanDistance(weights=weights),
         algorithm="brute",
     )
@@ -175,18 +180,14 @@ def validate_standard(
     classified_classes = knn_clf.predict(test_data.iloc[:, 1:])
     class_probabilities = knn_clf.predict_proba(test_data.iloc[:, 1:])
     true_classes = list(test_data["label"])
-    print('log_loss', log_loss(true_classes, class_probabilities))
-    print('roc', roc_auc_score(true_classes, class_probabilities[:, 1]))
-    print('mathews', matthews_corrcoef(true_classes, classified_classes))
+    # print('log_loss', log_loss(true_classes, class_probabilities))
+    # print('roc', roc_auc_score(true_classes, class_probabilities[:, 1]))
+    # print('mathews', matthews_corrcoef(true_classes, classified_classes))
     # print(classification_report(true_classes, classified_classes))
 
     assert len(classified_classes) == test_data.shape[0]
-    return (
-        classified_classes,
-        true_classes,
-        log_loss(true_classes, class_probabilities),
-        roc_auc_score(true_classes, class_probabilities[:, 1]),
-    )
+
+    return (true_classes, classified_classes, class_probabilities)
 
 
 def _validate_standard(

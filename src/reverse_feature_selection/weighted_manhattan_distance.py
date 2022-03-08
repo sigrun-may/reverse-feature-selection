@@ -10,10 +10,10 @@ class WeightedManhattanDistance:
         dist = np.sum(np.abs(p1 - p2) * self._weights)
         return dist
 
-    def pairwise(self, x: np.ndarray):
-        assert x.shape[0] == 2
-        assert x.shape[1] == self._weights.shape[0]
-        p1 = x[0]
-        p2 = x[1]
-        dist = np.sum(np.abs(p1 - p2) * self._weights)
-        return np.asarray([[0.0, dist], [dist, 0.0]])
+    # def pairwise(self, x: np.ndarray):
+    #     assert x.shape[0] == 2
+    #     assert x.shape[1] == self._weights.shape[0]
+    #     p1 = x[0]
+    #     p2 = x[1]
+    #     dist = np.sum(np.abs(p1 - p2) * self._weights)
+    #     return np.asarray([[0.0, dist], [dist, 0.0]])

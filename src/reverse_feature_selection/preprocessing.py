@@ -6,7 +6,8 @@ import numpy as np
 import pandas as pd
 import joblib
 from joblib import Parallel, delayed
-
+import utils
+import filter_methods
 
 def get_data(meta_data_dict) -> pd.DataFrame:
     # indices = [0]
@@ -14,12 +15,6 @@ def get_data(meta_data_dict) -> pd.DataFrame:
     # indices.extend(random_numbers)
     # print(indices)
     # data = data.iloc[:, indices]
-
-    # print(f"perfect features: '{utils.get_well_separated_data(data_df)}")
-    # scores, min, max = filter_methods.get_scores(data_df.iloc[:, :50])
-    # print(utils.sort_list_of_tuples_by_index(scores))
-    # print(f"good features (max, min): "
-    #       f"'{filter_methods.get_scores(data_df.iloc[:, :50])}")
 
     data = pd.read_csv(meta_data_dict["data"]["input_data_path"])
     print("input data shape:", data.shape)
@@ -34,6 +29,14 @@ def get_data(meta_data_dict) -> pd.DataFrame:
     if meta_data_dict["data"]["cluster_correlation_threshold"]:
         data, cluster_dict = cluster_data(data, meta_data_dict)
         print("clustered data shape", data.shape)
+
+    print(f"perfect features: '{utils.get_well_separated_data(data)}")
+    # scores, min, max = filter_methods.get_scores(data.iloc[:, :100])
+    # print(filter_methods.get_scores(data.iloc[:, :100]))
+    print((filter_methods.get_scores(data.iloc[:, :100])))
+    # print(utils.sort_list_of_tuples_by_index(scores, ascending = False))
+    # print(f"good features (max, min): "
+    #       f"'{filter_methods.get_scores(data.iloc[:, :100])}")
 
     if meta_data_dict["data"]["number_of_features"] is not None:
         if data.shape[1] > meta_data_dict["data"]["number_of_features"]:

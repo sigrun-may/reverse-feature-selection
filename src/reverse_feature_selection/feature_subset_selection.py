@@ -63,20 +63,10 @@ def select_feature_subset(
             meta_data,
             extra_trees=False,
         ),
-        # "extra_trees": tree_feature_selection.select_features(
-        #     preprocessed_data_dict, outer_cv_loop_iteration, meta_data,
-        #     extra_trees = True
-        # ),
+        "extra_trees": tree_feature_selection.select_features(
+            preprocessed_data_dict, outer_cv_loop_iteration, meta_data, extra_trees=True
+        ),
     }
-    # print(selected_features)
-    # selected_features = select_features(preprocessed_data_dict)
-    # selected_features = selection_method_rf(preprocessed_data_dict)
-
-    # # append metrics to overall result for outer cross-validation
-    # for selection_method, selected_features in metrics_dict.items():
-    #     r = validation_metrics_dict.get(selection_method, [])
-    #     r.append(selected_features)
-    #     validation_metrics_dict[selection_method] = r
     # TODO DataCLass?
     return selected_feature_subset, transformed_test_data, transformed_remain_data
     # return selected_feature_subset, test_indices, remaining_data_indices

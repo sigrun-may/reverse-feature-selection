@@ -42,8 +42,8 @@ def get_meta_data():
     ########################################################
     experiment_id = id_t
     print(experiment_id)
-    # data_name = "artificial1"
-    data_name = "colon"
+    data_name = "artificial2"
+    # data_name = "colon"
 
     print(experiment_id)
     folder = dict(data="../../data", experiments="../../experiments")
@@ -54,6 +54,8 @@ def get_meta_data():
         meta_data_path=f"{folder['data']}/{data_name}.pkl",
         clustered_data_path=f"{folder['data']}/{data_name}_clustered.csv",
         columns=None,
+        excluded_features=['bm_12', 'bm_13', 'bm_15', 'bm_16', 'bm_18', 'bm_19', 'bm_20',
+         'bm_21', 'bm_22', 'bm_23', 'bm_25', 'bm_27'],
         # excluded_features=[
         #     "bm_0",
         #     "bm_1",
@@ -65,30 +67,33 @@ def get_meta_data():
         #     "bm_7",
         #     "bm_8",
         #     "bm_9",
+        #     "bm_10",
+        #     "bm_11",
+        #     "bm_26",
         #     "bm_14",
         #     "bm_17",
         #     "bm_24",
         #     "bm_28",
         #     "bm_29",
         # ],
-        excluded_features=None,
-        cluster_correlation_threshold=0.8,
-        number_of_features=None,
+        # excluded_features=None,
+        cluster_correlation_threshold=None,
+        number_of_features=500,
         number_of_samples=None,
     )
     selection_method = dict(
         rf=dict(
-            trials=40,
-            pruner_threshold=0.5,
+            trials=20,
+            pruner_threshold=0.3,
             path_mlFlow=None,
             extra_trees=True,
         ),
-        lasso=dict(trials=40, pruner=15),
+        lasso=dict(trials=20, pruner=15),
         reverse_lasso=dict(
-            trials=30,
+            trials=15,
             pruner_patience=None,
-            pruner_threshold=0.45,
-            correlation_threshold=0.1,
+            pruner_threshold=0.3,
+            correlation_threshold=0.2,
             remove_deselected=False,
         ),
     )
@@ -97,12 +102,13 @@ def get_meta_data():
         experiment_path=experiment_path,
         commit="446b6a809f139842b698ad1cd5e63cd5ed8653b5",
         data=data,
-        cv=dict(n_outer_folds=5, n_inner_folds=4),
+        cv=dict(n_outer_folds=6, n_inner_folds=5),
         parallel=dict(n_jobs_preprocessing=1, n_jobs_cv=5, cluster=True),
         selection_method=selection_method,
-        validation=dict(k_neighbors=5, knn_method="distance", delta=0.0, factor=1),
+        validation=dict(k_neighbors=7, knn_method="distance", threshold=0.1, factor=1),
         path_selected_subsets=f"{experiment_path}/selected_subsets.pkl.gz",
         path_validation=f"{experiment_path}/validation.pkl.gz",
+        path_validation_result=f"{experiment_path}/validation.csv",
         path_preprocessed_data=None,
         # path_preprocessed_data=f
         # "{experiment_path}/preprocessed_data/preprocessed_data_dict",
@@ -131,8 +137,6 @@ def get_meta_data():
         except FileExistsError:
             print(f"Directory {experiment_path}/preprocessed_data already exists")
             pass
-
-    # TODO: load meta_data if experiments already exists
 
     save_meta_data(meta_data)
     return meta_data
