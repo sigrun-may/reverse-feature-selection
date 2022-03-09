@@ -54,18 +54,18 @@ def select_feature_subset(
         #     reverse_lasso_feature_selection_doubleHPO.select_features(
         #     preprocessed_data_dict, outer_cv_loop_iteration, meta_data
         # ),
-        "reverse_rf": reverse_rf_feature_selection.select_features(
-            preprocessed_data_dict, outer_cv_loop_iteration, meta_data
-        ),
-        "random_forest": tree_feature_selection.select_features(
-            preprocessed_data_dict,
-            outer_cv_loop_iteration,
-            meta_data,
-            extra_trees=False,
-        ),
-        "extra_trees": tree_feature_selection.select_features(
-            preprocessed_data_dict, outer_cv_loop_iteration, meta_data, extra_trees=True
-        ),
+        # "reverse_rf": reverse_rf_feature_selection.select_features(
+        #     preprocessed_data_dict, outer_cv_loop_iteration, meta_data
+        # ),
+        # "random_forest": tree_feature_selection.select_features(
+        #     preprocessed_data_dict,
+        #     outer_cv_loop_iteration,
+        #     meta_data,
+        #     extra_trees=False,
+        # ),
+        # "extra_trees": tree_feature_selection.select_features(
+        #     preprocessed_data_dict, outer_cv_loop_iteration, meta_data, extra_trees=True
+        # ),
     }
     # TODO DataCLass?
     return selected_feature_subset, transformed_test_data, transformed_remain_data

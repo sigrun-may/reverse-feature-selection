@@ -9,6 +9,7 @@ from joblib import Parallel, delayed
 import utils
 import filter_methods
 
+
 def get_data(meta_data_dict) -> pd.DataFrame:
     # indices = [0]
     # random_numbers = range(70, 120, 1)
@@ -30,13 +31,13 @@ def get_data(meta_data_dict) -> pd.DataFrame:
         data, cluster_dict = cluster_data(data, meta_data_dict)
         print("clustered data shape", data.shape)
 
-    print(f"perfect features: '{utils.get_well_separated_data(data)}")
-    # scores, min, max = filter_methods.get_scores(data.iloc[:, :100])
-    # print(filter_methods.get_scores(data.iloc[:, :100]))
-    print((filter_methods.get_scores(data.iloc[:, :100])))
-    # print(utils.sort_list_of_tuples_by_index(scores, ascending = False))
-    # print(f"good features (max, min): "
-    #       f"'{filter_methods.get_scores(data.iloc[:, :100])}")
+    # print(f"perfect features: '{utils.get_well_separated_data(data)}")
+    # # scores, min, max = filter_methods.get_scores(data.iloc[:, :100])
+    # # print(filter_methods.get_scores(data.iloc[:, :100]))
+    # print((filter_methods.get_scores(data.iloc[:, :100])))
+    # # print(utils.sort_list_of_tuples_by_index(scores, ascending = False))
+    # # print(f"good features (max, min): "
+    # #       f"'{filter_methods.get_scores(data.iloc[:, :100])}")
 
     if meta_data_dict["data"]["number_of_features"] is not None:
         if data.shape[1] > meta_data_dict["data"]["number_of_features"]:

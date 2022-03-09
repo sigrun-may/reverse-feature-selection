@@ -34,17 +34,18 @@ def calculate_adjusted_r2(y, predicted_y, number_of_coefficients):
 def calculate_r2(
     alpha,
     target_feature_name,
-    deselected_features,
     data_dict,
-    include_label,
-    trial,
     meta_data,
+    include_label=True,
+    trial=None,
+    deselected_features=None,
 ):
     predicted_y = []
     true_y = []
     number_of_coefficients_list = []
     label_coefficients = []
     r2_list = []
+    high_correlated_features = set()
 
     feature_names = data_dict["feature_names"].values
     assert feature_names[0] == "label"
@@ -84,6 +85,22 @@ def calculate_r2(
 
             test_data_df.drop(columns=deselected_features, inplace=True)
             assert test_data_df.shape[1] == test.shape[1] - len(deselected_features)
+
+        # find features highly correlated to the target_feature
+        high_corr_features = [
+            feature
+            for feature, correlation_coefficient in train_correlation_matrix[
+                target_feature_name
+            ].items()
+            if (
+                (abs(correlation_coefficient) > 0.7)
+                and (feature not in target_feature_name)
+            )
+        ]
+        assert target_feature_name not in high_corr_features
+        high_correlated_features = high_correlated_features.union(
+            set(high_corr_features)
+        )
 
         # How Correlations Influence Lasso Prediction, April 2012IEEE Transactions on Information Theory 59(3)
         # DOI: 10.1109/TIT.2012.2227680
@@ -183,6 +200,7 @@ def calculate_r2(
         trial.set_user_attr(
             "median_number_of_features_in_model", np.median(number_of_coefficients_list)
         )
+        trial.set_user_attr("union_correlated_features", high_correlated_features)
     # return adjusted_r2
     return r2_score(true_y, predicted_y)
     # return np.mean(r2_list)
@@ -228,11 +246,9 @@ def optimize(
             # alpha=trial.suggest_discrete_uniform("alpha", 0.001, 1.0, 0.001),
             alpha=trial.suggest_uniform("alpha", 0.01, 1.0),
             target_feature_name=target_feature_name,
-            deselected_features=deselected_features,
             data_dict=transformed_test_train_splits_dict,
-            include_label=True,
-            trial=trial,
             meta_data=meta_data,
+            trial=trial,
         )
 
     # try:
@@ -250,16 +266,6 @@ def optimize(
             n_startup_trials=3,
         ),
     )
-
-    reverse_lasso = (
-        dict(
-            trials=20,
-            pruner_patience=None,
-            pruner_threshold=0.1,
-            threshold_correlations=0.2,
-            remove_deselected=False,
-        ),
-    )
     if meta_data["parallel"]["cluster"]:  # deactivate logging on cluster
         optuna.logging.set_verbosity(optuna.logging.ERROR)
     study.optimize(
@@ -274,19 +280,17 @@ def optimize(
     # check if study.best_value is available and at least one trial was completed
     try:
         if study.best_value <= 0:  # Was r2 adjusted greater than zero?
-            return 0, 0
+            return 0, 0, 0
     except:
-        return 0, 0
+        return 0, 0, 0
 
     # calculate r2 without the label in the training data for the same alpha
     r2 = calculate_r2(
         study.best_params["alpha"],
         target_feature_name,
-        deselected_features,
         transformed_test_train_splits_dict,
+        meta_data,
         include_label=False,
-        trial=None,
-        meta_data=meta_data,
     )
     print(
         target_feature_name,
@@ -298,7 +302,7 @@ def optimize(
     return (
         r2,
         study.best_value,
-        # study.best_trial.user_attrs["label_coefficients"],
+        study.best_trial.user_attrs["union_correlated_features"],
     )
 
 
@@ -317,7 +321,7 @@ def select_features(
 
         # get performance of target feature
         # TODO label_coefficients_list needed?
-        r2_adjusted_unlabeled, r2_adjusted = optimize(
+        r2_adjusted_unlabeled, r2_adjusted, correlated_features = optimize(
             transformed_test_train_splits_dict,
             target_feature_name,
             deselected_features_list,
@@ -328,6 +332,7 @@ def select_features(
         selected_features_dict[target_feature_name] = (
             r2_adjusted_unlabeled,
             r2_adjusted,
+            correlated_features,
         )
 
         #

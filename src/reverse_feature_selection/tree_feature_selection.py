@@ -205,15 +205,14 @@ def select_features(preprocessed_data_dict, outer_cv_loop, meta_data, extra_tree
     # intermediate_result["test_train_indices"] = {}
     # return study.best_trial.user_attrs["label_coefficients"]
 
-    remain_data = preprocessed_data_dict["transformed_remain_data"]
-    model_all = lgb.train(
+    micro_feature_importance = lgb.train(
         study.best_params,
-        lgb.Dataset(remain_data[:, 1:], label=remain_data[:, 0]),
+        lgb.Dataset(
+            data=preprocessed_data_dict["transformed_remain_data"][:, 1:],
+            label=preprocessed_data_dict["transformed_remain_data"][:, 0],
+        ),
         callbacks=[lgb.record_evaluation({})],  # stop verbose
-    )
-    micro_feature_importance = np.abs(
-        model_all.feature_importance(importance_type="gain")
-    )
+    ).feature_importance(importance_type="gain")
 
     # check if study.best_value is available and at least one trial was completed
     try:

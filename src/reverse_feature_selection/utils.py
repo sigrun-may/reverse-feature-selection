@@ -51,3 +51,14 @@ def evaluate_proportion_of_selected_artificial_features(feature_set):
     print("random_features", len(random_features_list), random_features_list)
     print("bm", len(relevant_features_list), relevant_features_list)
     print("pseudo", len(pseudo_relevant_features_list), pseudo_relevant_features_list)
+
+
+def _select_intersect_from_feature_subsets(selected_feature_subsets, intersect):
+    intersect_dict_list = []
+    for subset_dict in selected_feature_subsets:
+        intersect_dict = dict()
+        for key, value in subset_dict.items():
+            if key in intersect:
+                intersect_dict[key] = value
+        intersect_dict_list.append(intersect_dict)
+    return intersect_dict_list

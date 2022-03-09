@@ -21,7 +21,7 @@ def get_prediction(feature, x, y):
     predicted_y = []
     true_values = []
     true_y = []
-    predicted_y_auc =[]
+    predicted_y_auc = []
     metric_list = []
 
     sample_loo_test = LeaveOneOut()
@@ -89,7 +89,7 @@ def get_prediction(feature, x, y):
         print(feature)
         return feature
     else:
-        return 'NAN'
+        return "NAN"
     # return test_auc
     # return np.mean(metric_list)
 
