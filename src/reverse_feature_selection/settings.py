@@ -42,7 +42,7 @@ def get_meta_data():
     ########################################################
     experiment_id = id_t
     print(experiment_id)
-    data_name = "artificial2"
+    data_name = "artificial3"
     # data_name = "colon"
 
     print(experiment_id)
@@ -54,20 +54,20 @@ def get_meta_data():
         meta_data_path=f"{folder['data']}/{data_name}.pkl",
         clustered_data_path=f"{folder['data']}/{data_name}_clustered.csv",
         columns=None,
-        excluded_features=[
-            "bm_12",
-            "bm_13",
-            "bm_15",
-            "bm_16",
-            "bm_18",
-            "bm_19",
-            "bm_20",
-            "bm_21",
-            "bm_22",
-            "bm_23",
-            "bm_25",
-            "bm_27",
-        ],
+        # excluded_features=[
+        #     "bm_12",
+        #     "bm_13",
+        #     "bm_15",
+        #     "bm_16",
+        #     "bm_18",
+        #     "bm_19",
+        #     "bm_20",
+        #     "bm_21",
+        #     "bm_22",
+        #     "bm_23",
+        #     "bm_25",
+        #     "bm_27",
+        # ],
         # excluded_features=[
         #     "bm_0",
         #     "bm_1",
@@ -88,8 +88,8 @@ def get_meta_data():
         #     "bm_28",
         #     "bm_29",
         # ],
-        # excluded_features=None,
-        cluster_correlation_threshold=None,
+        excluded_features=None,
+        cluster_correlation_threshold=0.7,
         number_of_features=1500,
         number_of_samples=None,
         pos_label=0,
@@ -104,16 +104,16 @@ def get_meta_data():
 
     selection_method = dict(
         rf=dict(
-            trials=20,
-            pruner_threshold=0.3,
+            trials=40,
+            pruner_threshold=0.5,
             path_mlFlow=None,
             extra_trees=True,
         ),
-        lasso=dict(trials=20, pruner=15),
+        lasso=dict(trials=40, pruner=20),
         reverse_lasso=dict(
-            trials=15,
+            trials=40,
             pruner_patience=None,
-            pruner_threshold=0.3,
+            pruner_threshold=0.1,
             correlation_threshold=0.1,
             remove_deselected=False,
         ),
@@ -126,7 +126,7 @@ def get_meta_data():
         cv=dict(n_outer_folds=6, n_inner_folds=5),
         parallel=dict(n_jobs_preprocessing=1, n_jobs_cv=5, cluster=True),
         selection_method=selection_method,
-        validation=dict(k_neighbors=11, knn_method="distance", threshold=0.2, factor=1),
+        validation=dict(k_neighbors=11, knn_method="distance", threshold=0.1, factor=1),
         path_selected_subsets=f"{experiment_path}/selected_subsets.pkl.gz",
         path_validation=f"{experiment_path}/validation.pkl.gz",
         path_validation_result=f"{experiment_path}/validation.csv",

@@ -32,9 +32,9 @@ def get_data(meta_data_dict) -> pd.DataFrame:
         print("clustered data shape", data.shape)
 
     # print(f"perfect features: '{utils.get_well_separated_data(data)}")
-    # # scores, min, max = filter_methods.get_scores(data.iloc[:, :100])
-    # # print(filter_methods.get_scores(data.iloc[:, :100]))
-    # print((filter_methods.get_scores(data.iloc[:, :100])))
+    # # # scores, min, max = filter_methods.get_scores(data.iloc[:, :100])
+    # # # print(filter_methods.get_scores(data.iloc[:, :100]))
+    # print((filter_methods.get_scores(data.iloc[:, :210])))
     # # print(utils.sort_list_of_tuples_by_index(scores, ascending = False))
     # # print(f"good features (max, min): "
     # #       f"'{filter_methods.get_scores(data.iloc[:, :100])}")
@@ -260,16 +260,18 @@ def cluster_data(
         if "uncorrelated_features" not in key:
             clustered_data_df.insert(0, f"cluster_{key}", data_df[key])
 
-    clustered_data_df.insert(0, "label", data_df["label"])
+    clustered_data_df.insert(0, "label", data_df["label"])  #
+    de_fragmented_df = clustered_data_df.copy()
+    de_fragmented_df.to_csv("art3_clustered.csv")
 
     assert (
-        clustered_data_df.shape[1]
+        de_fragmented_df.shape[1]
         == (len(cluster_dict.keys()) - 1)
         + len(cluster_dict["uncorrelated_features"])
         + 1  # the label
     )
-    print(clustered_data_df.shape)
-    return clustered_data_df, cluster_dict
+    print(de_fragmented_df.shape)
+    return de_fragmented_df, cluster_dict
 
 
 def _calculate_cluster_representative(cluster_feature_names, correlation_matrix_df):

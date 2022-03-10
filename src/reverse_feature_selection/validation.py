@@ -1,6 +1,8 @@
 from typing import List, Dict
 from weighted_manhattan_distance import WeightedManhattanDistance
-from sklearn.neighbors import KNeighborsClassifier
+from sklearn.neighbors import KNeighborsClassifier, VALID_METRICS
+from sklearn.metrics import DistanceMetric
+from sklearn.preprocessing import MinMaxScaler
 
 import numpy as np
 import pandas as pd
@@ -18,10 +20,10 @@ import utils
 
 
 def measure_correctness_of_feature_selection(selected_features_matrix, meta_data):
-    feature_names = meta_data['data']['columns'][1:]
+    feature_names = meta_data["data"]["columns"][1:]
     true_values = []
     for feature in feature_names:
-        if 'bm' in feature:
+        if "bm" in feature:
             true_values.append(1)
         else:
             true_values.append(0)
@@ -31,7 +33,7 @@ def measure_correctness_of_feature_selection(selected_features_matrix, meta_data
     selected_features = np.zeros_like(robustness_vector)
     selected_features[robustness_vector.nonzero()] = 1
     f1 = f1_score(true_values, selected_features)
-    print('f1:', f1)
+    print("f1:", f1)
     return f1
 
 
@@ -57,6 +59,15 @@ def evaluate_feature_selection(
             )
             assert np.ndarray == type(selection_result)
 
+            if "reverse" not in feature_selection_method:
+                for row in range(selection_result.shape[0]):
+                    normalized_fi = selection_result[row, :] / np.max(
+                        selection_result[row, :]
+                    )
+                    normalized_fi[normalized_fi < 0.1] = 0.0
+                    selection_result[row, :] = normalized_fi
+                assert np.min(selection_result[selection_result > 0]) >= 0.1
+
             # monitor stability of selection
             used_features_matrix = np.zeros_like(selection_result)
             used_features_matrix[selection_result.nonzero()] = 1
@@ -70,13 +81,20 @@ def evaluate_feature_selection(
             assert np.min(selection_result) >= 0.0
             # TODO quadrierte robustness/ sinus... / log
 
-            # cumulated_feature_importance = np.sum(np.array(
-            # selection_result), axis=0)
+            # cumulated_feature_importance = np.sum(np.array(selection_result), axis=0)
 
             mean_feature_importance = np.mean(np.array(selection_result), axis=0)
             robustness_vector = used_features_matrix.sum(axis=0)
             print(robustness_vector[robustness_vector.nonzero()])
             cumulated_feature_importance = mean_feature_importance * robustness_vector
+
+            # if 'reverse' not in feature_selection_method:
+            #     # scaler = MinMaxScaler()
+            #     # normalized_fi = scaler.fit_transform(cumulated_feature_importance.reshape(1, -1))
+            #     normalized_fi = cumulated_feature_importance/np.max(cumulated_feature_importance)
+            #     normalized_fi[normalized_fi < 0.1] = .0
+            #     cumulated_feature_importance = normalized_fi
+            #     assert np.min(cumulated_feature_importance) >= 0.1
 
             unlabeled_feature_names = np.asarray(meta_data["data"]["columns"][1:])
             assert len(unlabeled_feature_names) == cumulated_feature_importance.size
@@ -139,7 +157,11 @@ def evaluate_feature_selection(
             )
             performance_metrics_dict["relevant_features"] = sum(relevant_features)
             performance_metrics_dict["selected_features"] = len(selected_feature_names)
-            performance_metrics_dict["correctness f1"] = measure_correctness_of_feature_selection(used_features_matrix, meta_data)
+            performance_metrics_dict[
+                "correctness f1"
+            ] = measure_correctness_of_feature_selection(
+                used_features_matrix, meta_data
+            )
 
             metrics_per_method_dict[key] = performance_metrics_dict
 
@@ -177,6 +199,7 @@ def classify_feature_subsets(
         knn_clf = KNeighborsClassifier(
             n_neighbors=meta_data["validation"]["k_neighbors"],
             weights=meta_data["validation"]["knn_method"],
+            # metric='manhattan',
             metric=WeightedManhattanDistance(weights=weights),
             algorithm="brute",
         )
@@ -235,19 +258,18 @@ def _extract_test_data_and_results(feature_selection_result, meta_data_dict):
                         )
                     )
 
-                if selection_method not in micro_fi_dict:
-                    micro_fi_dict[selection_method] = selected_features[
-                        "micro_feature_importance"
-                    ]
-                elif selected_features["micro_feature_importance"] is not None:
-                    micro_fi_dict[selection_method] = np.vstack(
-                        (
-                            micro_fi_dict[selection_method],
-                            selected_features["micro_feature_importance"],
+                if selected_features["micro_feature_importance"] is not None:
+                    if selection_method not in micro_fi_dict:
+                        micro_fi_dict[selection_method] = selected_features[
+                            "micro_feature_importance"
+                        ]
+                    else:
+                        micro_fi_dict[selection_method] = np.vstack(
+                            (
+                                micro_fi_dict[selection_method],
+                                selected_features["micro_feature_importance"],
+                            )
                         )
-                    )
-                else:
-                    micro_fi_dict[selection_method] = None
             else:
                 weighted_features = _calculate_weights_reverse_feature_selection(
                     selected_features,
@@ -283,13 +305,21 @@ def _extract_test_data_and_results(feature_selection_result, meta_data_dict):
             meta_data_dict["cv"]["n_outer_folds"]
             * meta_data_dict["cv"]["n_inner_folds"],
         )
-        if micro_fi_dict[selection_method] is not None:
-            assert micro_fi_dict[selection_method].shape == (
-                meta_data_dict["cv"]["n_outer_folds"],
-                len(meta_data_dict["data"]["columns"]) - 1,  # remove label
-            ), micro_fi_dict[selection_method].shape
-        else:
-            micro_fi_dict.pop(selection_method)
+        if micro_fi_dict and (selection_method in micro_fi_dict):
+            # remove method with incomplete matrix
+            if not (
+                micro_fi_dict[selection_method].shape
+                == (
+                    meta_data_dict["cv"]["n_outer_folds"],
+                    len(meta_data_dict["data"]["columns"]) - 1,
+                )
+            ):
+                micro_fi_dict.pop(selection_method)
+            else:
+                assert micro_fi_dict[selection_method].shape == (
+                    meta_data_dict["cv"]["n_outer_folds"],
+                    len(meta_data_dict["data"]["columns"]) - 1,  # remove label
+                ), micro_fi_dict[selection_method].shape
 
     for selection_method in reverse_subsets_dict:
         assert reverse_subsets_dict[selection_method].shape == (
@@ -339,10 +369,14 @@ def calculate_micro_metrics(predicted_classes, true_classes, meta_data_dict):
         "accuracy",
         accuracy_score(true_classes, predicted_classes),
         "f1_score",
-        f1_score(true_classes, predicted_classes, pos_label=meta_data_dict['data']['pos_label']),
+        f1_score(
+            true_classes,
+            predicted_classes,
+            pos_label=meta_data_dict["data"]["pos_label"],
+        ),
         "balanced_accuracy_score",
         balanced_accuracy_score(true_classes, predicted_classes),
-        print(classification_report(true_classes, predicted_classes))
+        print(classification_report(true_classes, predicted_classes)),
     )
     return {
         "matthews": matthews_corrcoef(true_classes, predicted_classes),
@@ -352,4 +386,3 @@ def calculate_micro_metrics(predicted_classes, true_classes, meta_data_dict):
             true_classes, predicted_classes
         ),
     }
-

@@ -229,18 +229,18 @@ def optimize(
     """Optimize regularization parameter alpha for lasso regression."""
 
     def optuna_objective(trial):
-        optuna_study_pruner.study_no_trial_completed_pruner(trial, warm_up_steps=10)
-        optuna_study_pruner.study_no_improvement_pruner(
-            trial,
-            epsilon=0.001,
-            warm_up_steps=10,
-            number_of_similar_best_values=5,
-            threshold=0.1,
-        )
+        # optuna_study_pruner.study_no_trial_completed_pruner(trial, warm_up_steps=20)
+        # optuna_study_pruner.study_no_improvement_pruner(
+        #     trial,
+        #     epsilon=0.001,
+        #     warm_up_steps=30,
+        #     number_of_similar_best_values=5,
+        #     threshold=0.1,
+        # )
 
-        optuna_study_pruner.insufficient_results_study_pruner(
-            trial, warm_up_steps=10, threshold=0.05
-        )
+        # optuna_study_pruner.insufficient_results_study_pruner(
+        #     trial, warm_up_steps=20, threshold=0.05
+        # )
 
         return calculate_r2(
             # alpha=trial.suggest_discrete_uniform("alpha", 0.001, 1.0, 0.001),
