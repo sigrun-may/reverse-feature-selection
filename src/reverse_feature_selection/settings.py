@@ -42,8 +42,8 @@ def get_meta_data():
     ########################################################
     experiment_id = id_t
     print(experiment_id)
-    data_name = "artificial3"
-    # data_name = "colon"
+    # data_name = "artificial3"
+    data_name = "colon"
 
     print(experiment_id)
     folder = dict(data="../../data", experiments="../../experiments")
@@ -90,7 +90,7 @@ def get_meta_data():
         # ],
         excluded_features=None,
         cluster_correlation_threshold=0.7,
-        number_of_features=1500,
+        number_of_features=None,
         number_of_samples=None,
         pos_label=0,
     )
