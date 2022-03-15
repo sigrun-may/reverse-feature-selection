@@ -42,8 +42,8 @@ def get_meta_data():
     ########################################################
     experiment_id = id_t
     print(experiment_id)
-    # data_name = "artificial3"
-    data_name = "colon"
+    data_name = "artificial1"
+    # data_name = "colon"
 
     print(experiment_id)
     folder = dict(data="../../data", experiments="../../experiments")
@@ -54,20 +54,20 @@ def get_meta_data():
         meta_data_path=f"{folder['data']}/{data_name}.pkl",
         clustered_data_path=f"{folder['data']}/{data_name}_clustered.csv",
         columns=None,
-        # excluded_features=[
-        #     "bm_12",
-        #     "bm_13",
-        #     "bm_15",
-        #     "bm_16",
-        #     "bm_18",
-        #     "bm_19",
-        #     "bm_20",
-        #     "bm_21",
-        #     "bm_22",
-        #     "bm_23",
-        #     "bm_25",
-        #     "bm_27",
-        # ],
+        excluded_features=[
+            "bm_12",
+            "bm_13",
+            "bm_15",
+            "bm_16",
+            "bm_18",
+            "bm_19",
+            "bm_20",
+            "bm_21",
+            "bm_22",
+            "bm_23",
+            "bm_25",
+            "bm_27",
+        ],
         # excluded_features=[
         #     "bm_0",
         #     "bm_1",
@@ -88,9 +88,9 @@ def get_meta_data():
         #     "bm_28",
         #     "bm_29",
         # ],
-        excluded_features=None,
-        cluster_correlation_threshold=0.7,
-        number_of_features=None,
+        # excluded_features=None,
+        cluster_correlation_threshold=None,
+        number_of_features=2000,
         number_of_samples=None,
         pos_label=0,
     )
@@ -114,7 +114,7 @@ def get_meta_data():
             trials=40,
             pruner_patience=None,
             pruner_threshold=0.1,
-            correlation_threshold=0.1,
+            correlation_threshold=0.3,
             remove_deselected=False,
         ),
     )

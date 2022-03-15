@@ -16,20 +16,28 @@ def get_stability(used_features_matrix):
     for k in range(1, number_of_folds + 1):
         count_k += 1
 
+        # empirical density of the robustness_vector
+        # number of features which were selected k-times
+        robustness_density = list(robustness_vector).count(k)
+        subset_size_stability = _subset_size_stability(
+            subset_vector, number_of_features, k
+        )
+
         stability += (
-            k**2
-            # empirical density of the robustness_vector
-            # number of features which were selected k-times
-            * list(robustness_vector).count(k)
-            * _subset_size_stability(subset_vector, number_of_features, k)
+            k**2 * robustness_density * subset_size_stability
         ) / subset_vector[k - 1]
         if np.isnan(stability):
             print("stability is nan")
             return 0
 
+    if stability > number_of_folds**2:
+        print(stability)
     stability = stability / (number_of_folds**2)
 
     assert count_k == number_of_folds
+    if stability >= 1:
+        print(stability, " stability greater than 1")
+    # assert stability <= 1.1, stability
     return stability
 
 

@@ -48,7 +48,7 @@ def evaluate_feature_selection(
 
     metrics_per_method_dict = {}
     for feature_selection_method, result_dict in feature_selection_result_dict.items():
-        for feature_selection_algorithm, selection_result in result_dict.items():
+        for feature_selection_algorithm, importance_matrix in result_dict.items():
             key = f"{feature_selection_method}_{feature_selection_algorithm}"
             print(
                 "##############################",
@@ -57,20 +57,29 @@ def evaluate_feature_selection(
                 feature_selection_algorithm,
                 ": ",
             )
-            assert np.ndarray == type(selection_result)
+            assert isinstance(importance_matrix, np.ndarray)
 
             if "reverse" not in feature_selection_method:
-                for row in range(selection_result.shape[0]):
-                    normalized_fi = selection_result[row, :] / np.max(
-                        selection_result[row, :]
+                fi_threshold = meta_data['validation']['threshold']
+                for row in range(importance_matrix.shape[0]):
+                    normalized_fi = importance_matrix[row, :] / np.max(
+                        importance_matrix[row, :]
                     )
-                    normalized_fi[normalized_fi < 0.1] = 0.0
-                    selection_result[row, :] = normalized_fi
-                assert np.min(selection_result[selection_result > 0]) >= 0.1
+                    normalized_fi[normalized_fi < fi_threshold] = 0.0
+                    importance_matrix[row, :] = normalized_fi
+                assert np.min(importance_matrix[importance_matrix > 0]) >= fi_threshold
+
+            if "robustness" in feature_selection_method:
+                print(
+                    "robustness: ",
+                    importance_matrix.sum(axis=0),
+                    " from ",
+                    importance_matrix.shape[0],
+                )
 
             # monitor stability of selection
-            used_features_matrix = np.zeros_like(selection_result)
-            used_features_matrix[selection_result.nonzero()] = 1
+            used_features_matrix = np.zeros_like(importance_matrix)
+            used_features_matrix[importance_matrix.nonzero()] = 1
             stability = get_stability(used_features_matrix)
             print(
                 "stability:",
@@ -78,12 +87,12 @@ def evaluate_feature_selection(
             )
 
             # calculate importances
-            assert np.min(selection_result) >= 0.0
+            assert np.min(importance_matrix) >= 0.0
             # TODO quadrierte robustness/ sinus... / log
 
-            # cumulated_feature_importance = np.sum(np.array(selection_result), axis=0)
+            # cumulated_feature_importance = np.sum(np.array(importance_matrix), axis=0)
 
-            mean_feature_importance = np.mean(np.array(selection_result), axis=0)
+            mean_feature_importance = np.mean(np.array(importance_matrix), axis=0)
             robustness_vector = used_features_matrix.sum(axis=0)
             print(robustness_vector[robustness_vector.nonzero()])
             cumulated_feature_importance = mean_feature_importance * robustness_vector
@@ -224,6 +233,7 @@ def classify_feature_subsets(
 def _extract_test_data_and_results(feature_selection_result, meta_data_dict):
     test_train_sets = []
     reverse_subsets_dict = {}
+    reverse_robustness_dict = {}
     shap_values_dict = {}
     macro_fi_dict = {}
     micro_fi_dict = {}
@@ -271,12 +281,17 @@ def _extract_test_data_and_results(feature_selection_result, meta_data_dict):
                             )
                         )
             else:
-                weighted_features = _calculate_weights_reverse_feature_selection(
+                (
+                    weighted_features,
+                    reverse_robustness,
+                ) = _calculate_weights_reverse_feature_selection(
                     selected_features,
                     threshold=meta_data_dict["validation"]["threshold"],
                 )
                 assert (
-                    len(weighted_features) == len(meta_data_dict["data"]["columns"]) - 1
+                    len(weighted_features)
+                    == len(reverse_robustness)
+                    == len(meta_data_dict["data"]["columns"]) - 1
                 )
                 if selection_method not in reverse_subsets_dict:
                     reverse_subsets_dict[selection_method] = weighted_features
@@ -285,6 +300,16 @@ def _extract_test_data_and_results(feature_selection_result, meta_data_dict):
                         (
                             reverse_subsets_dict[selection_method],
                             weighted_features,
+                        )
+                    )
+
+                if selection_method not in reverse_robustness_dict:
+                    reverse_robustness_dict[selection_method] = reverse_robustness
+                else:
+                    reverse_robustness_dict[selection_method] = np.vstack(
+                        (
+                            reverse_robustness_dict[selection_method],
+                            reverse_robustness,
                         )
                     )
 
@@ -322,13 +347,18 @@ def _extract_test_data_and_results(feature_selection_result, meta_data_dict):
                 ), micro_fi_dict[selection_method].shape
 
     for selection_method in reverse_subsets_dict:
-        assert reverse_subsets_dict[selection_method].shape == (
-            meta_data_dict["cv"]["n_outer_folds"],
-            len(meta_data_dict["data"]["columns"]) - 1,
+        assert (
+            reverse_subsets_dict[selection_method].shape
+            == reverse_robustness_dict[selection_method].shape
+            == (
+                meta_data_dict["cv"]["n_outer_folds"],
+                len(meta_data_dict["data"]["columns"]) - 1,
+            )
         )
 
     result_dict = {
         "reverse_subsets": reverse_subsets_dict,
+        "reverse_robustness_dict": reverse_robustness_dict,
         "shap_values": shap_values_dict,
         "macro_fi": macro_fi_dict,
         "micro_fi": micro_fi_dict,
@@ -338,6 +368,7 @@ def _extract_test_data_and_results(feature_selection_result, meta_data_dict):
 
 def _calculate_weights_reverse_feature_selection(selected_feature_subset, threshold):
     weighted_selected_feature_subset = []
+    robustness = []
     for feature, (r2_unlabeled, r2, _) in selected_feature_subset.items():
 
         # for feature, (r2_unlabeled, r2) in feature_subset.items():
@@ -346,7 +377,8 @@ def _calculate_weights_reverse_feature_selection(selected_feature_subset, thresh
         # if difference > delta:
         #     subset[feature] = difference
         assert r2 >= 0.0
-        if r2 > r2_unlabeled and r2 > 0.1:
+        if r2 > r2_unlabeled:
+            robustness.append(1)
             if r2_unlabeled < 0:
                 r2_unlabeled = 0
             d = r2 - r2_unlabeled
@@ -356,10 +388,11 @@ def _calculate_weights_reverse_feature_selection(selected_feature_subset, thresh
             else:
                 weighted_selected_feature_subset.append(0)
         else:
+            robustness.append(0)
             weighted_selected_feature_subset.append(0)
             # weighted_selected_feature_subset[feature] = (r2 - r2_unlabeled,
             # None)
-    return np.array(weighted_selected_feature_subset)
+    return np.array(weighted_selected_feature_subset), np.array(robustness)
 
 
 def calculate_micro_metrics(predicted_classes, true_classes, meta_data_dict):

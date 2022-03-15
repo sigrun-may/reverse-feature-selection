@@ -75,7 +75,8 @@ def select_features(
             lasso = RelaxedLasso(
                 alpha=alpha,
                 theta=theta,
-                selection='random',
+                selection="random",
+                verbose=-1,
                 # alpha=trial.suggest_discrete_uniform("alpha", 0.001, 1.0,
                 # 0.001),
             )
@@ -186,9 +187,10 @@ def select_features(
     )
     # build LASSO model
     lasso_all = RelaxedLasso(
-            alpha=study.best_params["alpha"],
-            theta=study.best_params["theta"],
-            selection='random',
+        alpha=study.best_params["alpha"],
+        theta=study.best_params["theta"],
+        selection="random",
+        verbose=-1,
     )
     remain_data = preprocessed_data_dict["transformed_remain_data"]
     lasso_all.fit(remain_data[:, 1:], remain_data[:, 0])
