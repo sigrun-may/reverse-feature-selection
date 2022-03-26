@@ -14,6 +14,10 @@ def get_data(meta_data_dict) -> pd.DataFrame:
     data = pd.read_csv(meta_data_dict["data"]["input_data_path"])
     print("input data shape:", data.shape)
 
+    data_01 = data.iloc[:, 0:10]
+    data_02 = data.iloc[:, 200:1200]
+    data = pd.concat([data_01, data_02], join='outer', axis=1)
+
     # exclude features selected by the user
     if meta_data_dict["data"]["excluded_features"]:
         data = data.drop(labels=meta_data_dict["data"]["excluded_features"], axis=1)
@@ -59,59 +63,68 @@ def get_data(meta_data_dict) -> pd.DataFrame:
     return data
 
 
-def yeo_johnson_transform_test_train_splits(
-        data_df: pd.DataFrame,
-        outer_cv_loop_iteration: int,
-        meta_data: Dict,
+def preprocess_validation_train_splits(
+    data_df: pd.DataFrame,
+    outer_cv_loop_iteration: int,
+    meta_data: Dict,
 ) -> Dict[str, List[Union[Tuple[np.array], str]]]:
-    """
+    """Split and preprocess data.
+
+    Split data to validation and train. Transform (Yeo Johnson) and scale each split.
+    Calculate a pearson correlation matrix for each transformed and scaled train split.
 
     Args:
         data_df: original data
-        outer_cv_loop_iteration:
-        meta_data:
+        outer_cv_loop_iteration: iteration of the outer cross-validation loop
+        meta_data: metadata dict (see ... )
 
     Returns:
-        Dict with transformed test/train sets and respective column names
+        Dict with transformed and scaled test/train sets with the respective pearson correlation matrix
+        for each train set and the respective column names
 
     """
-    # """
-    # Do test and train splits and transform (Yeo Johnson) them.
-    #
-    # :param data_df: original data
-    # :param num_inner_folds: number of inner cross-validation folds
-    # :param path: path to directory to pickle transformed data
-    # :return: the transformed data in selected_feature_subset_list dict with transformed test/train set for each sample and the column names
-    #
-    # Args:
-    #     outer_cv_loop_iteration:
-    # """
 
-    # k_fold = KFold(n_splits=num_inner_folds, shuffle=True, random_state=42)
     k_fold = StratifiedKFold(
         n_splits=meta_data["cv"]["n_inner_folds"], shuffle=True, random_state=42
     )
-    transformed_data = Parallel(
+    transformed_data_list = Parallel(
         n_jobs=meta_data["parallel"]["n_jobs_preprocessing"], verbose=5
     )(
-        delayed(transform_train_test_set)(train_index, test_index, data_df)
-        for sample_index, (train_index, test_index) in enumerate(
+        delayed(transform_and_preprocess_data)(train_index, validation_index, data_df)
+        for sample_index, (train_index, validation_index) in enumerate(
             k_fold.split(data_df.iloc[:, 1:], data_df["label"])
         )
     )
-    assert len(transformed_data) == meta_data["cv"]["n_inner_folds"]
+    assert len(transformed_data_list) == meta_data["cv"]["n_inner_folds"]
 
     if meta_data["path_preprocessed_data"] is not None:
         joblib.dump(
-            {"transformed_data": transformed_data, "feature_names": data_df.columns},
+            transformed_data_list,
             f"{meta_data['path_preprocessed_data']}_{outer_cv_loop_iteration}.pkl",
-            compress='lz4',
+            compress="lz4",
         )
 
-    return {"transformed_data": transformed_data, "feature_names": data_df.columns}
+    # return {"transformed_data": transformed_data, "feature_names": data_df.columns}
+    return transformed_data_list
 
 
-def transform_train_test_set(train_index, test_index, data_df, correlation_matrix=True):
+def transform_and_preprocess_data(
+    train_index, validation_index, data_df, correlation_matrix=True
+):
+    """Scale and transform data and calculate train correlation matrix if specified.
+
+    BoxCox transformation is applied if all values are positive otherwise Yeo-Johnson transformation.
+    Correlation matrices are created based on Pearson.
+
+    Args:
+        train_index: Index for the train split.
+        validation_index: Index for the validation split.
+        data_df: Data to be transformed.
+        correlation_matrix: If a correlation matrix for the train data should be generated.
+
+    Returns:
+        Tuple of validation_data, train_data and train_correlation_matrix.
+    """
     assert not data_df.isnull().values.any(), "Missing values" + data_df.head()
 
     # remove label for transformation
@@ -137,19 +150,19 @@ def transform_train_test_set(train_index, test_index, data_df, correlation_matri
             copy=True, method="box-cox", standardize=True
         )
         train = power_transformer.fit_transform(unlabeled_data[train_index])
-        test = power_transformer.transform(unlabeled_data[test_index])
+        validation = power_transformer.transform(unlabeled_data[validation_index])
     else:
         # workaround for https://github.com/scikit-learn/scikit-learn/issues/14959
         scaler = StandardScaler(with_std=False)
         scaled_train = scaler.fit_transform(unlabeled_data[train_index])
-        scaled_test = scaler.transform(unlabeled_data[test_index])
+        scaled_test = scaler.transform(unlabeled_data[validation_index])
 
         # transform and standardize test and train data
         power_transformer = PowerTransformer(
             copy=True, method="yeo-johnson", standardize=True
         )
         train = power_transformer.fit_transform(scaled_train)
-        test = power_transformer.transform(scaled_test)
+        validation = power_transformer.transform(scaled_test)
 
     # # transform and standardize test and train data
     # power_transformer = PowerTransformer(
@@ -158,8 +171,11 @@ def transform_train_test_set(train_index, test_index, data_df, correlation_matri
     # train = power_transformer.fit_transform(unlabeled_data[train_index])
     # test = power_transformer.transform(unlabeled_data[outer_cv_loop])
 
-    assert test.shape == (len(test_index), unlabeled_data.shape[1])
+    assert validation.shape == (len(validation_index), unlabeled_data.shape[1])
     assert train.shape == (len(train_index), unlabeled_data.shape[1])
+
+    validation_pd = pd.DataFrame(validation, columns=data_df.columns[1:])
+    assert not validation_pd.isnull().values.any()
 
     # calculate correlation matrix for train data
     train_pd = pd.DataFrame(train, columns=data_df.columns[1:])
@@ -169,10 +185,12 @@ def transform_train_test_set(train_index, test_index, data_df, correlation_matri
     if correlation_matrix:
         train_correlation_matrix = train_pd.corr(method="pearson")
 
-    # add label to transformed data TODO: pandas
-    train_data = np.column_stack((label[train_index], train))
-    test_data = np.column_stack((label[test_index], test))
-    return test_data, train_data, train_correlation_matrix
+    # add label to transformed data
+    train_pd.insert(0, "label", label[train_index])
+    validation_pd.insert(0, "label", label[validation_index])
+    # train_data = np.column_stack((label[train_index], train))
+    # validation_data = np.column_stack((label[validation_index], validation))
+    return validation_pd, train_pd, train_correlation_matrix
 
 
 def get_cluster_dict(correlation_matrix, meta_data):
@@ -200,8 +218,8 @@ def get_cluster_dict(correlation_matrix, meta_data):
                     labels=correlated_feature_names, axis=1, inplace=True
                 )
                 assert (
-                        updated_correlation_matrix.shape[0]
-                        == updated_correlation_matrix.shape[1]
+                    updated_correlation_matrix.shape[0]
+                    == updated_correlation_matrix.shape[1]
                 )
 
     # find cluster representatives:
@@ -221,15 +239,13 @@ def get_cluster_dict(correlation_matrix, meta_data):
     clustered_data_dict["uncorrelated_features"] = updated_correlation_matrix.columns
 
     if meta_data["cluster_dict_path"]:
-        joblib.dump(
-            clustered_data_dict, meta_data["cluster_dict_path"], compress='lz4'
-        )
+        joblib.dump(clustered_data_dict, meta_data["cluster_dict_path"], compress="lz4")
 
     return clustered_data_dict
 
 
 def cluster_data(
-        data_df: pd.DataFrame, meta_data
+    data_df: pd.DataFrame, meta_data
 ) -> Tuple[pd.DataFrame, Dict[str, List[str]]]:
     ########################################################
     # Cluster correlated features
@@ -238,31 +254,40 @@ def cluster_data(
     if meta_data["correlation_matrix_path"]:
         try:
             correlation_matrix = joblib.load(meta_data["correlation_matrix_path"])
-        except:
+        except:  # noqa
             correlation_matrix = data_df.iloc[:, 1:].corr(method="spearman")
             joblib.dump(
                 correlation_matrix,
                 meta_data["correlation_matrix_path"],
-                compress='lz4',
+                compress="lz4",
             )
-            print(f'Calculated new correlation matrix and saved to {meta_data["correlation_matrix_path"]}')
+            print(
+                f'Calculated new correlation matrix and saved to {meta_data["correlation_matrix_path"]}'
+            )
     else:
         correlation_matrix = data_df.iloc[:, 1:].corr(method="spearman")
-    assert data_df.shape[1] - 1 == correlation_matrix.shape[0] == correlation_matrix.shape[1]
+    assert (
+        data_df.shape[1] - 1
+        == correlation_matrix.shape[0]
+        == correlation_matrix.shape[1]
+    )
 
     # load or calculate clusters
     if meta_data["cluster_dict_path"]:
         try:
             clustered_data_dict = joblib.load(meta_data["cluster_dict_path"])
             print(f'New clusters are reused from {meta_data["cluster_dict_path"]}')
-        except:
+        except:  # noqa
             print("New clusters are calculated")
             clustered_data_dict = get_cluster_dict(correlation_matrix, meta_data)
     else:
         clustered_data_dict = get_cluster_dict(correlation_matrix, meta_data)
 
-    print("number of features in clustered data: ", len(clustered_data_dict['clusters'].keys())
-          + len(clustered_data_dict['uncorrelated_features']))
+    print(
+        "number of features in clustered data: ",
+        len(clustered_data_dict["clusters"].keys())
+        + len(clustered_data_dict["uncorrelated_features"]),
+    )
 
     # generate clustered data_df
     clustered_data_df = data_df[clustered_data_dict["uncorrelated_features"]].copy()
@@ -280,30 +305,30 @@ def cluster_data(
     clustered_data_df.insert(0, "label", data_df["label"])
 
     assert (
-            clustered_data_df.shape[1]
-            == len(clustered_data_dict["clusters"].keys())
-            + len(clustered_data_dict["uncorrelated_features"])
-            + 1  # the label
-    ), f"clustered_data_df.shape[1] {clustered_data_df.shape[1]}= (len(cluster_dict.keys()) - 1) " \
-       f"{(len(clustered_data_dict['clusters'].keys()))} +len(cluster_dict['uncorrelated_features']) " \
-       f"{len(clustered_data_dict['uncorrelated_features'])}+1"
+        clustered_data_df.shape[1]
+        == len(clustered_data_dict["clusters"].keys())
+        + len(clustered_data_dict["uncorrelated_features"])
+        + 1  # the label
+    ), (
+        f"clustered_data_df.shape[1] {clustered_data_df.shape[1]}= (len(cluster_dict.keys()) - 1) "
+        f"{(len(clustered_data_dict['clusters'].keys()))} +len(cluster_dict['uncorrelated_features']) "
+        f"{len(clustered_data_dict['uncorrelated_features'])}+1"
+    )
     print(clustered_data_df.shape)
 
     # save correlation matrix for clustered data
     eliminated_features = [
         item for item in data_df.columns[1:] if item not in clustered_data_index
     ]
-    correlation_matrix.drop(
-        eliminated_features, inplace=True, axis=1
-    )
-    correlation_matrix.drop(
-        eliminated_features, inplace=True, axis=0
-    )
-    assert correlation_matrix.shape[1] == clustered_data_df.shape[1] - 1  # exclude label
+    correlation_matrix.drop(eliminated_features, inplace=True, axis=1)
+    correlation_matrix.drop(eliminated_features, inplace=True, axis=0)
+    assert (
+        correlation_matrix.shape[1] == clustered_data_df.shape[1] - 1
+    )  # exclude label
     joblib.dump(
         correlation_matrix,
         meta_data["clustered_correlation_matrix_path"],
-        compress='lz4',
+        compress="lz4",
     )
     return clustered_data_df, clustered_data_dict
 

@@ -47,9 +47,14 @@ def evaluate_feature_selection(
     ) = _extract_test_data_and_results(feature_selection_result, meta_data)
 
     metrics_per_method_dict = {}
+    selected_features_dict = {}
+    unlabeled_feature_names = np.asarray(meta_data["data"]["columns"][1:])
+    selected_features_df = pd.DataFrame(index=unlabeled_feature_names)
+
     for feature_selection_method, result_dict in feature_selection_result_dict.items():
         for feature_selection_algorithm, importance_matrix in result_dict.items():
             key = f"{feature_selection_method}_{feature_selection_algorithm}"
+            feature_selection_dict = {}
             print(
                 "##############################",
                 feature_selection_method,
@@ -58,17 +63,33 @@ def evaluate_feature_selection(
                 ": ",
             )
             assert isinstance(importance_matrix, np.ndarray)
+            feature_selection_dict["raw_importances"] = importance_matrix
 
+            # drop feature importance below validation threshold
             if "reverse" not in feature_selection_method:
-                fi_threshold = meta_data['validation']['threshold']
+                fi_threshold = meta_data["validation"]["threshold"]
                 for row in range(importance_matrix.shape[0]):
                     normalized_fi = importance_matrix[row, :] / np.max(
                         importance_matrix[row, :]
                     )
+                    feature_selection_dict["normalized_importances"] = normalized_fi
                     normalized_fi[normalized_fi < fi_threshold] = 0.0
                     importance_matrix[row, :] = normalized_fi
                 assert np.min(importance_matrix[importance_matrix > 0]) >= fi_threshold
 
+            feature_selection_dict["trimmed_importances"] = importance_matrix
+
+            # monitor stability of selection
+            used_features_matrix = np.zeros_like(importance_matrix)
+            used_features_matrix[importance_matrix.nonzero()] = 1
+            stability = get_stability(used_features_matrix)
+            print("stability:", stability)
+            feature_selection_dict["binary_trimmed_selection"] = used_features_matrix
+
+            # adapt feature importances
+
+            # weighting robustness
+            # TODO quadrierte robustness/ sinus... / log
             if "robustness" in feature_selection_method:
                 print(
                     "robustness: ",
@@ -76,37 +97,26 @@ def evaluate_feature_selection(
                     " from ",
                     importance_matrix.shape[0],
                 )
-
-            # monitor stability of selection
-            used_features_matrix = np.zeros_like(importance_matrix)
-            used_features_matrix[importance_matrix.nonzero()] = 1
-            stability = get_stability(used_features_matrix)
-            print(
-                "stability:",
-                stability,
-            )
-
-            # calculate importances
-            assert np.min(importance_matrix) >= 0.0
-            # TODO quadrierte robustness/ sinus... / log
+                feature_selection_dict["binary_raw_selection"] = []
 
             # cumulated_feature_importance = np.sum(np.array(importance_matrix), axis=0)
-
+            assert np.min(importance_matrix) >= 0.0
             mean_feature_importance = np.mean(np.array(importance_matrix), axis=0)
-            robustness_vector = used_features_matrix.sum(axis=0)
-            print(robustness_vector[robustness_vector.nonzero()])
-            cumulated_feature_importance = mean_feature_importance * robustness_vector
-
-            # if 'reverse' not in feature_selection_method:
-            #     # scaler = MinMaxScaler()
-            #     # normalized_fi = scaler.fit_transform(cumulated_feature_importance.reshape(1, -1))
-            #     normalized_fi = cumulated_feature_importance/np.max(cumulated_feature_importance)
-            #     normalized_fi[normalized_fi < 0.1] = .0
-            #     cumulated_feature_importance = normalized_fi
-            #     assert np.min(cumulated_feature_importance) >= 0.1
-
-            unlabeled_feature_names = np.asarray(meta_data["data"]["columns"][1:])
+            # robustness_vector = used_features_matrix.sum(axis=0)
+            # print(robustness_vector[robustness_vector.nonzero()])
+            raw_robustness = (
+                feature_selection_dict["raw_importances"].sum(axis=0)
+                / importance_matrix.shape[0]
+            )
+            print(raw_robustness[raw_robustness.nonzero()])
+            cumulated_feature_importance = mean_feature_importance * raw_robustness
             assert len(unlabeled_feature_names) == cumulated_feature_importance.size
+            selected_features_df[key] = cumulated_feature_importance
+            feature_selection_dict[
+                "weighted_feature_importance"
+            ] = cumulated_feature_importance
+
+            # print important features
             selected_feature_names = unlabeled_feature_names[
                 cumulated_feature_importance.nonzero()
             ]
@@ -128,15 +138,16 @@ def evaluate_feature_selection(
                 len(selected_feature_names)
                 == cumulated_feature_importance.nonzero()[0].size
             )
-
             named_importances = list(
                 zip(selected_feature_names, scaled_feature_importances)
             )
             sorted_importances = utils.sort_list_of_tuples_by_index(
                 named_importances, ascending=False
             )
+            feature_selection_dict["selected_features"] = sorted_importances
             print("number of selected features:", len(sorted_importances))
             print("importances:", sorted_importances)
+            # TODO save to csv
 
             # calculate performance evaluation metrics
             performance_metrics_dict = classify_feature_subsets(
@@ -147,6 +158,7 @@ def evaluate_feature_selection(
             )
             performance_metrics_dict["stability"] = stability
 
+            # calculate correctness
             bm = 0
             pseudo = 0
             random = 0
@@ -184,6 +196,13 @@ def evaluate_feature_selection(
             # metrics_per_method_dict[key] = calculate_micro_metrics(
             #     predicted_classes, true_classes
             # )
+
+    selected_features_df.sort_values(
+        by=selected_features_df.columns[0], ascending=False, inplace=True
+    )
+    selected_features_df[selected_features_df.values.sum(axis=1) != 0].to_csv(
+        meta_data["path_selected_features"]
+    )
     return metrics_per_method_dict
 
 
@@ -233,7 +252,7 @@ def classify_feature_subsets(
 def _extract_test_data_and_results(feature_selection_result, meta_data_dict):
     test_train_sets = []
     reverse_subsets_dict = {}
-    reverse_robustness_dict = {}
+    raw_robustness = {}
     shap_values_dict = {}
     macro_fi_dict = {}
     micro_fi_dict = {}
@@ -243,6 +262,9 @@ def _extract_test_data_and_results(feature_selection_result, meta_data_dict):
 
         # rewrite data structure
         for selection_method, selected_features in feature_selection_dict.items():
+            if not selected_features:
+                continue
+
             if "reverse" not in selection_method:
                 if selection_method not in shap_values_dict:
                     shap_values_dict[selection_method] = selected_features[
@@ -303,12 +325,12 @@ def _extract_test_data_and_results(feature_selection_result, meta_data_dict):
                         )
                     )
 
-                if selection_method not in reverse_robustness_dict:
-                    reverse_robustness_dict[selection_method] = reverse_robustness
+                if selection_method not in raw_robustness:
+                    raw_robustness[selection_method] = reverse_robustness
                 else:
-                    reverse_robustness_dict[selection_method] = np.vstack(
+                    raw_robustness[selection_method] = np.vstack(
                         (
-                            reverse_robustness_dict[selection_method],
+                            raw_robustness[selection_method],
                             reverse_robustness,
                         )
                     )
@@ -349,7 +371,7 @@ def _extract_test_data_and_results(feature_selection_result, meta_data_dict):
     for selection_method in reverse_subsets_dict:
         assert (
             reverse_subsets_dict[selection_method].shape
-            == reverse_robustness_dict[selection_method].shape
+            == raw_robustness[selection_method].shape
             == (
                 meta_data_dict["cv"]["n_outer_folds"],
                 len(meta_data_dict["data"]["columns"]) - 1,
@@ -358,7 +380,7 @@ def _extract_test_data_and_results(feature_selection_result, meta_data_dict):
 
     result_dict = {
         "reverse_subsets": reverse_subsets_dict,
-        "reverse_robustness_dict": reverse_robustness_dict,
+        "raw_robustness": raw_robustness,
         "shap_values": shap_values_dict,
         "macro_fi": macro_fi_dict,
         "micro_fi": micro_fi_dict,
@@ -369,7 +391,32 @@ def _extract_test_data_and_results(feature_selection_result, meta_data_dict):
 def _calculate_weights_reverse_feature_selection(selected_feature_subset, threshold):
     weighted_selected_feature_subset = []
     robustness = []
-    for feature, (r2_unlabeled, r2, _) in selected_feature_subset.items():
+    # try:
+    #     for feature, (r2_unlabeled, r2, _) in selected_feature_subset.items():
+    #
+    #         # for feature, (r2_unlabeled, r2) in feature_subset.items():
+    #         # TODO minimize and maximize unterscheiden
+    #         # difference = r2 - r2_unlabeled
+    #         # if difference > delta:
+    #         #     subset[feature] = difference
+    #         assert r2 >= 0.0
+    #         if r2 > r2_unlabeled:
+    #             robustness.append(1)
+    #             if r2_unlabeled < 0:
+    #                 r2_unlabeled = 0
+    #             d = r2 - r2_unlabeled
+    #             d *= r2
+    #             if d > threshold:
+    #                 weighted_selected_feature_subset.append(d)
+    #             else:
+    #                 weighted_selected_feature_subset.append(0)
+    #         else:
+    #             robustness.append(0)
+    #             weighted_selected_feature_subset.append(0)
+    #             # weighted_selected_feature_subset[feature] = (r2 - r2_unlabeled,
+    #             # None)
+    # except:
+    for feature, (r2_unlabeled, r2) in selected_feature_subset.items():
 
         # for feature, (r2_unlabeled, r2) in feature_subset.items():
         # TODO minimize and maximize unterscheiden

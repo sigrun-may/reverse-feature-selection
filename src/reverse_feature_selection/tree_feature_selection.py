@@ -72,7 +72,6 @@ def select_features(preprocessed_data_dict, outer_cv_loop, meta_data, extra_tree
                 metric="binary_logloss",
                 boosting_type="rf",
                 verbose=-1,
-                silent=True,
             )
 
             # num_leaves must be smaller than 2^max_depth

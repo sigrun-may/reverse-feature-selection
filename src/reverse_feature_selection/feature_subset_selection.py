@@ -11,7 +11,8 @@ from preprocessing import (
 )
 from src.reverse_feature_selection import (
     reverse_selection,
-    reverse_lasso
+    reverse_lasso,
+    standard_lasso_selection,
 )
 
 
@@ -37,26 +38,51 @@ def select_feature_subset(
     transformed_test_data, transformed_remain_data, _ = transform_and_preprocess_data(
         remaining_data_indices, test_indices, data, correlation_matrix=False
     )
-    # preprocessed_data_list["transformed_remain_data"] = transformed_remain_data
+    preprocessed_data_dict = dict(
+        preprocessed_data_list=preprocessed_data_list,
+        micro_train=transformed_remain_data,
+        micro_test=transformed_test_data,
+    )
 
     selected_feature_subset = {
-        # "relaxed_lasso":  reverse_selection.select_features(
-        #     preprocessed_data_list, outer_cv_loop_iteration, meta_data, reverse_relaxed_lasso
-        # ),
-        # "celer": reverse_selection.select_features(
-        #     preprocessed_data_list, outer_cv_loop_iteration, meta_data, reverse_celer
-        # ),
-        # "lasso_sklearn": reverse_selection.select_features(
-        #     preprocessed_data_list, outer_cv_loop_iteration, meta_data, reverse_lasso_sklearn
-        # ),
-        "reverse_relaxed_lasso":  reverse_selection.select_features(
-            preprocessed_data_list, outer_cv_loop_iteration, meta_data, reverse_lasso, 'relaxed'
+        "relaxed_lasso": standard_lasso_selection.select_features(
+            preprocessed_data_dict,
+            outer_cv_loop_iteration,
+            meta_data,
+            "relaxed",
+        ),
+        "celer": standard_lasso_selection.select_features(
+            preprocessed_data_dict,
+            outer_cv_loop_iteration,
+            meta_data,
+            "celer",
+        ),
+        "lasso_sklearn": standard_lasso_selection.select_features(
+            preprocessed_data_dict,
+            outer_cv_loop_iteration,
+            meta_data,
+            "lasso_sklearn",
+        ),
+        "reverse_relaxed_lasso": reverse_selection.select_features(
+            preprocessed_data_list,
+            outer_cv_loop_iteration,
+            meta_data,
+            reverse_lasso,
+            "relaxed",
         ),
         "reverse_celer": reverse_selection.select_features(
-            preprocessed_data_list, outer_cv_loop_iteration, meta_data, reverse_lasso, 'celer'
+            preprocessed_data_list,
+            outer_cv_loop_iteration,
+            meta_data,
+            reverse_lasso,
+            "celer",
         ),
         "reverse_lasso_sklearn": reverse_selection.select_features(
-            preprocessed_data_list, outer_cv_loop_iteration, meta_data, reverse_lasso, 'lasso_sklearn'
+            preprocessed_data_list,
+            outer_cv_loop_iteration,
+            meta_data,
+            reverse_lasso,
+            "lasso_sklearn",
         ),
         # "reverse_lasso2":
         #     reverse_lasso_feature_selection_doubleHPO.select_features(

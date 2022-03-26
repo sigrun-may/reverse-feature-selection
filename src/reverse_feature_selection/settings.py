@@ -40,9 +40,9 @@ def get_meta_data():
     ########################################################
     # Settings
     ########################################################
-    experiment_id = id_t
+    experiment_id = id_d
     print(experiment_id)
-    data_name = "artificial1"
+    data_name = "artificial4"
     # data_name = "colon"
 
     print(experiment_id)
@@ -54,20 +54,20 @@ def get_meta_data():
         meta_data_path=f"{folder['data']}/{data_name}.pkl",
         clustered_data_path=f"{folder['data']}/{data_name}_clustered.csv",
         columns=None,
-        excluded_features=[
-            "bm_12",
-            "bm_13",
-            "bm_15",
-            "bm_16",
-            "bm_18",
-            "bm_19",
-            "bm_20",
-            "bm_21",
-            "bm_22",
-            "bm_23",
-            "bm_25",
-            "bm_27",
-        ],
+        # excluded_features=[
+        #     "bm_12",
+        #     "bm_13",
+        #     "bm_15",
+        #     "bm_16",
+        #     "bm_18",
+        #     "bm_19",
+        #     "bm_20",
+        #     "bm_21",
+        #     "bm_22",
+        #     "bm_23",
+        #     "bm_25",
+        #     "bm_27",
+        # ],
         # excluded_features=[
         #     "bm_0",
         #     "bm_1",
@@ -88,9 +88,9 @@ def get_meta_data():
         #     "bm_28",
         #     "bm_29",
         # ],
-        # excluded_features=None,
+        excluded_features=None,
         cluster_correlation_threshold=None,
-        number_of_features=2000,
+        number_of_features=30,
         number_of_samples=None,
         pos_label=0,
     )
@@ -105,7 +105,7 @@ def get_meta_data():
     selection_method = dict(
         rf=dict(
             trials=40,
-            pruner_threshold=0.5,
+            pruner_threshold=0.2,
             path_mlFlow=None,
             extra_trees=True,
         ),
@@ -124,18 +124,24 @@ def get_meta_data():
         commit="446b6a809f139842b698ad1cd5e63cd5ed8653b5",
         data=data,
         cv=dict(n_outer_folds=6, n_inner_folds=5),
-        parallel=dict(n_jobs_preprocessing=1, n_jobs_cv=5, cluster=True),
+        parallel=dict(n_jobs_preprocessing=1, n_jobs_cv=1, cluster=True),
         selection_method=selection_method,
         validation=dict(k_neighbors=11, knn_method="distance", threshold=0.1, factor=1),
         path_selected_subsets=f"{experiment_path}/selected_subsets.pkl.gz",
+        path_selected_features=f"{experiment_path}/selected_features.csv",
         path_validation=f"{experiment_path}/validation.pkl.gz",
         path_validation_result=f"{experiment_path}/validation.csv",
         path_preprocessed_data=None,
         # path_preprocessed_data=f
         # "{experiment_path}/preprocessed_data/preprocessed_data_dict",
-        correlation_matrix_path=f"{folder['data']}/"
-        f"{data_name}_correlation_matrix.pkl.gz",
-        cluster_dict_path=f"{folder['data']}/" f"{data_name}_clusters.pkl.gz",
+        correlation_matrix_path=None,
+        clustered_correlation_matrix_path=None,
+        # correlation_matrix_path=f"{folder['data']}/"
+        # f"{data_name}_correlation_matrix.pkl.gz",
+        # clustered_correlation_matrix_path=f"{folder['data']}/"
+        # f"{data_name}_clustered_correlation_matrix.pkl.gz",
+        # cluster_dict_path=f"{folder['data']}/" f"{data_name}_clusters.pkl.gz",
+        cluster_dict_path=None,
     )
     try:
         os.mkdir(folder["experiments"])

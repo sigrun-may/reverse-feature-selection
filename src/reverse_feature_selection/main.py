@@ -8,15 +8,14 @@ from validation import evaluate_feature_selection
 
 
 if __name__ == "__main__":
-    # meta_data_dict = settings.get_meta_data()
-    meta_data_dict = settings.get_old_meta_data("t_84")
+    meta_data_dict = settings.get_meta_data()
+    # meta_data_dict = settings.get_old_meta_data("d_138")
+    # meta_data_dict['data']['excluded_features'] = None
     # meta_data_dict["validation"]["threshold"] = 0.1
     data_df = get_data(meta_data_dict)
 
     # # save meta data for parsed data
     meta_data_dict["data"]["columns"] = data_df.columns.tolist()
-    # # meta_data_dict["validation"]["threshold"]=0.05
-    # # meta_data_dict['path_validation_result']='validation_sum.csv'
     settings.save_meta_data(meta_data_dict)
 
     # select feature subsets
@@ -28,11 +27,11 @@ if __name__ == "__main__":
         meta_data_dict,
     )
     # result output
-    df = pd.DataFrame()
+    result_df = pd.DataFrame()
     for method, result in evaluation_result_dict.items():
         print(" ")
         print(f"#########################  {method}")
         for k, v in result.items():
             print(k, v)
-            df.loc[k, method] = v
-    df.to_csv(meta_data_dict["path_validation_result"])
+            result_df.loc[k, method] = v
+    result_df.to_csv(meta_data_dict["path_validation_result"])

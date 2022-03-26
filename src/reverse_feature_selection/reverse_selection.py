@@ -1,15 +1,14 @@
 import reverse_lasso
 import utils
 import numpy as np
-from optuna import TrialPruned
 
 
 def select_features(
-        preprocessed_data,
-        outer_cv_loop_iteration,
-        meta_data,
-        reverse_selection_algorithm,
-        method,
+    preprocessed_data,
+    outer_cv_loop_iteration,
+    meta_data,
+    reverse_selection_algorithm,
+    method,
 ):
     deselected_features_list = []
     selected_features_dict = {}
@@ -44,13 +43,13 @@ def select_features(
             performance_evaluation_metric_unlabeled_train_data,
             performance_evaluation_metric_labeled_train_data,
         )
-    assert (
-            len(selected_features_dict) == len(feature_names) - 1  # exclude the label
-    )
+    assert len(selected_features_dict) == len(feature_names) - 1  # exclude the label
     return selected_features_dict
 
 
-def remove_deselected_features(deselected_features, train_correlation_matrix, train_data_df, test_data_df):
+def remove_deselected_features(
+    deselected_features, train_correlation_matrix, train_data_df, test_data_df
+):
     number_of_initial_features = len(train_correlation_matrix.columns)
     # remove irrelevant features from train_correlation_matrix
     train_correlation_matrix.drop(
@@ -64,8 +63,9 @@ def remove_deselected_features(deselected_features, train_correlation_matrix, tr
         inplace=True,
     )
     assert (
-            number_of_initial_features - len(deselected_features)
-            == train_correlation_matrix.shape[1] == train_correlation_matrix.shape[0]
+        number_of_initial_features - len(deselected_features)
+        == train_correlation_matrix.shape[1]
+        == train_correlation_matrix.shape[0]
     )
     # remove irrelevant features from test and train data
     train_data_df.drop(columns=deselected_features, inplace=True)
@@ -81,7 +81,8 @@ def find_correlated_features(train_correlation_matrix, target_feature_name, meta
         for feature, correlation_coefficient in train_correlation_matrix[
             target_feature_name
         ].items()
-        if abs(correlation_coefficient) > meta_data["selection_method"]["reverse_lasso"]["correlation_threshold"]
+        if abs(correlation_coefficient)
+        > meta_data["selection_method"]["reverse_lasso"]["correlation_threshold"]
     ]
 
     correlated_feature_names = list(map(list, zip(*correlated_features)))[0]
@@ -107,14 +108,14 @@ def find_correlated_features(train_correlation_matrix, target_feature_name, meta
 
 
 def calculate_performance_metric_cv(
-        params,
-        target_feature_name,
-        preprocessed_data,
-        meta_data,
-        method,
-        calculate_performance_metric,
-        include_label=True,
-        deselected_features=None,
+    params,
+    target_feature_name,
+    preprocessed_data,
+    meta_data,
+    method,
+    calculate_performance_metric,
+    include_label=True,
+    deselected_features=None,
 ):
     performance_metric_list = []
 
@@ -123,24 +124,31 @@ def calculate_performance_metric_cv(
 
         # remove irrelevant features from train_correlation_matrix
         if meta_data["selection_method"]["reverse_lasso"]["remove_deselected"]:
-            remove_deselected_features(deselected_features, train_correlation_matrix, train_data_df, test_data_df)
+            remove_deselected_features(
+                deselected_features,
+                train_correlation_matrix,
+                train_data_df,
+                test_data_df,
+            )
 
         # remove features correlated to the target feature from train data
-        names_of_correlated_features = find_correlated_features(train_correlation_matrix, target_feature_name,
-                                                                meta_data)
+        names_of_correlated_features = find_correlated_features(
+            train_correlation_matrix, target_feature_name, meta_data
+        )
 
         # remove features correlated to the target_feature from test/ train data and the label if it is not included
-        train_df = train_data_df.drop(columns=names_of_correlated_features, inplace=False)
+        train_df = train_data_df.drop(
+            columns=names_of_correlated_features, inplace=False
+        )
         test_df = test_data_df.drop(columns=names_of_correlated_features, inplace=False)
 
         if not include_label:
-            train_df.drop(columns='label', inplace=True)
-            test_df.drop(columns='label', inplace=True)
+            train_df.drop(columns="label", inplace=True)
+            test_df.drop(columns="label", inplace=True)
 
-        performance_metric, pruned = calculate_performance_metric(params, train_df, test_df, target_feature_name, method)
-        if pruned:
-            raise TrialPruned()
-
+        performance_metric, pruned = calculate_performance_metric(
+            params, train_df, test_df, target_feature_name, method
+        )
         performance_metric_list.append(performance_metric)
 
     return np.mean(performance_metric_list)

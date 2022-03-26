@@ -1,7 +1,6 @@
 import numpy as np
 import optuna
 from optuna.samplers import TPESampler
-from optuna import TrialPruned
 from sklearn.metrics import r2_score
 from relaxed_lasso import RelaxedLasso
 import reverse_selection
@@ -36,7 +35,7 @@ def optimize(
         #     trial, warm_up_steps=20, threshold=0.05
         # )
         params = {"alpha": trial.suggest_uniform("alpha", 0.01, 1.0)}
-        if method == "relaxed":
+        if method == "celer":
             params["theta"] = trial.suggest_uniform("theta", 0.01, 1.0)
 
         return reverse_selection.calculate_performance_metric_cv(
@@ -44,7 +43,6 @@ def optimize(
             target_feature_name,
             preprocessed_data,
             meta_data,
-            method,
             calculate_performance_metric,
             include_label=True,
             deselected_features=deselected_features,
@@ -83,7 +81,6 @@ def optimize(
         target_feature_name,
         preprocessed_data,
         meta_data,
-        method,
         calculate_performance_metric,
         include_label=False,
         deselected_features=None,
@@ -102,7 +99,7 @@ def optimize(
 def calculate_performance_metric(
     params, train_data_df, test_data_df, target_feature_name, method
 ):
-    prune = False
+    pruned = False
 
     # prepare train/ test data
     y_train = train_data_df[target_feature_name].values.reshape(-1, 1)
@@ -124,28 +121,26 @@ def calculate_performance_metric(
         )
         lasso.fit(x_train.values, y_train)
 
-    elif method == "celer":
+    if method == "celer":
         lasso = celer.Lasso(alpha=params["alpha"], verbose=0)
         lasso.fit(x_train.values, y_train)
 
-    elif method == "lasso_sklearn":
+    if method == "lasso_sklearn":
         lasso = Lasso(alpha=params["alpha"])
         lasso.fit(np.asfortranarray(x_train), y_train)
 
     else:
         raise ValueError(
-            f"Feature selection method not provided: relaxed, celer and lasso_sklearn are valid options. "
-            f"Given method was {method}"
+            "Feature selection method not provided: relaxed, celer and lasso_sklearn are valid options"
         )
 
-    if "label" in x_train.columns[0]:
+    if "label" in train_data_df.columns:
         # prune trials if label coefficient is zero or model includes no coefficients
-        if lasso.coef_[0] == 0:
-            prune = True
-    if np.count_nonzero(lasso.coef_) == 0:
-        prune = True
+        label_coefficient = lasso.coef_[0]
+        if label_coefficient == 0 or np.count_nonzero(lasso.coef_) == 0:
+            pruned = True
 
     # predict y_test
     performance_metric = r2_score(y_test, lasso.predict(x_test))
 
-    return performance_metric, prune
+    return performance_metric, pruned

@@ -1,12 +1,11 @@
 import numpy as np
+import pandas as pd
 import optuna
-from optuna.samplers import TPESampler
 from optuna import TrialPruned
+from optuna.samplers import TPESampler
 from sklearn.metrics import r2_score
-from relaxed_lasso import RelaxedLasso
-import reverse_selection
 import celer
-from sklearn.linear_model import Lasso
+import reverse_selection
 
 
 # import optuna_study_pruner
@@ -18,7 +17,6 @@ def optimize(
     deselected_features,
     outer_cv_loop,
     meta_data,
-    method,
 ):
     """Optimize regularization parameter alpha for lasso regression."""
 
@@ -36,15 +34,12 @@ def optimize(
         #     trial, warm_up_steps=20, threshold=0.05
         # )
         params = {"alpha": trial.suggest_uniform("alpha", 0.01, 1.0)}
-        if method == "relaxed":
-            params["theta"] = trial.suggest_uniform("theta", 0.01, 1.0)
 
         return reverse_selection.calculate_performance_metric_cv(
             params,
             target_feature_name,
             preprocessed_data,
             meta_data,
-            method,
             calculate_performance_metric,
             include_label=True,
             deselected_features=deselected_features,
@@ -83,7 +78,6 @@ def optimize(
         target_feature_name,
         preprocessed_data,
         meta_data,
-        method,
         calculate_performance_metric,
         include_label=False,
         deselected_features=None,
@@ -100,9 +94,9 @@ def optimize(
 
 
 def calculate_performance_metric(
-    params, train_data_df, test_data_df, target_feature_name, method
+    params, train_data_df, test_data_df, target_feature_name
 ):
-    prune = False
+    pruned = False
 
     # prepare train/ test data
     y_train = train_data_df[target_feature_name].values.reshape(-1, 1)
@@ -111,41 +105,21 @@ def calculate_performance_metric(
     y_test = test_data_df[target_feature_name].values
 
     assert x_train.shape[1] >= 1
-
     # build LASSO model
-    if method == "relaxed":
-        lasso = RelaxedLasso(
-            alpha=params["alpha"],
-            theta=params["theta"],
-            selection="random",
-            verbose=-1,
-            # alpha=trial.suggest_discrete_uniform("alpha", 0.001, 1.0,
-            # 0.001),
-        )
-        lasso.fit(x_train.values, y_train)
+    lasso = celer.Lasso(alpha=params["alpha"], verbose=0)
+    lasso.fit(x_train.values, y_train)
 
-    elif method == "celer":
-        lasso = celer.Lasso(alpha=params["alpha"], verbose=0)
-        lasso.fit(x_train.values, y_train)
+    # sklearn lasso
+    # lasso = Lasso(alpha = alpha, fit_intercept = True, positive = False)
+    # lasso.fit(np.asfortranarray(x_train), y_train)
 
-    elif method == "lasso_sklearn":
-        lasso = Lasso(alpha=params["alpha"])
-        lasso.fit(np.asfortranarray(x_train), y_train)
-
-    else:
-        raise ValueError(
-            f"Feature selection method not provided: relaxed, celer and lasso_sklearn are valid options. "
-            f"Given method was {method}"
-        )
-
-    if "label" in x_train.columns[0]:
+    if "label" in train_data_df.columns:
         # prune trials if label coefficient is zero or model includes no coefficients
-        if lasso.coef_[0] == 0:
-            prune = True
-    if np.count_nonzero(lasso.coef_) == 0:
-        prune = True
+        label_coefficient = lasso.coef_[0]
+        if label_coefficient == 0 or np.count_nonzero(lasso.coef_) == 0:
+            pruned = True
 
     # predict y_test
     performance_metric = r2_score(y_test, lasso.predict(x_test))
 
-    return performance_metric, prune
+    return performance_metric, pruned
