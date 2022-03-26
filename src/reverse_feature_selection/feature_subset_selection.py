@@ -3,21 +3,15 @@ from typing import List, Tuple
 import joblib
 import pandas as pd
 from joblib import Parallel, delayed
-from sklearn.model_selection import LeaveOneOut, StratifiedKFold
+from sklearn.model_selection import StratifiedKFold
 
 from preprocessing import (
-    yeo_johnson_transform_test_train_splits,
-    transform_train_test_set,
+    preprocess_validation_train_splits,
+    transform_and_preprocess_data,
 )
 from src.reverse_feature_selection import (
-    standard_lasso_feature_selection,
-    reverse_lasso_feature_selection,
-    relaxed_lasso_feature_selection,
-    reverse_lasso_feature_selection_doubleHPO,
-    tree_feature_selection,
-    reverse_rf_feature_selection_doubleHPO,
-    reverse_rf_feature_selection,
-    reverse_relaxed_lasso_feature_selection,
+    reverse_selection,
+    reverse_lasso
 )
 
 
@@ -34,29 +28,35 @@ def select_feature_subset(
         " #############################################################",
     )
 
-    preprocessed_data_dict = yeo_johnson_transform_test_train_splits(
+    preprocessed_data_list = preprocess_validation_train_splits(
         data_df=data.iloc[remaining_data_indices, :],
         outer_cv_loop_iteration=outer_cv_loop_iteration,
         meta_data=meta_data,
     )
 
-    transformed_test_data, transformed_remain_data, _ = transform_train_test_set(
+    transformed_test_data, transformed_remain_data, _ = transform_and_preprocess_data(
         remaining_data_indices, test_indices, data, correlation_matrix=False
     )
-    preprocessed_data_dict["transformed_remain_data"] = transformed_remain_data
+    # preprocessed_data_list["transformed_remain_data"] = transformed_remain_data
 
     selected_feature_subset = {
-        "standard_lasso": standard_lasso_feature_selection.select_features(
-            preprocessed_data_dict, outer_cv_loop_iteration, meta_data
+        # "relaxed_lasso":  reverse_selection.select_features(
+        #     preprocessed_data_list, outer_cv_loop_iteration, meta_data, reverse_relaxed_lasso
+        # ),
+        # "celer": reverse_selection.select_features(
+        #     preprocessed_data_list, outer_cv_loop_iteration, meta_data, reverse_celer
+        # ),
+        # "lasso_sklearn": reverse_selection.select_features(
+        #     preprocessed_data_list, outer_cv_loop_iteration, meta_data, reverse_lasso_sklearn
+        # ),
+        "reverse_relaxed_lasso":  reverse_selection.select_features(
+            preprocessed_data_list, outer_cv_loop_iteration, meta_data, reverse_lasso, 'relaxed'
         ),
-        "relaxed_lasso": relaxed_lasso_feature_selection.select_features(
-            preprocessed_data_dict, outer_cv_loop_iteration, meta_data
+        "reverse_celer": reverse_selection.select_features(
+            preprocessed_data_list, outer_cv_loop_iteration, meta_data, reverse_lasso, 'celer'
         ),
-        "reverse_relaxed_lasso": reverse_relaxed_lasso_feature_selection.select_features(
-            preprocessed_data_dict, outer_cv_loop_iteration, meta_data
-        ),
-        "reverse_lasso": reverse_lasso_feature_selection.select_features(
-            preprocessed_data_dict, outer_cv_loop_iteration, meta_data
+        "reverse_lasso_sklearn": reverse_selection.select_features(
+            preprocessed_data_list, outer_cv_loop_iteration, meta_data, reverse_lasso, 'lasso_sklearn'
         ),
         # "reverse_lasso2":
         #     reverse_lasso_feature_selection_doubleHPO.select_features(
@@ -65,7 +65,19 @@ def select_feature_subset(
         # "reverse_rf": reverse_rf_feature_selection.select_features(
         #     preprocessed_data_dict, outer_cv_loop_iteration, meta_data
         # ),
+        # "reverse_rf_oob": reverse_rf_oob_feature_selection.select_features(
+        #     data.iloc[remaining_data_indices, :],
+        #     preprocessed_data_list,
+        #     outer_cv_loop_iteration,
+        #     meta_data,
+        # ),
         # "random_forest": tree_feature_selection.select_features(
+        #     preprocessed_data_dict,
+        #     outer_cv_loop_iteration,
+        #     meta_data,
+        #     extra_trees=False,
+        # ),
+        # "random_forest_oob": tree_feature_selection.select_features(
         #     preprocessed_data_dict,
         #     outer_cv_loop_iteration,
         #     meta_data,
@@ -96,7 +108,7 @@ def compute_feature_subsets(data_df, meta_data):
             joblib.dump(
                 selected_subsets_and_indices,
                 meta_data["path_selected_subsets"],
-                compress=("gzip", 3),
+                compress="lz4",
             )
         return selected_subsets_and_indices
 
