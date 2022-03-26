@@ -11,18 +11,10 @@ import filter_methods
 
 
 def get_data(meta_data_dict) -> pd.DataFrame:
-    # indices = [0]
-    # random_numbers = range(70, 120, 1)
-    # indices.extend(random_numbers)
-    # print(indices)
-    # data = data.iloc[:, indices]
-    if meta_data_dict["data"]["number_of_features"] is not None:
-        data = pd.read_csv(meta_data_dict["data"]["input_data_path"]).iloc[
-            :, : meta_data_dict["data"]["number_of_features"]
-        ]
-    else:
-        data = pd.read_csv(meta_data_dict["data"]["input_data_path"])
+    data = pd.read_csv(meta_data_dict["data"]["input_data_path"])
     print("input data shape:", data.shape)
+
+    # exclude features selected by the user
     if meta_data_dict["data"]["excluded_features"]:
         data = data.drop(labels=meta_data_dict["data"]["excluded_features"], axis=1)
         print(
@@ -31,37 +23,46 @@ def get_data(meta_data_dict) -> pd.DataFrame:
             f"{len(meta_data_dict['data']['excluded_features'])} "
             f"features: {meta_data_dict['data']['excluded_features']}",
         )
-    if meta_data_dict["data"]["cluster_correlation_threshold"]:
-        data, cluster_dict = cluster_data(data, meta_data_dict)
-        print("clustered data shape", data.shape)
 
     # print(f"perfect features: '{utils.get_well_separated_data(data)}")
     # # # scores, min, max = filter_methods.get_scores(data.iloc[:, :100])
     # # # print(filter_methods.get_scores(data.iloc[:, :100]))
-    # print((filter_methods.get_scores(data.iloc[:, :210])))
-    # # print(utils.sort_list_of_tuples_by_index(scores, ascending = False))
-    # # print(f"good features (max, min): "
-    # #       f"'{filter_methods.get_scores(data.iloc[:, :100])}")
+    # excl_features = (filter_methods.get_scores(data.iloc[:, :102]))
+    # print(excl_features)
+    # data = data.drop(labels=excl_features, axis=1)
+    # print([x for x in data.columns if 'bm' in x])
+    # meta_data_dict['data']['excluded_features'] = excl_features
+    # import settings
+    # settings.save_meta_data(meta_data_dict)
+    # print(utils.sort_list_of_tuples_by_index(scores, ascending = False))
+    # print(f"good features (max, min): "
+    #       f"'{filter_methods.get_scores(data.iloc[:, :100])}")
 
-    # if meta_data_dict["data"]["number_of_features"] is not None:
-    #     if data.shape[1] > meta_data_dict["data"]["number_of_features"]:
-    #         data = data.iloc[:, : meta_data_dict["data"]["number_of_features"]]
-    #         assert len(data.columns) == meta_data_dict["data"]["number_of_features"]
-    #     else:
-    #         print(
-    #             f"Data shape after clustering is {data.shape}. It is not "
-    #             f"possible to select "
-    #             f'{meta_data_dict["data"]["number_of_features"]} features.'
-    #         )
-
+    # adapt the data shape
+    if meta_data_dict["data"]["number_of_features"] is not None:
+        if data.shape[1] > meta_data_dict["data"]["number_of_features"]:
+            data = data.iloc[:, : meta_data_dict["data"]["number_of_features"]]
+            assert len(data.columns) == meta_data_dict["data"]["number_of_features"]
+        else:
+            print(
+                f"Data shape after clustering is {data.shape}. It is not "
+                f"possible to select "
+                f'{meta_data_dict["data"]["number_of_features"]} features.'
+            )
     print("data shape:", data.shape)
+
+    # cluster highly correlated features
+    if meta_data_dict["data"]["cluster_correlation_threshold"]:
+        data, cluster_dict = cluster_data(data, meta_data_dict)
+        print("clustered data shape", data.shape)
+
     return data
 
 
 def yeo_johnson_transform_test_train_splits(
-    data_df: pd.DataFrame,
-    outer_cv_loop_iteration: int,
-    meta_data: Dict,
+        data_df: pd.DataFrame,
+        outer_cv_loop_iteration: int,
+        meta_data: Dict,
 ) -> Dict[str, List[Union[Tuple[np.array], str]]]:
     """
 
@@ -104,6 +105,7 @@ def yeo_johnson_transform_test_train_splits(
         joblib.dump(
             {"transformed_data": transformed_data, "feature_names": data_df.columns},
             f"{meta_data['path_preprocessed_data']}_{outer_cv_loop_iteration}.pkl",
+            compress='lz4',
         )
 
     return {"transformed_data": transformed_data, "feature_names": data_df.columns}
@@ -190,8 +192,6 @@ def get_cluster_dict(correlation_matrix, meta_data):
             if len(correlated_feature_names) > 1:  # more than the initial feature?
                 clusters_list.append(correlated_feature_names)
 
-                # TODO else append to correlated features
-
                 # remove features already assigned to another cluster from updated correlation matrix
                 updated_correlation_matrix.drop(
                     labels=correlated_feature_names, inplace=True
@@ -200,8 +200,8 @@ def get_cluster_dict(correlation_matrix, meta_data):
                     labels=correlated_feature_names, axis=1, inplace=True
                 )
                 assert (
-                    updated_correlation_matrix.shape[0]
-                    == updated_correlation_matrix.shape[1]
+                        updated_correlation_matrix.shape[0]
+                        == updated_correlation_matrix.shape[1]
                 )
 
     # find cluster representatives:
@@ -213,80 +213,99 @@ def get_cluster_dict(correlation_matrix, meta_data):
         )
         clusters_dict[cluster_representative] = cluster
 
-    clusters_dict["uncorrelated_features"] = updated_correlation_matrix.columns
-    # joblib.dump(clusters_dict, meta_data["cluster_dict_path"], compress=("gzip", 3))
-
     for k, v in clusters_dict.items():
         print(k, v)
     print(len(clusters_dict.keys()))
-    return clusters_dict
+
+    clustered_data_dict = dict(clusters=clusters_dict)
+    clustered_data_dict["uncorrelated_features"] = updated_correlation_matrix.columns
+
+    if meta_data["cluster_dict_path"]:
+        joblib.dump(
+            clustered_data_dict, meta_data["cluster_dict_path"], compress='lz4'
+        )
+
+    return clustered_data_dict
 
 
 def cluster_data(
-    data_df: pd.DataFrame, meta_data
+        data_df: pd.DataFrame, meta_data
 ) -> Tuple[pd.DataFrame, Dict[str, List[str]]]:
     ########################################################
     # Cluster correlated features
     ########################################################
     # load or generate correlation matrix
-    try:
-        correlation_matrix = joblib.load(meta_data["correlation_matrix_path"])
-        # joblib.load('klkhlh')
-    except:
-        unlabeled_data_df = data_df.iloc[:, 1:]
-        correlation_matrix = unlabeled_data_df.corr(method="spearman")
-        # joblib.dump(
-        #     correlation_matrix,
-        #     meta_data["correlation_matrix_path"],
-        #     compress=("gzip", 3),
-        # )
-    # TODO einkommentieren
-    # assert (
-    #     correlation_matrix.shape[0]
-    #     == correlation_matrix.shape[1]
-    #     == data_df.shape[1] - 1
-    # )
+    if meta_data["correlation_matrix_path"]:
+        try:
+            correlation_matrix = joblib.load(meta_data["correlation_matrix_path"])
+        except:
+            correlation_matrix = data_df.iloc[:, 1:].corr(method="spearman")
+            joblib.dump(
+                correlation_matrix,
+                meta_data["correlation_matrix_path"],
+                compress='lz4',
+            )
+            print(f'Calculated new correlation matrix and saved to {meta_data["correlation_matrix_path"]}')
+    else:
+        correlation_matrix = data_df.iloc[:, 1:].corr(method="spearman")
+    assert data_df.shape[1] - 1 == correlation_matrix.shape[0] == correlation_matrix.shape[1]
 
     # load or calculate clusters
-    try:
-        cluster_dict = joblib.load(meta_data["cluster_dict_path"])
-        # joblib.load('klkhlh')
-    except:
-        cluster_dict = get_cluster_dict(correlation_matrix, meta_data)
+    if meta_data["cluster_dict_path"]:
+        try:
+            clustered_data_dict = joblib.load(meta_data["cluster_dict_path"])
+            print(f'New clusters are reused from {meta_data["cluster_dict_path"]}')
+        except:
+            print("New clusters are calculated")
+            clustered_data_dict = get_cluster_dict(correlation_matrix, meta_data)
+    else:
+        clustered_data_dict = get_cluster_dict(correlation_matrix, meta_data)
 
-    print(cluster_dict)
-    print(len(cluster_dict.keys()))
+    print("number of features in clustered data: ", len(clustered_data_dict['clusters'].keys())
+          + len(clustered_data_dict['uncorrelated_features']))
 
     # generate clustered data_df
-    clustered_data_df = data_df[cluster_dict["uncorrelated_features"]].copy()
-
+    clustered_data_df = data_df[clustered_data_dict["uncorrelated_features"]].copy()
+    clustered_data_index = clustered_data_df.columns.union(
+        clustered_data_dict["clusters"].keys()
+    )
     # append cluster representatives
     dict_of_cols = {}
-    for key, values in cluster_dict.items():
-        # TODO dict ggf anders speichern: cluster and uncorrelated features
-        if "uncorrelated_features" not in key:
-            dict_of_cols[f"cluster_{key}"] = data_df[key]
+    for key, values in clustered_data_dict["clusters"].items():
+        dict_of_cols[f"cluster_{key}"] = data_df[key]
+        clustered_data_index = clustered_data_index.union([key])
     clustered_data_df = pd.concat(
-        [clustered_data_df, pd.DataFrame(dict_of_cols)], axis=1
+        [pd.DataFrame(dict_of_cols), clustered_data_df], axis=1
     )
-
-    # for key, values in cluster_dict.items():
-    #     # TODO dict ggf anders speichern: cluster and uncorrelated features
-    #     if "uncorrelated_features" not in key:
-    #         clustered_data_df.insert(0, f"cluster_{key}", data_df[key])
-
-    clustered_data_df.insert(0, "label", data_df["label"])  #
-    # de_fragmented_df = clustered_data_df.copy()
-    # de_fragmented_df.to_csv("art3_clustered.csv")
+    clustered_data_df.insert(0, "label", data_df["label"])
 
     assert (
-        clustered_data_df.shape[1]
-        == (len(cluster_dict.keys()) - 1)
-        + len(cluster_dict["uncorrelated_features"])
-        + 1  # the label
-    ), f"clustered_data_df.shape[1] {clustered_data_df.shape[1]}= (len(cluster_dict.keys()) - 1) {(len(cluster_dict.keys()) - 1)} +len(cluster_dict['uncorrelated_features']) {len(cluster_dict['uncorrelated_features'])}+1"
+            clustered_data_df.shape[1]
+            == len(clustered_data_dict["clusters"].keys())
+            + len(clustered_data_dict["uncorrelated_features"])
+            + 1  # the label
+    ), f"clustered_data_df.shape[1] {clustered_data_df.shape[1]}= (len(cluster_dict.keys()) - 1) " \
+       f"{(len(clustered_data_dict['clusters'].keys()))} +len(cluster_dict['uncorrelated_features']) " \
+       f"{len(clustered_data_dict['uncorrelated_features'])}+1"
     print(clustered_data_df.shape)
-    return clustered_data_df, cluster_dict
+
+    # save correlation matrix for clustered data
+    eliminated_features = [
+        item for item in data_df.columns[1:] if item not in clustered_data_index
+    ]
+    correlation_matrix.drop(
+        eliminated_features, inplace=True, axis=1
+    )
+    correlation_matrix.drop(
+        eliminated_features, inplace=True, axis=0
+    )
+    assert correlation_matrix.shape[1] == clustered_data_df.shape[1] - 1  # exclude label
+    joblib.dump(
+        correlation_matrix,
+        meta_data["clustered_correlation_matrix_path"],
+        compress='lz4',
+    )
+    return clustered_data_df, clustered_data_dict
 
 
 def _calculate_cluster_representative(cluster_feature_names, correlation_matrix_df):
@@ -297,9 +316,7 @@ def _calculate_cluster_representative(cluster_feature_names, correlation_matrix_
         sum_of_correlation_coefficients_dict[base_feature] = np.sum(
             np.abs((correlation_matrix_df[base_feature][cluster_feature_names]))
         )
-
-    # The feature_selection_method parameter takes selected_feature_subset_list function, and for each entry in the iterable,
-    # it'll find the one for which the feature_selection_method function returns the highest selected_feature_subsets.
+    # select the feature with the highest overall correlation to all other elements of the cluster
     return max(
         sum_of_correlation_coefficients_dict,
         key=sum_of_correlation_coefficients_dict.get,
