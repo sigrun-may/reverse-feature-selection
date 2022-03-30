@@ -127,9 +127,7 @@ def compute_feature_subsets(data_df, meta_data):
     try:
         return joblib.load(meta_data["path_selected_subsets"])
     except:  # noqa
-        selected_subsets_and_indices = parallel_feature_subset_selection(
-            data_df, meta_data
-        )
+        selected_subsets_and_indices = parallel_feature_subset_selection(data_df, meta_data)
         if meta_data["path_selected_subsets"]:
             joblib.dump(
                 selected_subsets_and_indices,
@@ -141,15 +139,9 @@ def compute_feature_subsets(data_df, meta_data):
 
 def parallel_feature_subset_selection(data_df, meta_data) -> List[Tuple]:
     # outer cross-validation to validate selected feature subsets
-    fold_splitter = StratifiedKFold(
-        n_splits=meta_data["cv"]["n_outer_folds"], shuffle=True, random_state=42
-    )
-    selected_subsets_and_indices = Parallel(
-        n_jobs=meta_data["parallel"]["n_jobs_cv"], verbose=5
-    )(
-        delayed(select_feature_subset)(
-            data_df, train_indices, test_indices, outer_cv_loop_iteration, meta_data
-        )
+    fold_splitter = StratifiedKFold(n_splits=meta_data["cv"]["n_outer_folds"], shuffle=True, random_state=42)
+    selected_subsets_and_indices = Parallel(n_jobs=meta_data["parallel"]["n_jobs_cv"], verbose=5)(
+        delayed(select_feature_subset)(data_df, train_indices, test_indices, outer_cv_loop_iteration, meta_data)
         for outer_cv_loop_iteration, (train_indices, test_indices) in enumerate(
             fold_splitter.split(data_df.iloc[:, 1:], data_df["label"])
         )

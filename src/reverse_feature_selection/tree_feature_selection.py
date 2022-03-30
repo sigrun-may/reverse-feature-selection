@@ -42,9 +42,7 @@ def select_features(preprocessed_data_dict, outer_cv_loop, meta_data, extra_tree
         transformed_data = preprocessed_data_dict["transformed_data"]
 
         # cross validation for the optimization of alpha
-        for fold_index, (test, train, train_correlation_matrix_complete) in enumerate(
-            transformed_data
-        ):
+        for fold_index, (test, train, train_correlation_matrix_complete) in enumerate(transformed_data):
             train_data_df = pd.DataFrame(train, columns=feature_names)
             test_data_df = pd.DataFrame(test, columns=feature_names)
 
@@ -59,9 +57,7 @@ def select_features(preprocessed_data_dict, outer_cv_loop, meta_data, extra_tree
 
             # parameters for model training to combat overfitting
             parameters = dict(
-                min_data_in_leaf=trial.suggest_int(
-                    "min_data_in_leaf", 2, math.floor(x_train.shape[0] / 2)
-                ),
+                min_data_in_leaf=trial.suggest_int("min_data_in_leaf", 2, math.floor(x_train.shape[0] / 2)),
                 lambda_l1=trial.suggest_uniform("lambda_l1", 0.0, 3),
                 min_gain_to_split=trial.suggest_uniform("min_gain_to_split", 0, 5),
                 max_depth=trial.suggest_int("max_depth", 2, 20),
@@ -78,9 +74,7 @@ def select_features(preprocessed_data_dict, outer_cv_loop, meta_data, extra_tree
             # https://lightgbm.readthedocs.io/en/latest/Parameters-Tuning.html#tune-parameters-for-the-leaf-wise-best-first-tree
             max_num_leaves = 2 ** parameters["max_depth"] - 1
             max_num_leaves = min(max_num_leaves, 90)
-            parameters["num_leaves"] = trial.suggest_int(
-                "num_leaves", 2, max_num_leaves
-            )
+            parameters["num_leaves"] = trial.suggest_int("num_leaves", 2, max_num_leaves)
 
             model = lgb.train(
                 parameters,
@@ -89,32 +83,24 @@ def select_features(preprocessed_data_dict, outer_cv_loop, meta_data, extra_tree
                 callbacks=[lgb.record_evaluation({})],  # stop verbose
             )
 
-            if cv_pruner.no_features_selected(
-                model.feature_importance(importance_type="gain")
-            ):
+            if cv_pruner.no_features_selected(model.feature_importance(importance_type="gain")):
                 raise TrialPruned()
 
-            validation_metric_history.append(
-                model.best_score["valid_0"]["binary_logloss"]
-            )
+            validation_metric_history.append(model.best_score["valid_0"]["binary_logloss"])
 
             if cv_pruner.should_prune_against_threshold(
                 current_step_of_complete_nested_cross_validation=fold_index,
                 folds_outer_cv=meta_data["cv"]["n_outer_folds"],
                 folds_inner_cv=meta_data["cv"]["n_inner_folds"],
                 validation_metric_history=validation_metric_history,
-                threshold_for_pruning=meta_data["selection_method"]["rf"][
-                    "pruner_threshold"
-                ],
+                threshold_for_pruning=meta_data["selection_method"]["rf"]["pruner_threshold"],
                 direction_to_optimize_is_minimize=True,
                 optimal_metric=0,
                 method=Method.OPTIMAL_METRIC,
             ):
                 return trim_mean(validation_metric_history, proportiontocut=0.2)
 
-            feature_importances_list.append(
-                model.feature_importance(importance_type="gain")
-            )
+            feature_importances_list.append(model.feature_importance(importance_type="gain"))
 
             # calculate shap values
             explainer = shap.TreeExplainer(model)
@@ -123,9 +109,7 @@ def select_features(preprocessed_data_dict, outer_cv_loop, meta_data, extra_tree
             shap_values_list.append(np.sum(raw_shap_values, axis=0))
 
         trial.set_user_attr("shap_values", np.array(shap_values_list))
-        trial.set_user_attr(
-            "macro_feature_importances", np.array(feature_importances_list)
-        )
+        trial.set_user_attr("macro_feature_importances", np.array(feature_importances_list))
 
         #     if (
         #         meta_data_dict["selection_method"]["rf"]["shap_test"] is None
@@ -217,9 +201,7 @@ def select_features(preprocessed_data_dict, outer_cv_loop, meta_data, extra_tree
     try:
         return {
             "shap_values": study.best_trial.user_attrs["shap_values"],
-            "macro_feature_importances": study.best_trial.user_attrs[
-                "macro_feature_importances"
-            ],
+            "macro_feature_importances": study.best_trial.user_attrs["macro_feature_importances"],
             "micro_feature_importance": micro_feature_importance,
         }
     except:

@@ -106,9 +106,7 @@ def get_scores(data_df):
     # evaluation_metric: ?')
     start = time.time()
     number_of_features = x.shape[1]
-    scores = Parallel(n_jobs=1, prefer="threads", verbose=5)(
-        delayed(get_prediction)(feature, x, y) for feature in x
-    )
+    scores = Parallel(n_jobs=1, prefer="threads", verbose=5)(delayed(get_prediction)(feature, x, y) for feature in x)
     # return scores
     # return [x for x in scores if "NAN" not in x]
     return [x for x in scores if "NAN" not in x]

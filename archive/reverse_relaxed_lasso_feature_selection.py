@@ -24,10 +24,7 @@ def calculate_adjusted_r2(y, predicted_y, number_of_coefficients):
     sample_size = len(y)
 
     # adjusted_r2 = 1 - (1 - r2) * (sample_size - 1) / (sample_size - (np.max(number_of_coefficients)) - 1)
-    adjusted_r2 = 1 - (
-        ((1 - r2) * (sample_size - 1))
-        / (sample_size - (np.median(number_of_coefficients)) - 1)
-    )
+    adjusted_r2 = 1 - (((1 - r2) * (sample_size - 1)) / (sample_size - (np.median(number_of_coefficients)) - 1))
 
     # Adj r2 = 1-(1-R2)*(n-1)/(n-p-1)
     # assume n = number of sample size , p = number of independent variables
@@ -94,29 +91,19 @@ def calculate_r2(
         # find features highly correlated to the target_feature
         high_corr_features = [
             feature
-            for feature, correlation_coefficient in train_correlation_matrix[
-                target_feature_name
-            ].items()
-            if (
-                (abs(correlation_coefficient) > 0.7)
-                and (feature not in target_feature_name)
-            )
+            for feature, correlation_coefficient in train_correlation_matrix[target_feature_name].items()
+            if ((abs(correlation_coefficient) > 0.7) and (feature not in target_feature_name))
         ]
         assert target_feature_name not in high_corr_features
-        high_correlated_features = high_correlated_features.union(
-            set(high_corr_features)
-        )
+        high_correlated_features = high_correlated_features.union(set(high_corr_features))
 
         # How Correlations Influence Lasso Prediction, April 2012IEEE Transactions on Information Theory 59(3)
         # DOI: 10.1109/TIT.2012.2227680
         # find features correlated to the target_feature from test/ train data
         correlated_features = [
             (feature, correlation_coefficient)
-            for feature, correlation_coefficient in train_correlation_matrix[
-                target_feature_name
-            ].items()
-            if abs(correlation_coefficient)
-            > meta_data["selection_method"]["reverse_lasso"]["correlation_threshold"]
+            for feature, correlation_coefficient in train_correlation_matrix[target_feature_name].items()
+            if abs(correlation_coefficient) > meta_data["selection_method"]["reverse_lasso"]["correlation_threshold"]
         ]
 
         correlated_feature_names = list(map(list, zip(*correlated_features)))[0]
@@ -129,9 +116,7 @@ def calculate_r2(
                 for feature_name, correlation_coefficient in correlated_features
             ]
             # keep the feature with the lowest correlation to the target feature
-            sorted_correlated_features = sort_list_of_tuples_by_index(
-                absolute_correlations, index=1, ascending=True
-            )
+            sorted_correlated_features = sort_list_of_tuples_by_index(absolute_correlations, index=1, ascending=True)
             min_correlated_feature = sorted_correlated_features[0][0]
             correlated_feature_names.remove(min_correlated_feature)
             assert len(absolute_correlations) - 1 == len(correlated_feature_names)
@@ -209,9 +194,7 @@ def calculate_r2(
     if include_label:  # TODO prüfen, ob das noch gebraucht wird
         trial.set_user_attr("label_coefficients", label_coefficients)
         # trial.set_user_attr("r2_score", r2_score(true_y, predicted_y))
-        trial.set_user_attr(
-            "median_number_of_features_in_model", np.median(number_of_coefficients_list)
-        )
+        trial.set_user_attr("median_number_of_features_in_model", np.median(number_of_coefficients_list))
         trial.set_user_attr("union_correlated_features", high_correlated_features)
     # return adjusted_r2
     return r2_score(true_y, predicted_y)
@@ -320,9 +303,7 @@ def optimize(
     )
 
 
-def select_features(
-    transformed_test_train_splits_dict, outer_cv_loop_iteration, meta_data
-):
+def select_features(transformed_test_train_splits_dict, outer_cv_loop_iteration, meta_data):
     # calculate relevance for each feature
     deselected_features_list = []
     robustness_vector = []
@@ -371,7 +352,6 @@ def select_features(
     # )  # exclude the label
 
     assert (
-        len(selected_features_dict)
-        == len(transformed_test_train_splits_dict["feature_names"]) - 1
+        len(selected_features_dict) == len(transformed_test_train_splits_dict["feature_names"]) - 1
     )  # exclude the label
     return selected_features_dict  # , np.array(robustness_vector)

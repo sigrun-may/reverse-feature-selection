@@ -202,9 +202,7 @@ def select_features(
     # TODO check if study.best_value is available and at least one trial was completed
     return {
         "shap_values": study.best_trial.user_attrs["shap_values"],
-        "macro_feature_importances": study.best_trial.user_attrs[
-            "macro_feature_importances"
-        ],
+        "macro_feature_importances": study.best_trial.user_attrs["macro_feature_importances"],
         "micro_feature_importance": micro_feature_importance,
     }
 

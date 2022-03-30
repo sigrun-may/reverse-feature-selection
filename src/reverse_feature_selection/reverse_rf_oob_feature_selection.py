@@ -30,9 +30,7 @@ def calculate_oob(
     assert feature_names[0] == "label"
 
     try:
-        train_correlation_matrix_complete = joblib.load(
-            meta_data["clustered_correlation_matrix_path"]
-        )
+        train_correlation_matrix_complete = joblib.load(meta_data["clustered_correlation_matrix_path"])
     except:
         raise ValueError("no correlation matrix")
 
@@ -74,11 +72,8 @@ def calculate_oob(
     # find features correlated to the target_feature from test/ train data
     correlated_features = [
         (feature, correlation_coefficient)
-        for feature, correlation_coefficient in train_correlation_matrix_complete[
-            target_feature_name
-        ].items()
-        if abs(correlation_coefficient)
-        > meta_data["selection_method"]["reverse_lasso"]["correlation_threshold"]
+        for feature, correlation_coefficient in train_correlation_matrix_complete[target_feature_name].items()
+        if abs(correlation_coefficient) > meta_data["selection_method"]["reverse_lasso"]["correlation_threshold"]
     ]
 
     correlated_feature_names = list(map(list, zip(*correlated_features)))[0]
@@ -91,9 +86,7 @@ def calculate_oob(
             for feature_name, correlation_coefficient in correlated_features
         ]
         # keep the feature with the lowest correlation to the target feature
-        sorted_correlated_features = sort_list_of_tuples_by_index(
-            absolute_correlations, index=1, ascending=True
-        )
+        sorted_correlated_features = sort_list_of_tuples_by_index(absolute_correlations, index=1, ascending=True)
         min_correlated_feature = sorted_correlated_features[0][0]
         correlated_feature_names.remove(min_correlated_feature)
         assert len(absolute_correlations) - 1 == len(correlated_feature_names)
@@ -115,16 +108,10 @@ def calculate_oob(
     # assert test_data_df.shape[1] == test.shape[1] - len(deselected_features) - len(
     #     correlated_features
     # )
-    if not train_data_df.shape[1] == complete_train_data_df.shape[1] - len(
-        correlated_feature_names
-    ):
+    if not train_data_df.shape[1] == complete_train_data_df.shape[1] - len(correlated_feature_names):
         print("d")
-    assert train_data_df.shape[1] == complete_train_data_df.shape[1] - len(
-        correlated_feature_names
-    ), (
-        str(len(correlated_feature_names))
-        + "  train_data_df.shape[1] "
-        + str(train_data_df.shape[1])
+    assert train_data_df.shape[1] == complete_train_data_df.shape[1] - len(correlated_feature_names), (
+        str(len(correlated_feature_names)) + "  train_data_df.shape[1] " + str(train_data_df.shape[1])
     )
 
     # # prepare train/ test data
@@ -173,15 +160,11 @@ def optimize(
         #     threshold=0.1,
         # )
 
-        optuna_study_pruner.insufficient_results_study_pruner(
-            trial, warm_up_steps=15, threshold=0.05
-        )
+        optuna_study_pruner.insufficient_results_study_pruner(trial, warm_up_steps=15, threshold=0.05)
         # if 'random' in target_feature_name:
         #     return 0
 
-        parameters = dict(
-            min_impurity_decrease=trial.suggest_uniform("min_impurity_decrease", 0.0, 3)
-        )
+        parameters = dict(min_impurity_decrease=trial.suggest_uniform("min_impurity_decrease", 0.0, 3))
 
         return calculate_oob(
             parameters=parameters,
@@ -281,7 +264,5 @@ def select_features(train_data, outer_cv_loop_iteration, meta_data):
             oob_labeled,
         )
 
-    assert (
-        len(selected_features_dict) == len(train_data.columns) - 1
-    )  # exclude the label
+    assert len(selected_features_dict) == len(train_data.columns) - 1  # exclude the label
     return selected_features_dict  # , np.array(robustness_vector)

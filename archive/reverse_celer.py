@@ -93,9 +93,7 @@ def optimize(
     )
 
 
-def calculate_performance_metric(
-    params, train_data_df, test_data_df, target_feature_name
-):
+def calculate_performance_metric(params, train_data_df, test_data_df, target_feature_name):
     pruned = False
 
     # prepare train/ test data

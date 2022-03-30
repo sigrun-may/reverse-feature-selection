@@ -11,10 +11,7 @@ def get_well_separated_data(data_df):
     print("class2.shape", class2.shape)
 
     for i in range(class2.shape[1]):
-        if not (
-            (np.min(class2[:, i]) < np.max(class1[:, i]))
-            or (np.min(class1[:, i]) < np.max(class2[:, i]))
-        ):
+        if not ((np.min(class2[:, i]) < np.max(class1[:, i])) or (np.min(class1[:, i]) < np.max(class2[:, i]))):
             print(data_df.columns[i])
 
 
@@ -23,12 +20,8 @@ def sort_list_of_tuples_by_index(list_to_be_sorted, index=1, ascending=True):
     lst = len(list_to_be_sorted)
     for i in range(0, lst):
         for j in range(0, lst - i - 1):
-            if (
-                ascending
-                and list_to_be_sorted[j][index] > list_to_be_sorted[j + 1][index]
-            ) or (
-                not ascending
-                and (list_to_be_sorted[j][index] < list_to_be_sorted[j + 1][index])
+            if (ascending and list_to_be_sorted[j][index] > list_to_be_sorted[j + 1][index]) or (
+                not ascending and (list_to_be_sorted[j][index] < list_to_be_sorted[j + 1][index])
             ):
                 temp = list_to_be_sorted[j]
                 list_to_be_sorted[j] = list_to_be_sorted[j + 1]

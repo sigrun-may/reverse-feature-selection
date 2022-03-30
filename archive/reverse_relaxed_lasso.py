@@ -96,9 +96,7 @@ def optimize(
     )
 
 
-def calculate_performance_metric(
-    params, train_data_df, test_data_df, target_feature_name, method
-):
+def calculate_performance_metric(params, train_data_df, test_data_df, target_feature_name, method):
     pruned = False
 
     # prepare train/ test data
@@ -130,9 +128,7 @@ def calculate_performance_metric(
         lasso.fit(np.asfortranarray(x_train), y_train)
 
     else:
-        raise ValueError(
-            "Feature selection method not provided: relaxed, celer and lasso_sklearn are valid options"
-        )
+        raise ValueError("Feature selection method not provided: relaxed, celer and lasso_sklearn are valid options")
 
     if "label" in train_data_df.columns:
         # prune trials if label coefficient is zero or model includes no coefficients

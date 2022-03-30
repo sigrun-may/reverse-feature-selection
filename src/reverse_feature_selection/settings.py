@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import yaml
 from sqlitedict import SqliteDict
 
@@ -40,10 +41,10 @@ def get_meta_data():
     ########################################################
     # Settings
     ########################################################
-    experiment_id = id_d
+    experiment_id = id_t
     print(experiment_id)
-    data_name = "artificial4"
-    # data_name = "colon"
+    # data_name = "artificial4"
+    data_name = "colon"
 
     print(experiment_id)
     folder = dict(data="../../data", experiments="../../experiments")
@@ -89,8 +90,8 @@ def get_meta_data():
         #     "bm_29",
         # ],
         excluded_features=None,
-        cluster_correlation_threshold=None,
-        number_of_features=30,
+        cluster_correlation_threshold=0.9,
+        number_of_features=2600,
         number_of_samples=None,
         pos_label=0,
     )
@@ -105,16 +106,16 @@ def get_meta_data():
     selection_method = dict(
         rf=dict(
             trials=40,
-            pruner_threshold=0.2,
+            pruner_threshold=0.5,
             path_mlFlow=None,
             extra_trees=True,
         ),
         lasso=dict(trials=40, pruner=20),
         reverse_lasso=dict(
-            trials=40,
+            trials=30,
             pruner_patience=None,
-            pruner_threshold=0.1,
-            correlation_threshold=0.3,
+            pruner_threshold=0.5,
+            correlation_threshold=0.1,
             remove_deselected=False,
         ),
     )
@@ -124,9 +125,11 @@ def get_meta_data():
         commit="446b6a809f139842b698ad1cd5e63cd5ed8653b5",
         data=data,
         cv=dict(n_outer_folds=6, n_inner_folds=5),
-        parallel=dict(n_jobs_preprocessing=1, n_jobs_cv=1, cluster=True),
+        parallel=dict(n_jobs_preprocessing=1, n_jobs_cv=6, cluster=True),
         selection_method=selection_method,
-        validation=dict(k_neighbors=11, knn_method="distance", threshold=0.1, factor=1),
+        validation=dict(
+            k_neighbors=11, knn_method="distance", reverse_threshold=0.05, standard_threshold=0.0, factor=1
+        ),
         path_selected_subsets=f"{experiment_path}/selected_subsets.pkl.gz",
         path_selected_features=f"{experiment_path}/selected_features.csv",
         path_validation=f"{experiment_path}/validation.pkl.gz",
@@ -135,14 +138,14 @@ def get_meta_data():
         # path_preprocessed_data=f
         # "{experiment_path}/preprocessed_data/preprocessed_data_dict",
         correlation_matrix_path=None,
-        clustered_correlation_matrix_path=None,
-        # correlation_matrix_path=f"{folder['data']}/"
-        # f"{data_name}_correlation_matrix.pkl.gz",
+        # clustered_correlation_matrix_path=None,
+        clustered_correlation_matrix_path=f"{folder['data']}/{data_name}_clustered_correlation_matrix.pkl.gz",
         # clustered_correlation_matrix_path=f"{folder['data']}/"
         # f"{data_name}_clustered_correlation_matrix.pkl.gz",
         # cluster_dict_path=f"{folder['data']}/" f"{data_name}_clusters.pkl.gz",
         cluster_dict_path=None,
     )
+    # meta_data["validation"]["standard_threshold"] = np.sqrt(meta_data["validation"]["reverse_threshold"])
     try:
         os.mkdir(folder["experiments"])
         print(f"Directory {folder['experiments']} created")

@@ -39,26 +39,14 @@ def validate(
     # number_of_samples = train_data.shape[0]
 
     # z transform to compare the distances
-    powerTransformer = PowerTransformer(
-        copy=True, method="yeo-johnson", standardize=True
-    )
+    powerTransformer = PowerTransformer(copy=True, method="yeo-johnson", standardize=True)
     scaled_train_data = powerTransformer.fit_transform(train_data)
     scaled_test_data = powerTransformer.transform(test_data)
 
-    assert (
-        scaled_train_data.shape[1]
-        == train_data.shape[1]
-        == scaled_test_data.shape[1]
-        == test_data.shape[1]
-    )
+    assert scaled_train_data.shape[1] == train_data.shape[1] == scaled_test_data.shape[1] == test_data.shape[1]
     assert scaled_train_data.shape[0] == train_data.shape[0]
 
-    weights = np.asarray(
-        [
-            selected_feature_subset[selected_feature]
-            for selected_feature in train_data.columns
-        ]
-    )
+    weights = np.asarray([selected_feature_subset[selected_feature] for selected_feature in train_data.columns])
     assert type(weights) == np.ndarray, type(weights)
     assert type(weights[0]) == np.float64, weights
 
@@ -84,9 +72,7 @@ def validate(
                 # calculate weighted manhattan distance
                 weighted_distance = 0
                 for j in range(class_sample.size):
-                    weighted_distance += (
-                        np.abs(class_sample[j] - test_sample[j]) * weights[j]
-                    )
+                    weighted_distance += np.abs(class_sample[j] - test_sample[j]) * weights[j]
 
                 # distance = class_sample - test_sample
                 # absolute_distance = np.absolute(distance)
@@ -201,26 +187,14 @@ def _validate_standard(
     train_data = train[selected_feature_subset]
 
     # z transform to compare the distances
-    powerTransformer = PowerTransformer(
-        copy=True, method="yeo-johnson", standardize=True
-    )
+    powerTransformer = PowerTransformer(copy=True, method="yeo-johnson", standardize=True)
     scaled_train_data = powerTransformer.fit_transform(train_data)
     scaled_test_data = powerTransformer.transform(test_data)
 
-    assert (
-        scaled_train_data.shape[1]
-        == train_data.shape[1]
-        == scaled_test_data.shape[1]
-        == test_data.shape[1]
-    )
+    assert scaled_train_data.shape[1] == train_data.shape[1] == scaled_test_data.shape[1] == test_data.shape[1]
     assert scaled_train_data.shape[0] == train_data.shape[0]
 
-    weights = np.asarray(
-        [
-            selected_feature_subset[selected_feature][0]
-            for selected_feature in train_data.columns
-        ]
-    )
+    weights = np.asarray([selected_feature_subset[selected_feature][0] for selected_feature in train_data.columns])
     weights = weights / np.sum(weights)
     assert np.sum(weights) == 1
     assert type(weights) == np.ndarray, type(weights)

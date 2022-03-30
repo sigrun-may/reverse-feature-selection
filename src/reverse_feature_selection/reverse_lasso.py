@@ -7,6 +7,8 @@ from relaxed_lasso import RelaxedLasso
 import reverse_selection
 import celer
 from sklearn.linear_model import Lasso
+import warnings
+warnings.filterwarnings('ignore')
 
 
 # import optuna_study_pruner
@@ -99,9 +101,7 @@ def optimize(
     )
 
 
-def calculate_performance_metric(
-    params, train_data_df, test_data_df, target_feature_name, method
-):
+def calculate_performance_metric(params, train_data_df, test_data_df, target_feature_name, method):
     prune = False
 
     # prepare train/ test data

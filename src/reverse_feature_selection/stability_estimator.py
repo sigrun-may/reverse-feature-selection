@@ -19,13 +19,9 @@ def get_stability(used_features_matrix):
         # empirical density of the robustness_vector
         # number of features which were selected k-times
         robustness_density = list(robustness_vector).count(k)
-        subset_size_stability = _subset_size_stability(
-            subset_vector, number_of_features, k
-        )
+        subset_size_stability = _subset_size_stability(subset_vector, number_of_features, k)
 
-        stability += (
-            k**2 * robustness_density * subset_size_stability
-        ) / subset_vector[k - 1]
+        stability += (k**2 * robustness_density * subset_size_stability) / subset_vector[k - 1]
         if np.isnan(stability):
             print("stability is nan")
             return 0

@@ -47,9 +47,7 @@ def select_features(
     return selected_features_dict
 
 
-def remove_deselected_features(
-    deselected_features, train_correlation_matrix, train_data_df, test_data_df
-):
+def remove_deselected_features(deselected_features, train_correlation_matrix, train_data_df, test_data_df):
     number_of_initial_features = len(train_correlation_matrix.columns)
     # remove irrelevant features from train_correlation_matrix
     train_correlation_matrix.drop(
@@ -78,11 +76,8 @@ def find_correlated_features(train_correlation_matrix, target_feature_name, meta
     # find features correlated to the target_feature from test/ train data
     correlated_features = [
         (feature, correlation_coefficient)
-        for feature, correlation_coefficient in train_correlation_matrix[
-            target_feature_name
-        ].items()
-        if abs(correlation_coefficient)
-        > meta_data["selection_method"]["reverse_lasso"]["correlation_threshold"]
+        for feature, correlation_coefficient in train_correlation_matrix[target_feature_name].items()
+        if abs(correlation_coefficient) > meta_data["selection_method"]["reverse_lasso"]["correlation_threshold"]
     ]
 
     correlated_feature_names = list(map(list, zip(*correlated_features)))[0]
@@ -94,9 +89,7 @@ def find_correlated_features(train_correlation_matrix, target_feature_name, meta
             for feature_name, correlation_coefficient in correlated_features
         ]
         # keep the feature with the lowest correlation to the target feature
-        sorted_correlated_features = utils.sort_list_of_tuples_by_index(
-            absolute_correlations, index=1, ascending=True
-        )
+        sorted_correlated_features = utils.sort_list_of_tuples_by_index(absolute_correlations, index=1, ascending=True)
         min_correlated_feature = sorted_correlated_features[0][0]
         correlated_feature_names.remove(min_correlated_feature)
         assert len(absolute_correlations) - 1 == len(correlated_feature_names)
@@ -137,9 +130,7 @@ def calculate_performance_metric_cv(
         )
 
         # remove features correlated to the target_feature from test/ train data and the label if it is not included
-        train_df = train_data_df.drop(
-            columns=names_of_correlated_features, inplace=False
-        )
+        train_df = train_data_df.drop(columns=names_of_correlated_features, inplace=False)
         test_df = test_data_df.drop(columns=names_of_correlated_features, inplace=False)
 
         if not include_label:

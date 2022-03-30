@@ -16,9 +16,7 @@ def train_model(test_data_df, train_data_df, target_feature, trial, extra_trees)
 
     # parameters for model training to combat overfitting
     parameters = dict(
-        min_data_in_leaf=trial.suggest_int(
-            "min_data_in_leaf", 2, math.floor(x_train.shape[0] / 2)
-        ),
+        min_data_in_leaf=trial.suggest_int("min_data_in_leaf", 2, math.floor(x_train.shape[0] / 2)),
         lambda_l1=trial.suggest_uniform("lambda_l1", 0.0, 3),
         min_gain_to_split=trial.suggest_uniform("min_gain_to_split", 0, 5),
         max_depth=trial.suggest_int("max_depth", 2, 20),

@@ -9,12 +9,14 @@ from validation import evaluate_feature_selection
 
 if __name__ == "__main__":
     meta_data_dict = settings.get_meta_data()
-    # meta_data_dict = settings.get_old_meta_data("d_138")
+    # meta_data_dict = settings.get_old_meta_data("t_93")
+    meta_data_dict["validation"]["reverse_threshold"] = 0.05
+    meta_data_dict["validation"]["standard_threshold"] = 0.0
+
     # meta_data_dict['data']['excluded_features'] = None
-    # meta_data_dict["validation"]["threshold"] = 0.1
     data_df = get_data(meta_data_dict)
 
-    # # save meta data for parsed data
+    # save meta data for parsed data
     meta_data_dict["data"]["columns"] = data_df.columns.tolist()
     settings.save_meta_data(meta_data_dict)
 
