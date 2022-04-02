@@ -56,6 +56,7 @@ def get_data(meta_data_dict) -> pd.DataFrame:
     print("data shape:", data.shape)
 
     # cluster highly correlated features
+    # TODO shuffle data
     if meta_data_dict["data"]["cluster_correlation_threshold"]:
         data, cluster_dict = cluster_data(data, meta_data_dict)
         print("clustered data shape", data.shape)

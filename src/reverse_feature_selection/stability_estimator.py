@@ -2,11 +2,11 @@ from typing import List, Dict, Tuple
 import numpy as np
 
 
-def get_stability(used_features_matrix):
+def get_stability(selected_features_matrix):
 
-    robustness_vector = used_features_matrix.sum(axis=0)
+    robustness_vector = selected_features_matrix.sum(axis=0)
     print(robustness_vector[robustness_vector.nonzero()])
-    subset_vector = used_features_matrix.sum(axis=1)
+    subset_vector = selected_features_matrix.sum(axis=1)
 
     number_of_features = len(robustness_vector)
     number_of_folds = len(subset_vector)
@@ -31,7 +31,7 @@ def get_stability(used_features_matrix):
     stability = stability / (number_of_folds**2)
 
     assert count_k == number_of_folds
-    if stability >= 1:
+    if stability > 1:
         print(stability, " stability greater than 1")
     # assert stability <= 1.1, stability
     return stability

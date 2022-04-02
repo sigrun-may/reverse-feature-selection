@@ -8,21 +8,22 @@ from validation import evaluate_feature_selection
 
 
 if __name__ == "__main__":
-    meta_data_dict = settings.get_meta_data()
-    # meta_data_dict = settings.get_old_meta_data("t_93")
+    # meta_data_dict = settings.get_meta_data()
+    meta_data_dict = settings.get_old_meta_data("t_98")
     meta_data_dict["validation"]["reverse_threshold"] = 0.05
-    meta_data_dict["validation"]["standard_threshold"] = 0.0
+    meta_data_dict["validation"]["standard_threshold"] = 0.05
 
     # meta_data_dict['data']['excluded_features'] = None
     data_df = get_data(meta_data_dict)
 
     # save meta data for parsed data
-    meta_data_dict["data"]["columns"] = data_df.columns.tolist()
-    settings.save_meta_data(meta_data_dict)
+    # meta_data_dict["data"]["columns"] = data_df.columns.tolist()
+    # settings.save_meta_data(meta_data_dict)
 
     # select feature subsets
     feature_selection_result = compute_feature_subsets(data_df, meta_data_dict)
-
+    meta_data_dict["data"]["columns"] = ['label']
+    meta_data_dict["data"]["columns"].extend(feature_selection_result[0][1].columns[1:].tolist())
     # validate feature subsets
     evaluation_result_dict = evaluate_feature_selection(
         feature_selection_result,

@@ -8,7 +8,8 @@ import reverse_selection
 import celer
 from sklearn.linear_model import Lasso
 import warnings
-warnings.filterwarnings('ignore')
+
+warnings.filterwarnings("ignore")
 
 
 # import optuna_study_pruner

@@ -43,8 +43,8 @@ def get_meta_data():
     ########################################################
     experiment_id = id_t
     print(experiment_id)
-    # data_name = "artificial4"
-    data_name = "colon"
+    data_name = "artificial_c1"
+    # data_name = "colon"
 
     print(experiment_id)
     folder = dict(data="../../data", experiments="../../experiments")
@@ -91,7 +91,7 @@ def get_meta_data():
         # ],
         excluded_features=None,
         cluster_correlation_threshold=0.9,
-        number_of_features=2600,
+        number_of_features=200,
         number_of_samples=None,
         pos_label=0,
     )
@@ -105,14 +105,14 @@ def get_meta_data():
 
     selection_method = dict(
         rf=dict(
-            trials=40,
+            trials=20,
             pruner_threshold=0.5,
             path_mlFlow=None,
             extra_trees=True,
         ),
-        lasso=dict(trials=40, pruner=20),
+        lasso=dict(trials=20, pruner=20),
         reverse_lasso=dict(
-            trials=30,
+            trials=20,
             pruner_patience=None,
             pruner_threshold=0.5,
             correlation_threshold=0.1,
@@ -122,7 +122,7 @@ def get_meta_data():
     meta_data = dict(
         experiment_id=experiment_id,
         experiment_path=experiment_path,
-        commit="446b6a809f139842b698ad1cd5e63cd5ed8653b5",
+        commit="746c81622e4861227497e1e5dfd6888008d26b0b",
         data=data,
         cv=dict(n_outer_folds=6, n_inner_folds=5),
         parallel=dict(n_jobs_preprocessing=1, n_jobs_cv=6, cluster=True),
