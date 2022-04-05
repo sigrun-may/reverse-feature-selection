@@ -51,7 +51,7 @@ def evaluate_feature_selection(
             )
             selected_features_df[f"{key}_raw"] = np.mean(importance_matrix, axis=0)
 
-            if not 'reverse' in embedded_feature_selection_method:
+            if 'reverse' in embedded_feature_selection_method:
                 # process reverse selection
                 scaled_importance_matrix = _trim_and_scale_feature_weight_matrix(
                     importance_matrix, 0.0
@@ -65,6 +65,12 @@ def evaluate_feature_selection(
                 )
                 metrics_per_method_dict[f"{key}_trimmed"] = calculate_performance(
                     test_train_sets, unlabeled_feature_names, trimmed_importance_matrix, meta_data
+                )
+                robust_importance_matrix = _trim_and_scale_robust_features(
+                    importance_matrix, 0.0, reverse=True
+                )
+                metrics_per_method_dict[f"{key}_robust"] = calculate_performance(
+                    test_train_sets, unlabeled_feature_names, robust_importance_matrix, meta_data
                 )
                 trimmed_r_importance_matrix = _trim_and_scale_robust_features(
                     importance_matrix, meta_data["validation"]["standard_threshold"], reverse=True
@@ -80,6 +86,12 @@ def evaluate_feature_selection(
                 metrics_per_method_dict[f"{key}_trimmed"] = calculate_performance(
                     test_train_sets, unlabeled_feature_names, trimmed_importance_matrix, meta_data
                 )
+                robust_importance_matrix = _trim_and_scale_robust_features(
+                    importance_matrix, 0.0
+                )
+                metrics_per_method_dict[f"{key}_robust"] = calculate_performance(
+                    test_train_sets, unlabeled_feature_names, robust_importance_matrix, meta_data
+                )
                 trimmed_r_importance_matrix = _trim_and_scale_robust_features(
                     importance_matrix, meta_data["validation"]["standard_threshold"]
                 )
@@ -88,6 +100,7 @@ def evaluate_feature_selection(
                 )
 
             selected_features_df[f"{key}_trimmed"] = np.mean(trimmed_importance_matrix, axis=0)
+            selected_features_df[f"{key}_robust"] = np.mean(robust_importance_matrix, axis=0)
             selected_features_df[f"{key}_r_trimmed"] = np.mean(trimmed_r_importance_matrix, axis=0)
 
     selected_features_df.sort_values(by=selected_features_df.columns[0], ascending=False, inplace=True)
@@ -433,3 +446,24 @@ def _get_selected_features_array(selected_feature_subset):
         else:
             selection.append(0.0)
     return np.array(selection)
+
+
+def test_trim_and_scale_robust_features():
+    only_ones = np.ones((10, 20))
+    stability = get_stability(only_ones)
+    assert stability == 1, stability
+
+    perfect_stability = np.concatenate((np.ones((10, 8)), np.zeros((10, 120))), axis=1)
+    assert perfect_stability.shape == (10, 128)
+    perfect_stability_metric = get_stability(perfect_stability)
+    assert perfect_stability_metric == 1, perfect_stability_metric
+
+    perfect_stability2 = np.concatenate((np.ones((10, 1)), np.zeros((10, 120))), axis=1)
+    assert perfect_stability2.shape == (10, 121)
+    perfect_stability_metric2 = get_stability(perfect_stability2)
+    assert perfect_stability_metric2 == 1, perfect_stability_metric2
+
+    # print(get_stability(perfect_stability))
+    not_stable = get_stability(np.zeros((10, 20)))
+    assert not_stable == 0, not_stable
+
