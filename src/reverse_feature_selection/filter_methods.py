@@ -85,7 +85,7 @@ def get_prediction(feature, x, y):
     #     return feature
     # else:
     #     return 'NAN'
-    if test_auc > 0.7:
+    if test_auc > 0.9:
         print(feature)
         return feature
     else:

@@ -11,6 +11,9 @@ from scipy.stats import trim_mean
 import cv_pruner
 from cv_pruner import Method
 import optuna_study_pruner
+import warnings
+
+warnings.filterwarnings("ignore")
 
 
 def select_features(preprocessed_data_dict, outer_cv_loop, meta_data, extra_trees):
@@ -38,22 +41,21 @@ def select_features(preprocessed_data_dict, outer_cv_loop, meta_data, extra_tree
         feature_importances_list = []
         shap_values_list = []
 
-        feature_names = preprocessed_data_dict["feature_names"].values
-        transformed_data = preprocessed_data_dict["transformed_data"]
-
         # cross validation for the optimization of alpha
-        for fold_index, (test, train, train_correlation_matrix_complete) in enumerate(transformed_data):
-            train_data_df = pd.DataFrame(train, columns=feature_names)
-            test_data_df = pd.DataFrame(test, columns=feature_names)
-
+        for fold_index, (test_data_df, train_data_df, _) in enumerate(preprocessed_data_dict["preprocessed_data_list"]):
             # prepare train/ test data
-            y_train = train_data_df["label"].values.reshape(-1, 1)
+            # y_train = train_data_df["label"].values.reshape(-1, 1)
+            # x_train = train_data_df.drop(columns="label")
+            # x_test = test_data_df.drop(columns="label").values
+            # y_test = test_data_df["label"].values
+            #
+            # train_data = lgb.Dataset(x_train, label=y_train)
+            # test_data = lgb.Dataset(x_test, label=y_test)
+
             x_train = train_data_df.drop(columns="label")
             x_test = test_data_df.drop(columns="label").values
-            y_test = test_data_df["label"].values
-
-            train_data = lgb.Dataset(x_train, label=y_train)
-            test_data = lgb.Dataset(x_test, label=y_test)
+            train_data = lgb.Dataset(x_train, label=train_data_df["label"])
+            test_data = lgb.Dataset(x_test, label=test_data_df["label"])
 
             # parameters for model training to combat overfitting
             parameters = dict(
@@ -106,7 +108,7 @@ def select_features(preprocessed_data_dict, outer_cv_loop, meta_data, extra_tree
             explainer = shap.TreeExplainer(model)
             shap_values = explainer(x_test)
             raw_shap_values = np.abs(shap_values.values)[:, :, 0]
-            shap_values_list.append(np.sum(raw_shap_values, axis=0))
+            shap_values_list.append(np.sum(raw_shap_values, axis=0))  # TODO SHAP mean or sum
 
         trial.set_user_attr("shap_values", np.array(shap_values_list))
         trial.set_user_attr("macro_feature_importances", np.array(feature_importances_list))
@@ -181,31 +183,27 @@ def select_features(preprocessed_data_dict, outer_cv_loop, meta_data, extra_tree
         optuna_objective,
         n_trials=meta_data["selection_method"]["rf"]["trials"],
     )
-    # relevant_features_dict = dict(
-    #     label=(0, 0, study.best_trial.user_attrs["shap_values"])
-    # )
-    # intermediate_result = dict(relevant_features_dict=relevant_features_dict)
-    # intermediate_result["test_train_indices"] = {}
-    # return study.best_trial.user_attrs["label_coefficients"]
 
     micro_feature_importance = lgb.train(
         study.best_params,
         lgb.Dataset(
-            data=preprocessed_data_dict["transformed_remain_data"][:, 1:],
-            label=preprocessed_data_dict["transformed_remain_data"][:, 0],
+            data=preprocessed_data_dict["micro_train"].iloc[:, 1:],
+            label=preprocessed_data_dict["micro_train"].iloc[:, 0],
         ),
         callbacks=[lgb.record_evaluation({})],  # stop verbose
     ).feature_importance(importance_type="gain")
 
     # check if study.best_value is available and at least one trial was completed
     try:
-        return {
-            "shap_values": study.best_trial.user_attrs["shap_values"],
-            "macro_feature_importances": study.best_trial.user_attrs["macro_feature_importances"],
-            "micro_feature_importance": micro_feature_importance,
-        }
+        best = study.best_value
     except:
         return {"NONE": 0}
+
+    return {
+        "shap_values": study.best_trial.user_attrs["shap_values"],
+        "macro_feature_importances": study.best_trial.user_attrs["macro_feature_importances"],
+        "micro_feature_importance": micro_feature_importance,
+    }
 
     # try:
     #     return (

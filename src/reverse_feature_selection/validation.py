@@ -60,48 +60,50 @@ def evaluate_feature_selection(
                 metrics_per_method_dict[f"{key}_scaled"] = calculate_performance(
                     test_train_sets, unlabeled_feature_names, scaled_importance_matrix, meta_data
                 )
+
                 trimmed_importance_matrix = _trim_and_scale_feature_weight_matrix(
                     importance_matrix, meta_data["validation"]["standard_threshold"]
-                )
-                metrics_per_method_dict[f"{key}_trimmed"] = calculate_performance(
-                    test_train_sets, unlabeled_feature_names, trimmed_importance_matrix, meta_data
                 )
                 robust_importance_matrix = _trim_and_scale_robust_features(
                     importance_matrix, 0.0, reverse=True
                 )
-                metrics_per_method_dict[f"{key}_robust"] = calculate_performance(
-                    test_train_sets, unlabeled_feature_names, robust_importance_matrix, meta_data
+                close_to_robust_importance_matrix = _trim_and_scale_robust_features(
+                    importance_matrix, 0.0, reverse=True, close_to_robust=True
                 )
-                trimmed_r_importance_matrix = _trim_and_scale_robust_features(
+                trimmed_robust_importance_matrix = _trim_and_scale_robust_features(
                     importance_matrix, meta_data["validation"]["standard_threshold"], reverse=True
-                )
-                metrics_per_method_dict[f"{key}_r_trimmed"] = calculate_performance(
-                    test_train_sets, unlabeled_feature_names, trimmed_r_importance_matrix, meta_data
                 )
             else:
                 # process standard methods
                 trimmed_importance_matrix = _trim_and_scale_feature_weight_matrix(
                     importance_matrix, meta_data["validation"]["standard_threshold"]
                 )
-                metrics_per_method_dict[f"{key}_trimmed"] = calculate_performance(
-                    test_train_sets, unlabeled_feature_names, trimmed_importance_matrix, meta_data
-                )
                 robust_importance_matrix = _trim_and_scale_robust_features(
                     importance_matrix, 0.0
                 )
-                metrics_per_method_dict[f"{key}_robust"] = calculate_performance(
-                    test_train_sets, unlabeled_feature_names, robust_importance_matrix, meta_data
+                close_to_robust_importance_matrix = _trim_and_scale_robust_features(
+                    importance_matrix, 0.0, close_to_robust=True
                 )
-                trimmed_r_importance_matrix = _trim_and_scale_robust_features(
+                trimmed_robust_importance_matrix = _trim_and_scale_robust_features(
                     importance_matrix, meta_data["validation"]["standard_threshold"]
                 )
-                metrics_per_method_dict[f"{key}_r_trimmed"] = calculate_performance(
-                    test_train_sets, unlabeled_feature_names, trimmed_r_importance_matrix, meta_data
-                )
 
+            metrics_per_method_dict[f"{key}_trimmed"] = calculate_performance(
+                test_train_sets, unlabeled_feature_names, trimmed_importance_matrix, meta_data
+            )
+            metrics_per_method_dict[f"{key}_robust"] = calculate_performance(
+                test_train_sets, unlabeled_feature_names, robust_importance_matrix, meta_data
+            )
+            metrics_per_method_dict[f"{key}_close_to_robust"] = calculate_performance(
+                test_train_sets, unlabeled_feature_names, close_to_robust_importance_matrix, meta_data
+            )
+            metrics_per_method_dict[f"{key}_r_trimmed"] = calculate_performance(
+                test_train_sets, unlabeled_feature_names, trimmed_robust_importance_matrix, meta_data
+            )
             selected_features_df[f"{key}_trimmed"] = np.mean(trimmed_importance_matrix, axis=0)
             selected_features_df[f"{key}_robust"] = np.mean(robust_importance_matrix, axis=0)
-            selected_features_df[f"{key}_r_trimmed"] = np.mean(trimmed_r_importance_matrix, axis=0)
+            selected_features_df[f"{key}_close_to_robust"] = np.mean(close_to_robust_importance_matrix, axis=0)
+            selected_features_df[f"{key}_r_trimmed"] = np.mean(trimmed_robust_importance_matrix, axis=0)
 
     selected_features_df.sort_values(by=selected_features_df.columns[0], ascending=False, inplace=True)
     selected_features_df[selected_features_df.values.sum(axis=1) != 0].to_csv(meta_data["path_selected_features"])
@@ -269,7 +271,7 @@ def _measure_correctness_of_feature_selection(
     return performance_metrics_dict
 
 
-def _trim_and_scale_robust_features(_importance_matrix, _threshold, reverse=False):
+def _trim_and_scale_robust_features(_importance_matrix, _threshold, reverse=False, close_to_robust=False):
     """Drop feature importance below threshold.
     Args:
         _threshold:
@@ -282,10 +284,20 @@ def _trim_and_scale_robust_features(_importance_matrix, _threshold, reverse=Fals
     binary_importance_matrix = np.zeros_like(_importance_matrix)
     binary_importance_matrix[_importance_matrix.nonzero()] = 1
 
+    if close_to_robust:
+        index_of_robust_features = np.where(
+            np.int_(binary_importance_matrix.sum(axis=0)) >= binary_importance_matrix.shape[0] - 1
+        )
+        if not len(index_of_robust_features) > 0:
+            index_of_robust_features = np.where(
+                np.int_(binary_importance_matrix.sum(axis=0)) == binary_importance_matrix.shape[0]
+            )
+    else:
+        index_of_robust_features = np.where(
+            np.int_(binary_importance_matrix.sum(axis=0)) == binary_importance_matrix.shape[0]
+        )
+
     robust_features_matrix = np.zeros_like(_importance_matrix)
-    index_of_robust_features = np.where(
-        np.int_(binary_importance_matrix.sum(axis=0)) == binary_importance_matrix.shape[0]
-    )
     robust_features_matrix[:, index_of_robust_features] = _importance_matrix[:, index_of_robust_features]
     assert np.array_equal(
         robust_features_matrix[:, index_of_robust_features], _importance_matrix[:, index_of_robust_features]
@@ -322,7 +334,8 @@ def _normalize_feature_importance(_feature_importance):
     # normalize with softmax function
     fi = _feature_importance * 1000  # TODO ensure the sum to be more than one
     normalized_fi = fi / np.sum(fi)
-    assert np.isclose(np.sum(normalized_fi), 1), np.sum(normalized_fi)
+    if not np.isclose(np.sum(normalized_fi), 1):
+        assert np.isclose(np.sum(normalized_fi), 1), np.sum(normalized_fi)
     return normalized_fi
 
 

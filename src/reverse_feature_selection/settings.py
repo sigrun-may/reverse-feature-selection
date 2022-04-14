@@ -89,9 +89,11 @@ def get_meta_data():
         #     "bm_28",
         #     "bm_29",
         # ],
-        excluded_features=None,
+        # artificial_c1: AUC > 0.9
+        excluded_features=['bmc0_0', 'bmc0_1', 'bmc0_15', 'bmc1_18', 'bmc2_8', 'bmc2_13', 'bmc2_14'],
+        # excluded_features=None,
         cluster_correlation_threshold=0.9,
-        number_of_features=200,
+        number_of_features=1000,
         number_of_samples=None,
         pos_label=0,
     )
@@ -105,17 +107,17 @@ def get_meta_data():
 
     selection_method = dict(
         rf=dict(
-            trials=20,
+            trials=40,
             pruner_threshold=0.5,
             path_mlFlow=None,
             extra_trees=True,
         ),
-        lasso=dict(trials=20, pruner=20),
+        lasso=dict(trials=40, pruner=20),
         reverse_lasso=dict(
-            trials=20,
+            trials=40,
             pruner_patience=None,
             pruner_threshold=0.5,
-            correlation_threshold=0.1,
+            correlation_threshold=0.2,
             remove_deselected=False,
         ),
     )

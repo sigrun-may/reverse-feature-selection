@@ -6,6 +6,7 @@ import celer
 from sklearn.linear_model import Lasso
 from sklearn.metrics import r2_score
 import shap
+import math
 
 
 def select_features(
@@ -21,7 +22,7 @@ def select_features(
         if method == "relaxed":
             params["theta"] = trial.suggest_uniform("theta", 0.01, 1.0)
 
-        return calculate_performance_metric_cv(params, preprocessed_data, meta_data, trial, method)
+        return calculate_performance_metric_cv(params, preprocessed_data, trial, method)
 
     study = optuna.create_study(
         # storage = "sqlite:///optuna_test.db",
@@ -37,24 +38,19 @@ def select_features(
         n_trials=meta_data["selection_method"]["lasso"]["trials"],
     )
 
-    _, _, micro_coef, _ = calculate_performance_metric(
+    _, _, micro_coefficients = calculate_performance_metric(
         study.best_params,
         preprocessed_data_dict["micro_train"],
         preprocessed_data_dict["micro_test"],
         method,
         micro=True,
     )
-    assert len(micro_coef) == len(preprocessed_data[0][0].columns[1:])
-    if np.sum(np.abs(micro_coef)) > 0:
-        micro_feature_importance = np.abs(micro_coef)
+    assert len(micro_coefficients) == len(preprocessed_data[0][0].columns[1:])
+
+    if np.sum(np.abs(micro_coefficients)) > 0:
+        micro_feature_importance = np.abs(micro_coefficients)
     else:
         micro_feature_importance = None
-
-    # try:
-    #     if not sum(study.best_trial.user_attrs["shap_values"]) > 0:
-    #         print("No shap values found")
-    # except:  # noqa
-    #     return None
 
     return {
         "shap_values": study.best_trial.user_attrs["shap_values"],
@@ -63,7 +59,7 @@ def select_features(
     }
 
 
-def calculate_performance_metric_cv(params, preprocessed_data, meta_data, trial, method):
+def calculate_performance_metric_cv(params, preprocessed_data, trial, method):
     performance_metric_list = []
     shap_values_list = []
     coefficients_list = []
@@ -74,9 +70,10 @@ def calculate_performance_metric_cv(params, preprocessed_data, meta_data, trial,
             performance_metric,
             mean_shap_values,
             coefficients,
-            should_prune,
         ) = calculate_performance_metric(params, train_data_df, test_data_df, method)
-        if should_prune:
+
+        # prune trials with models where all coefficients are zero
+        if math.isclose(np.count_nonzero(coefficients), 0):
             raise TrialPruned()
 
         performance_metric_list.append(performance_metric)
@@ -91,11 +88,10 @@ def calculate_performance_metric_cv(params, preprocessed_data, meta_data, trial,
 
 
 def calculate_performance_metric(params, train_data_df, test_data_df, method, micro=False):
-    prune = False
 
     # prepare train/ test data
     y_train = train_data_df["label"].values.reshape(-1, 1)
-    x_train = train_data_df.drop(columns="label")
+    x_train = train_data_df.drop(columns="label").values
     x_test = test_data_df.drop(columns="label").values
     y_test = test_data_df["label"].values
 
@@ -111,11 +107,11 @@ def calculate_performance_metric(params, train_data_df, test_data_df, method, mi
             # alpha=trial.suggest_discrete_uniform("alpha", 0.001, 1.0,
             # 0.001),
         )
-        lasso.fit(x_train.values, y_train)
+        lasso.fit(x_train, y_train)
 
     elif method == "celer":
         lasso = celer.Lasso(alpha=params["alpha"], verbose=0)
-        lasso.fit(x_train.values, y_train)
+        lasso.fit(x_train, y_train)
 
     elif method == "lasso_sklearn":
         lasso = Lasso(alpha=params["alpha"])
@@ -127,22 +123,16 @@ def calculate_performance_metric(params, train_data_df, test_data_df, method, mi
             f"Given method was {method}"
         )
 
-    if "label" in x_train.columns[0]:
-        # prune trials if label coefficient is zero or model includes no coefficients
-        if lasso.coef_[0] == 0:
-            prune = True
-    if np.count_nonzero(lasso.coef_) == 0:
-        prune = True
+    mean_shap_values = performance_metric = None
 
-    if micro:
-        mean_shap_values = performance_metric = None
-    else:
+    # shap values and performance_metric are not available for micro feature selection due to missing test data
+    if not micro:
         # predict y_test
         performance_metric = r2_score(y_test, lasso.predict(x_test))
 
         # calculate shap values
         explainer = shap.explainers.Linear(lasso, x_train)
         shap_values = explainer(x_test)
-        mean_shap_values = np.mean(np.abs(shap_values.values), axis=0)
+        mean_shap_values = np.mean(np.abs(shap_values.values), axis=0)  # TODO mean nonzero?
 
-    return performance_metric, mean_shap_values, np.abs(lasso.coef_), prune
+    return performance_metric, mean_shap_values, np.abs(lasso.coef_)

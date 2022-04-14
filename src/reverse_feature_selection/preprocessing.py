@@ -12,6 +12,9 @@ import filter_methods
 
 def get_data(meta_data_dict) -> pd.DataFrame:
     data = pd.read_csv(meta_data_dict["data"]["input_data_path"])
+    # data.insert(loc=1,
+    #           column='perfect',
+    #           value=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
     print("input data shape:", data.shape)
 
     # data_01 = data.iloc[:, 0:10]
@@ -38,9 +41,9 @@ def get_data(meta_data_dict) -> pd.DataFrame:
     # meta_data_dict['data']['excluded_features'] = excl_features
     # import settings
     # settings.save_meta_data(meta_data_dict)
-    # print(utils.sort_list_of_tuples_by_index(scores, ascending = False))
-    # print(f"good features (max, min): "
-    #       f"'{filter_methods.get_scores(data.iloc[:, :100])}")
+    # # print(utils.sort_list_of_tuples_by_index(scores, ascending = False))
+    # # print(f"good features (max, min): "
+    # #       f"'{filter_methods.get_scores(data.iloc[:, :100])}")
 
     # adapt the data shape
     if meta_data_dict["data"]["number_of_features"] is not None:
