@@ -9,34 +9,34 @@ def get_meta_data():
     # d_ = delete
     # t_ = test
     # p_ = paper
-    sqllite_mydict = SqliteDict("../../meta_data_db.sqlite", autocommit=True)
-    experiment_ids_d = []
-    experiment_ids_t = []
-    experiment_ids_p = []
-    # for key in sqllite_mydict.keys():
-    #     if key[2:] and key[2:].isdigit():
-    #         if key.startswith("d"):
-    #             experiment_ids_d.append(int(key[2:]))
-    #         if key.startswith("t"):
-    #             experiment_ids_t.append(int(key[2:]))
-    #         if key.startswith("p"):
-    #             experiment_ids_p.append(int(key[2:]))
-    sqllite_mydict.close()
-
-    if not experiment_ids_d:
-        id_d = "d_0"
-    else:
-        id_d = f"d_{max(experiment_ids_d) + 1}"
-
-    if not experiment_ids_t:
-        id_t = "t_0"
-    else:
-        id_t = f"t_{max(experiment_ids_t) + 1}"
-
-    if not experiment_ids_p:
-        id_p = "p_0"
-    else:
-        id_p = f"p_{max(experiment_ids_p) + 1}"
+    # sqllite_mydict = SqliteDict("../../meta_data_db.sqlite", autocommit=True)
+    # experiment_ids_d = []
+    # experiment_ids_t = []
+    # experiment_ids_p = []
+    # # for key in sqllite_mydict.keys():
+    # #     if key[2:] and key[2:].isdigit():
+    # #         if key.startswith("d"):
+    # #             experiment_ids_d.append(int(key[2:]))
+    # #         if key.startswith("t"):
+    # #             experiment_ids_t.append(int(key[2:]))
+    # #         if key.startswith("p"):
+    # #             experiment_ids_p.append(int(key[2:]))
+    # sqllite_mydict.close()
+    #
+    # if not experiment_ids_d:
+    #     id_d = "d_0"
+    # else:
+    #     id_d = f"d_{max(experiment_ids_d) + 1}"
+    #
+    # if not experiment_ids_t:
+    #     id_t = "t_0"
+    # else:
+    #     id_t = f"t_{max(experiment_ids_t) + 1}"
+    #
+    # if not experiment_ids_p:
+    #     id_p = "p_0"
+    # else:
+    #     id_p = f"p_{max(experiment_ids_p) + 1}"
 
     ########################################################
     # Settings
