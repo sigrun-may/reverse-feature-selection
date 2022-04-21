@@ -13,14 +13,14 @@ def get_meta_data():
     experiment_ids_d = []
     experiment_ids_t = []
     experiment_ids_p = []
-    for key in sqllite_mydict.keys():
-        if key[2:] and key[2:].isdigit():
-            if key.startswith("d"):
-                experiment_ids_d.append(int(key[2:]))
-            if key.startswith("t"):
-                experiment_ids_t.append(int(key[2:]))
-            if key.startswith("p"):
-                experiment_ids_p.append(int(key[2:]))
+    # for key in sqllite_mydict.keys():
+    #     if key[2:] and key[2:].isdigit():
+    #         if key.startswith("d"):
+    #             experiment_ids_d.append(int(key[2:]))
+    #         if key.startswith("t"):
+    #             experiment_ids_t.append(int(key[2:]))
+    #         if key.startswith("p"):
+    #             experiment_ids_p.append(int(key[2:]))
     sqllite_mydict.close()
 
     if not experiment_ids_d:
@@ -41,7 +41,7 @@ def get_meta_data():
     ########################################################
     # Settings
     ########################################################
-    experiment_id = id_t
+    experiment_id = "d_0"
     print(experiment_id)
     data_name = "artificial_c1"
     # data_name = "colon"
