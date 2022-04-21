@@ -43,7 +43,8 @@ def get_meta_data():
     ########################################################
     experiment_id = "d_0"
     print(experiment_id)
-    data_name = "artificial_c1"
+    data_name = "small_50"
+    # data_name = "artificial_c1"
     # data_name = "colon"
 
     print(experiment_id)
@@ -98,8 +99,8 @@ def get_meta_data():
         #     "bm_29",
         # ],
         # artificial_c1: AUC > 0.9
-        excluded_features=['bmc0_0', 'bmc0_1', 'bmc0_15', 'bmc1_18', 'bmc2_8', 'bmc2_13', 'bmc2_14'],
-        # excluded_features=None,
+        # excluded_features=['bmc0_0', 'bmc0_1', 'bmc0_15', 'bmc1_18', 'bmc2_8', 'bmc2_13', 'bmc2_14'],
+        excluded_features=None,
         cluster_correlation_threshold=0.9,
         train_correlation_threshold=0.2,
         number_of_features=100,
