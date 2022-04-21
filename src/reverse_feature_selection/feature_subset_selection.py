@@ -9,14 +9,7 @@ from preprocessing import (
     preprocess_validation_train_splits,
     transform_and_preprocess_data,
 )
-from src.reverse_feature_selection import (
-    reverse_selection,
-    reverse_lasso,
-    reverse_trees,
-    standard_lasso_selection,
-    tree_feature_selection
-)
-
+import reverse_selection, reverse_lasso, reverse_trees, standard_lasso_selection, tree_feature_selection
 
 def select_feature_subset(
     data: pd.DataFrame,
