@@ -5,7 +5,7 @@ from optuna import TrialPruned
 
 from relaxed_lasso import RelaxedLasso
 import reverse_selection
-import celer
+# import celer
 from sklearn.linear_model import Lasso
 import warnings
 
@@ -123,9 +123,9 @@ def calculate_performance_metric(params, _, train_data_df, target_feature_name, 
         )
         lasso.fit(x_train.values, y_train)
 
-    elif method == "celer":
-        lasso = celer.Lasso(alpha=params["alpha"], verbose=0)
-        lasso.fit(x_train.values, y_train)
+    # elif method == "celer":
+    #     lasso = celer.Lasso(alpha=params["alpha"], verbose=0)
+    #     lasso.fit(x_train.values, y_train)
 
     elif method == "lasso_sklearn":
         lasso = Lasso(alpha=params["alpha"])
