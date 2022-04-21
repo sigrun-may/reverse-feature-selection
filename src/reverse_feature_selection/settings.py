@@ -152,12 +152,12 @@ def get_meta_data():
         cluster_dict_path=None,
     )
     # meta_data["validation"]["standard_threshold"] = np.sqrt(meta_data["validation"]["reverse_threshold"])
-    try:
-        os.mkdir(folder["experiments"])
-        print(f"Directory {folder['experiments']} created")
-    except FileExistsError:
-        print(f"Directory {folder['experiments']} already exists")
-        pass
+    # try:
+    #     os.mkdir(folder["experiments"])
+    #     print(f"Directory {folder['experiments']} created")
+    # except FileExistsError:
+    #     print(f"Directory {folder['experiments']} already exists")
+    #     pass
 
     try:
         os.mkdir(experiment_path)
