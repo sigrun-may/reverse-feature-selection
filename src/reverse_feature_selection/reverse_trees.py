@@ -1,15 +1,9 @@
 import numpy as np
 import optuna
 from optuna.samplers import TPESampler
-from optuna import TrialPruned
-from sklearn.metrics import r2_score
-from relaxed_lasso import RelaxedLasso
 import reverse_selection
-import celer
-from sklearn.linear_model import Lasso
 import warnings
 import math
-from lightgbm import LGBMRegressor as lgb
 from optuna import TrialPruned, pruners
 import tree_model
 warnings.filterwarnings("ignore")
