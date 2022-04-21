@@ -93,7 +93,8 @@ def get_meta_data():
         excluded_features=['bmc0_0', 'bmc0_1', 'bmc0_15', 'bmc1_18', 'bmc2_8', 'bmc2_13', 'bmc2_14'],
         # excluded_features=None,
         cluster_correlation_threshold=0.9,
-        number_of_features=1000,
+        train_correlation_threshold=0.2,
+        number_of_features=100,
         number_of_samples=None,
         pos_label=0,
     )
@@ -106,19 +107,21 @@ def get_meta_data():
     # Kein Ergebnis über dem Grenzwert nach patience
 
     selection_method = dict(
-        rf=dict(
+        trees=dict(
             trials=40,
             pruner_threshold=0.5,
             path_mlFlow=None,
-            extra_trees=True,
         ),
         lasso=dict(trials=40, pruner=20),
         reverse_lasso=dict(
             trials=40,
             pruner_patience=None,
             pruner_threshold=0.5,
-            correlation_threshold=0.2,
-            remove_deselected=False,
+        ),
+        reverse_trees=dict(
+            trials=40,
+            pruner_patience=None,
+            pruner_threshold=0.5,
         ),
     )
     meta_data = dict(
@@ -129,6 +132,7 @@ def get_meta_data():
         cv=dict(n_outer_folds=6, n_inner_folds=5),
         parallel=dict(n_jobs_preprocessing=1, n_jobs_cv=6, cluster=True),
         selection_method=selection_method,
+        remove_deselected=False,
         validation=dict(
             k_neighbors=11, knn_method="distance", reverse_threshold=0.05, standard_threshold=0.0, factor=1
         ),

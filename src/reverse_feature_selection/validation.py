@@ -334,8 +334,7 @@ def _normalize_feature_importance(_feature_importance):
     # normalize with softmax function
     fi = _feature_importance * 1000  # TODO ensure the sum to be more than one
     normalized_fi = fi / np.sum(fi)
-    if not np.isclose(np.sum(normalized_fi), 1):
-        assert np.isclose(np.sum(normalized_fi), 1), np.sum(normalized_fi)
+    assert np.isclose(np.sum(normalized_fi), 1), np.sum(normalized_fi)
     return normalized_fi
 
 
@@ -354,7 +353,7 @@ def _trim_and_scale_feature_weight_matrix(_importance_matrix, _threshold):
             # cut values below _threshold
             fi = _importance_matrix[row, :]
             fi[fi < _threshold] = 0.0
-            if sum(fi[fi.nonzero()]) > 0:
+            if sum(fi) > 0:
                 assert np.min(fi[fi.nonzero()]) >= _threshold
                 # normalize with softmax similar function
                 processed_matrix[row, :] = _normalize_feature_importance(fi)

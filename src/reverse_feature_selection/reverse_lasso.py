@@ -2,7 +2,7 @@ import numpy as np
 import optuna
 from optuna.samplers import TPESampler
 from optuna import TrialPruned
-from sklearn.metrics import r2_score
+
 from relaxed_lasso import RelaxedLasso
 import reverse_selection
 import celer
@@ -102,14 +102,12 @@ def optimize(
     )
 
 
-def calculate_performance_metric(params, train_data_df, test_data_df, target_feature_name, method):
+def calculate_performance_metric(params, _, train_data_df, target_feature_name, method):
     prune = False
 
-    # prepare train/ test data
+    # prepare train data
     y_train = train_data_df[target_feature_name].values.reshape(-1, 1)
     x_train = train_data_df.drop(columns=target_feature_name)
-    x_test = test_data_df.drop(columns=target_feature_name).values
-    y_test = test_data_df[target_feature_name].values
 
     assert x_train.shape[1] >= 1
 
@@ -146,7 +144,8 @@ def calculate_performance_metric(params, train_data_df, test_data_df, target_fea
     if np.count_nonzero(lasso.coef_) == 0:
         prune = True
 
-    # predict y_test
-    performance_metric = r2_score(y_test, lasso.predict(x_test))
+    # # predict y_test
+    # performance_metric = r2_score(y_test, lasso.predict(x_test))
 
-    return performance_metric, prune
+    return lasso, prune
+    # return performance_metric, prune

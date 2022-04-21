@@ -1,6 +1,7 @@
 import reverse_lasso
 import utils
 import numpy as np
+from sklearn.metrics import r2_score
 
 
 def select_features(
@@ -77,7 +78,7 @@ def find_correlated_features(train_correlation_matrix, target_feature_name, meta
     correlated_features = [
         (feature, correlation_coefficient)
         for feature, correlation_coefficient in train_correlation_matrix[target_feature_name].items()
-        if abs(correlation_coefficient) > meta_data["selection_method"]["reverse_lasso"]["correlation_threshold"]
+        if abs(correlation_coefficient) > meta_data["data"]["train_correlation_threshold"]
     ]
 
     correlated_feature_names = list(map(list, zip(*correlated_features)))[0]
@@ -116,7 +117,7 @@ def calculate_performance_metric_cv(
     for test_data_df, train_data_df, train_correlation_matrix in preprocessed_data:
 
         # remove irrelevant features from train_correlation_matrix
-        if meta_data["selection_method"]["reverse_lasso"]["remove_deselected"]:
+        if meta_data["remove_deselected"]:
             remove_deselected_features(
                 deselected_features,
                 train_correlation_matrix,
@@ -137,9 +138,11 @@ def calculate_performance_metric_cv(
             train_df.drop(columns="label", inplace=True)
             test_df.drop(columns="label", inplace=True)
 
-        performance_metric, pruned = calculate_performance_metric(
-            params, train_df, test_df, target_feature_name, method
+        model, pruned = calculate_performance_metric(
+            params, test_df, train_df, target_feature_name, method
         )
-        performance_metric_list.append(performance_metric)
+        x_test = test_df.drop(columns=target_feature_name).values
+        y_test = test_df[target_feature_name].values
+        performance_metric_list.append(r2_score(y_test, model.predict(x_test)))
 
     return np.mean(performance_metric_list)

@@ -12,6 +12,7 @@ from preprocessing import (
 from src.reverse_feature_selection import (
     reverse_selection,
     reverse_lasso,
+    reverse_trees,
     standard_lasso_selection,
     tree_feature_selection
 )
@@ -89,9 +90,20 @@ def select_feature_subset(
         #     reverse_lasso_feature_selection_doubleHPO.select_features(
         #     preprocessed_data_dict, outer_cv_loop_iteration, meta_data
         # ),
-        # "reverse_rf": reverse_rf_feature_selection.select_features(
-        #     preprocessed_data_dict, outer_cv_loop_iteration, meta_data
-        # ),
+        "reverse_rf": reverse_selection.select_features(
+            preprocessed_data_list,
+            outer_cv_loop_iteration,
+            meta_data,
+            reverse_trees,
+            "rf",
+        ),
+        "reverse_extra_trees": reverse_selection.select_features(
+            preprocessed_data_list,
+            outer_cv_loop_iteration,
+            meta_data,
+            reverse_trees,
+            "extra_trees",
+        ),
         # "reverse_rf_oob": reverse_rf_oob_feature_selection.select_features(
         #     data.iloc[remaining_data_indices, :],
         #     preprocessed_data_list,
