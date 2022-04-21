@@ -182,7 +182,11 @@ def get_old_meta_data(experiment_id):
 
 
 def save_meta_data(meta_data):
-    sqllite_mydict = SqliteDict("../../meta_data_db.sqlite", autocommit=True)
+    if meta_data['parallel']['cluster']:
+        data_base_path = f'/vol/projects/smay/develop/reverse_feature_selection/meta_data_db.sqlite'
+    else:
+        data_base_path = "../../meta_data_db.sqlite"
+    sqllite_mydict = SqliteDict(data_base_path, autocommit=True)
     sqllite_mydict[meta_data["experiment_id"]] = meta_data
     sqllite_mydict.close()
 
