@@ -50,6 +50,14 @@ def get_meta_data():
     folder = dict(data="../../data", experiments="../../experiments")
     experiment_path = f"{folder['experiments']}/{experiment_id}"
 
+    meta_data = dict(
+            cv=dict(n_outer_folds=6, n_inner_folds=5),
+            parallel=dict(n_jobs_preprocessing=1, n_jobs_cv=6, cluster=True),
+    )
+    if meta_data['parallel']['cluster']:
+        folder = dict(data="/vol/projects/smay/develop/reverse_feature_selection/data", experiments="/vol/projects/smay/develop/reverse_feature_selection/experiments/")
+        experiment_path = f'/vol/projects/smay/develop/reverse_feature_selection/experiments/{experiment_id}'
+
     data = dict(
         input_data_path=f"{folder['data']}/{data_name}.csv",
         meta_data_path=f"{folder['data']}/{data_name}.pkl",
@@ -124,7 +132,7 @@ def get_meta_data():
             pruner_threshold=0.5,
         ),
     )
-    meta_data = dict(
+    meta_data.update(
         experiment_id=experiment_id,
         experiment_path=experiment_path,
         commit="746c81622e4861227497e1e5dfd6888008d26b0b",
@@ -152,9 +160,6 @@ def get_meta_data():
         cluster_dict_path=None,
     )
     # meta_data["validation"]["standard_threshold"] = np.sqrt(meta_data["validation"]["reverse_threshold"])
-
-    if meta_data['parallel']['cluster']:
-        experiment_path = f'/vol/projects/smay/develop/reverse_feature_selection/experiments/{experiment_id}'
     try:
         os.mkdir(experiment_path)
         print(f"Directory {experiment_path} created")
