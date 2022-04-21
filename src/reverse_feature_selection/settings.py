@@ -152,13 +152,9 @@ def get_meta_data():
         cluster_dict_path=None,
     )
     # meta_data["validation"]["standard_threshold"] = np.sqrt(meta_data["validation"]["reverse_threshold"])
-    # try:
-    #     os.mkdir(folder["experiments"])
-    #     print(f"Directory {folder['experiments']} created")
-    # except FileExistsError:
-    #     print(f"Directory {folder['experiments']} already exists")
-    #     pass
 
+    if meta_data['parallel']['cluster']:
+        experiment_path = f'/vol/projects/smay/develop/reverse_feature_selection/experiments/{experiment_id}'
     try:
         os.mkdir(experiment_path)
         print(f"Directory {experiment_path} created")
