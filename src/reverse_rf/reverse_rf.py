@@ -25,11 +25,15 @@ def calculate_validation_metric_per_feature(
         # n_estimators=30,
         criterion="absolute_error",
         random_state=42,
-        min_samples_leaf=2,
+        # min_samples_leaf=2,
     )
 
     # iterate over all features
     for target_feature_name in data_df.columns[1:]:
+        # initialize scores
+        score_unlabeled = 0
+        score_labeled = 0
+
         (
             x_train,
             y_train,
@@ -43,39 +47,31 @@ def calculate_validation_metric_per_feature(
         )
         # predict the target feature including the label in the training data
         clf.fit(x_train, ravel(y_train))
-        score_labeled = clf.oob_score_
         label_zero = clf.feature_importances_[0] == 0
         assert clf.feature_importances_.size == x_train.shape[1]
 
-        # preprocess data without label
-        preprocessed_data = preprocessing.get_uncorrelated_train_and_validation_data(
-            data_split=data_split,
-            target_feature=target_feature_name,
-            labeled=False,
-            meta_data=meta_data,
-        )
-        if preprocessed_data is not None:
-            x_train, y_train, x_validation, y_validation = preprocessed_data
+        # label was included in the model
+        if not label_zero:
+            score_labeled = clf.oob_score_
+
+            # ensure at least one feature is uncorrelated to the target feature
+            assert x_train.shape[1] > 1
 
             # predict the target feature without the label information
-            clf.fit(x_train, ravel(y_train))
+            clf.fit(x_train.loc[:, x_train.columns != "label"], ravel(y_train))
             score_unlabeled = clf.oob_score_
-        # no feature was uncorrelated to the target feature
-        else:
-            score_unlabeled = 0
 
-        if (
-            label_zero # label was not selected
-            or score_labeled <= score_unlabeled  # labeled training was not better than training without label
-            or (
+            # labeled training was not better than training without label
+            # if score_labeled <= score_unlabeled:
+            if score_labeled <= score_unlabeled or (
+                # both scores are negative and don't have a significant distance
                 score_unlabeled <= 0
                 and score_labeled <= 0
-                and abs(score_labeled - score_unlabeled) < 0.4  # both scores are negative,
-                                                                # but have a significant distance
-            )
-        ):
-            score_unlabeled = score_labeled = 0
-        else:
+                and abs(score_unlabeled) - abs(score_labeled) < 0.2
+            ):
+                score_unlabeled = score_labeled = 0  # deselect feature
+
+        if score_labeled != 0:
             print(
                 f"{target_feature_name} selected {abs(score_unlabeled-score_labeled)}, "
                 f"ul{score_unlabeled}, l{score_labeled}"
