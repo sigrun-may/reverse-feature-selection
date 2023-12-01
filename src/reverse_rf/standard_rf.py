@@ -36,7 +36,7 @@ def optimize(train_index, validation_index, data_df, meta_data):
             seed=42,
         ),
     )
-    if meta_data["parallel"]["cluster"]:  # deactivate logging on cluster
+    if not meta_data["verbose_optuna"]:  # deactivate logging on cluster
         optuna.logging.set_verbosity(optuna.logging.ERROR)
 
     # terminator = TerminatorCallback()

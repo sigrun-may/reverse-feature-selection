@@ -1,0 +1,17 @@
+experiment_id = "test"
+description = "Can be deleted. Only for testing."
+seed_list = [1, 2,]
+verbose_optuna = true
+
+[cv]
+n_outer_folds = 6
+
+[data]
+train_correlation_threshold = 0.2
+name = "small_50"
+path = "data/small_50.csv"
+
+[rf_parameters]
+classifier = {}
+regressor = {}
+

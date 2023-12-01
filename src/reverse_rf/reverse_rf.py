@@ -66,10 +66,10 @@ def calculate_mean_oob_scores_and_p_value(target_feature_name, outer_cv_loop, me
     p_value = None
 
     # Load preprocessed data for the given outer cross-validation fold
-    with open(f"data/{meta_data['data_name']}_preprocessed_cv_fold_outer{outer_cv_loop}_train.pkl", "rb") as file:
+    with open(f"../../preprocessed_data/{meta_data['data']['name']}_preprocessed_cv_fold_outer{outer_cv_loop}_train.pkl", "rb") as file:
         train_df = pickle.load(file)
 
-    with open(f"data/{meta_data['data_name']}_preprocessed_cv_fold_outer{outer_cv_loop}_corr.pkl", "rb") as file:
+    with open(f"../../preprocessed_data/{meta_data['data']['name']}_preprocessed_cv_fold_outer{outer_cv_loop}_corr.pkl", "rb") as file:
         corr_matrix_df = pickle.load(file)
 
     assert target_feature_name in train_df.columns
@@ -84,6 +84,9 @@ def calculate_mean_oob_scores_and_p_value(target_feature_name, outer_cv_loop, me
     # Remove features correlated to the target feature
     x_train = preprocessing.remove_features_correlated_to_target_feature(train_df, corr_matrix_df,
                                                                          target_feature_name, meta_data)
+    if x_train is None:
+        return None, None, None
+
     assert target_feature_name not in x_train.columns
 
     # Calculate out-of-bag (OOB) scores for labeled and unlabeled training data
@@ -340,9 +343,13 @@ def calculate_mean_oob_scores_and_p_value(target_feature_name, outer_cv_loop, me
 def calculate_validation_metric_per_feature(
         data_df, meta_data, outer_cv_loop
 ):
-    # serial version
+    scores_labeled_list = []
+    scores_unlabeled_list = []
+    p_values_list = []
+
+    # # serial version
     # for target_feature_name in data_df.columns[1:]:
-    #     score_labeled, score_unlabeled, p_value = calculate_significance(target_feature_name, train_index, data_df, meta_data)
+    #     score_labeled, score_unlabeled, p_value = calculate_mean_oob_scores_and_p_value(target_feature_name, outer_cv_loop, meta_data)
     #     scores_labeled_list.append(score_labeled)
     #     scores_unlabeled_list.append(score_unlabeled)
     #     p_values_list.append(p_value)
@@ -351,11 +358,7 @@ def calculate_validation_metric_per_feature(
     out = Parallel(n_jobs=multiprocessing.cpu_count(), verbose=-1)(
         delayed(calculate_mean_oob_scores_and_p_value)(target_feature_name, outer_cv_loop, meta_data) for
         target_feature_name in data_df.columns[1:])
-    # out = Parallel(n_jobs=4, verbose=-1)(delayed(calculate_validation_metric)(data_split, target_feature_name, meta_data, clf) for target_feature_name in data_df.columns[1:])
 
-    scores_labeled_list = []
-    scores_unlabeled_list = []
-    p_values_list = []
     for score_labeled, score_unlabeled, p_value in out:
         scores_labeled_list.append(score_labeled)
         scores_unlabeled_list.append(score_unlabeled)
