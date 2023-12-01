@@ -11,6 +11,7 @@ warnings.filterwarnings("ignore")
 
 def optimize(train_index, validation_index, data_df, meta_data):
     def optuna_objective(trial):
+        # TODO move parameters to settings.toml
         rf_clf = RandomForestClassifier(
             warm_start=False,
             # max_features=None,
@@ -25,6 +26,7 @@ def optimize(train_index, validation_index, data_df, meta_data):
         print(score)
         return score
 
+    # TODO move direction to settings.toml
     study = optuna.create_study(
         # storage = "sqlite:///optuna_test.db",
         # load_if_exists = True,
@@ -38,6 +40,7 @@ def optimize(train_index, validation_index, data_df, meta_data):
         optuna.logging.set_verbosity(optuna.logging.ERROR)
 
     # terminator = TerminatorCallback()
+    # TODO move n_trials to settings.toml
     study.optimize(
         optuna_objective,
         # n_trials=meta_data["selection_method"]["reverse_trees"]["trials"],
