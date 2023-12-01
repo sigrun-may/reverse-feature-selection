@@ -1,4 +1,7 @@
+import math
+
 import joblib
+from scipy.special import softmax
 from sklearn.preprocessing import MinMaxScaler
 from typing import Dict
 from weighted_manhattan_distance import WeightedManhattanDistance
@@ -19,7 +22,9 @@ from sklearn.metrics import (
 )
 from src.validation.stability_estimator import get_stability
 
-data_name = "overlapping_500"
+# data_name = "overlapping_500_3"
+data_name = "colon_str15"
+
 
 
 def evaluate_feature_selection(
@@ -28,9 +33,9 @@ def evaluate_feature_selection(
     metrics_per_method_dict = {}
 
     # iterate over feature selection algorithms
-    for method, cv_result_list in feature_selection_result_dict[
-        "method_result_dict"
-    ].items():
+    for method, cv_result_list in feature_selection_result_dict["method_result_dict"].items():
+        if method != "rf":
+            continue
         print(method)
         performance_metrics_dict = {}
         importance_matrix_reverse = np.empty(
@@ -100,10 +105,20 @@ def evaluate_feature_selection(
 
 
 def _normalize_feature_subsets(feature_selection_result_pd, meta_data):
+
     # normalize standard feature selection result
-    feature_selection_result_pd["standard_ts"] = _normalize_feature_importance(
-        feature_selection_result_pd["standard"].values
-    )
+    assert np.min(feature_selection_result_pd["standard"].values) >= 0
+    standard_feature_importance = feature_selection_result_pd["standard"].values/max(feature_selection_result_pd["standard"].values)
+    # eliminate normalized feature importances smaller than 0.05
+    for i in range(standard_feature_importance.size):
+        if standard_feature_importance[i] < 0.05:
+            standard_feature_importance[i] = 0.0
+
+    if np.min(standard_feature_importance) > 0.0:
+        assert np.min(standard_feature_importance) >= 0.05
+
+    # feature_selection_result_pd["standard_ts"] = feature_selection_result_pd["standard"].values/max(feature_selection_result_pd["standard"].values)
+    feature_selection_result_pd["standard_ts"] = standard_feature_importance
 
     # normalize reverse feature selection result
     feature_selection_result_pd["reverse_ts"] = _calculate_feature_weights(
@@ -116,23 +131,30 @@ def _calculate_feature_weights(result_pd, meta_data):
     metrics_unlabeled_training_np = result_pd["unlabeled"].values
 
     # TODO ensure maximized metric or implement also case minimizing
-    feature_weights_np = abs(
-        metrics_labeled_training_np - metrics_unlabeled_training_np
-    )
-    # feature_weights_np = feature_weights_np[feature_weights_np > 0.1]
-    # assert np.min(feature_weights_np) > 0.1
+    feature_weights_np = abs(metrics_labeled_training_np - metrics_unlabeled_training_np) / abs(metrics_unlabeled_training_np)
+    for i in range(metrics_unlabeled_training_np.size):
+        if abs(metrics_unlabeled_training_np[i]) > 0.0:
+            feature_weights_np[i] = abs(metrics_labeled_training_np[i] - metrics_unlabeled_training_np[i]) / abs(metrics_unlabeled_training_np[i])
+        else:
+            feature_weights_np[i] = 0.0
+    assert np.min(feature_weights_np) >= 0.0
+
+    # eliminate features with weights smaller than or equal to 0.05
+    for i in range(feature_weights_np.size):
+        if feature_weights_np[i] < 0.05:
+            feature_weights_np[i] = 0.0
+
+    if np.min(feature_weights_np) > 0.0:
+        assert np.min(feature_weights_np) >= 0.05
+
+    # feature_weights_np = feature_weights_np[feature_weights_np >= 0.05]
+    # assert np.min(feature_weights_np) >= 0.05
     # # feature_weights_np = feature_weights_np[feature_weights_np > meta_data["validation"]["min_distance"]]
 
-    soft_max_normalized_feature_weights_np = _normalize_feature_importance(
-        feature_weights_np
-    )
-    for i in range(feature_weights_np.size):
-        if metrics_labeled_training_np[i] < -0.1:
-            print("---")
-            print(soft_max_normalized_feature_weights_np[i])
-            soft_max_normalized_feature_weights_np[i] = (soft_max_normalized_feature_weights_np[i]/(abs(metrics_labeled_training_np[i])*1000))*100
-            print(soft_max_normalized_feature_weights_np[i], metrics_labeled_training_np[i])
-    return soft_max_normalized_feature_weights_np
+    normalized_feature_weights_np = feature_weights_np/np.max(feature_weights_np)
+    assert np.min(normalized_feature_weights_np) >= 0.0
+    assert np.max(normalized_feature_weights_np) == 1.0
+    return normalized_feature_weights_np
 
 
 def calculate_performance(
@@ -195,6 +217,7 @@ def calculate_performance(
 
 def classify_feature_subsets(
     test_train_sets,
+        # TODO series?
     selected_feature_names,
     weights,
     meta_data,
@@ -391,15 +414,15 @@ def _trim_and_scale_feature_importance_matrix(_importance_matrix, _threshold):
 
 
 def _normalize_feature_importance(_feature_importance):
-    # normalize with softmax function
-    fi = _feature_importance * 1000
+    # # normalize with softmax function
+    _feature_importance = _feature_importance * 1000
 
-    if np.isclose(np.sum(fi), 0):
-        normalized_fi = fi
+    if np.isclose(np.sum(_feature_importance), 0):
+        normalized_fi = _feature_importance
     else:
-        # ensure the sum to be more than one
-        assert np.sum(fi) > 1
-        normalized_fi = fi / np.sum(fi)
+        # # ensure the sum to be more than one
+        # assert np.sum(_feature_importance) > 1
+        normalized_fi = softmax(_feature_importance)
         assert np.isclose(np.sum(normalized_fi), 1), np.sum(normalized_fi)
     return normalized_fi
 
