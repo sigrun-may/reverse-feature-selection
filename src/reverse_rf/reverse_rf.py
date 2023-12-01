@@ -117,25 +117,14 @@ def calculate_mean_oob_scores_and_p_value(target_feature_name, outer_cv_loop, me
             mean_oob_score_unlabeled = np.mean(oob_scores_unlabeled)
             print(f"p_value {target_feature_name} {p_value} l: {mean_oob_score_labeled} ul: {mean_oob_score_unlabeled}")
 
-            # Calculate the absolute difference between OOB scores
-            difference = np.mean(np.abs(oob_scores_unlabeled) - np.abs(oob_scores_labeled))
-            print("difference", difference, mean_oob_score_unlabeled - mean_oob_score_labeled)
-
-            # Calculate the normalized difference between OOB scores
-            norm_diff = 1 - (mean_oob_score_labeled / mean_oob_score_unlabeled)
-            print("norm_diff", norm_diff)
-
             # Calculate the percentage difference between OOB scores
             absolute_percentage_difference = (
                 (mean_oob_score_unlabeled - mean_oob_score_labeled) / abs(mean_oob_score_unlabeled)
             ) * 100
             print("absolute_percentage_difference", absolute_percentage_difference)
 
-            # Calculate a metric based on the difference, normalized difference, and p-value
-            metric = (difference / abs(mean_oob_score_labeled)) / p_value
-            metric2 = absolute_percentage_difference / p_value
-            metric3 = norm_diff / p_value
-            print("metric", metric, "metric2", metric2, "metric3", metric3)
+            # Calculate a metric based on the percentage difference and p-value
+            print("metric", absolute_percentage_difference / p_value)
             print("---------")
 
     return mean_oob_score_labeled, mean_oob_score_unlabeled, p_value

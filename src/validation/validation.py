@@ -23,7 +23,7 @@ from sklearn.metrics import (
 from src.validation.stability_estimator import get_stability
 
 # data_name = "overlapping_500_3"
-data_name = "colon_str15"
+data_name = "colon2"
 
 
 def evaluate_feature_selection(
@@ -58,6 +58,9 @@ def evaluate_feature_selection(
 
         reverse_subset = np.sum(importance_matrix_reverse, axis=0)
         standard_subset = np.sum(importance_matrix_standard, axis=0)
+        assert reverse_subset.shape == standard_subset.shape
+        df = pd.DataFrame(columns=["reverse"], data=reverse_subset)
+        df["standard"] = standard_subset
         trimmed_standard_subset = np.argwhere(standard_subset > 0.1)
         trimmed_reverse_subset = np.argwhere(reverse_subset > 0.1)
         num_selected_reverse = np.count_nonzero(reverse_subset)
@@ -86,13 +89,13 @@ def _normalize_feature_subsets(feature_selection_result_pd, meta_data):
     standard_feature_importance = feature_selection_result_pd["standard"].values / max(
         feature_selection_result_pd["standard"].values
     )
-    # eliminate normalized feature importances smaller than 0.05
-    for i in range(standard_feature_importance.size):
-        if standard_feature_importance[i] < 0.05:
-            standard_feature_importance[i] = 0.0
-
-    if np.min(standard_feature_importance) > 0.0:
-        assert np.min(standard_feature_importance) >= 0.05
+    # # eliminate normalized feature importances smaller than 0.05
+    # for i in range(standard_feature_importance.size):
+    #     if standard_feature_importance[i] < 0.05:
+    #         standard_feature_importance[i] = 0.0
+    #
+    # if np.min(standard_feature_importance) > 0.0:
+    #     assert np.min(standard_feature_importance) >= 0.05
 
     # feature_selection_result_pd["standard_ts"] = feature_selection_result_pd["standard"].values/max(feature_selection_result_pd["standard"].values)
     feature_selection_result_pd["standard_ts"] = standard_feature_importance
@@ -118,13 +121,13 @@ def _calculate_feature_weights(result_pd, meta_data):
             feature_weights_np[i] = 0.0
     assert np.min(feature_weights_np) >= 0.0
 
-    # eliminate features with weights smaller than or equal to 0.05
-    for i in range(feature_weights_np.size):
-        if feature_weights_np[i] < 0.05:
-            feature_weights_np[i] = 0.0
-
-    if np.min(feature_weights_np) > 0.0:
-        assert np.min(feature_weights_np) >= 0.05
+    # # eliminate features with weights smaller than or equal to 0.05
+    # for i in range(feature_weights_np.size):
+    #     if feature_weights_np[i] < 0.05:
+    #         feature_weights_np[i] = 0.0
+    #
+    # if np.min(feature_weights_np) > 0.0:
+    #     assert np.min(feature_weights_np) >= 0.05
 
     # feature_weights_np = feature_weights_np[feature_weights_np >= 0.05]
     # assert np.min(feature_weights_np) >= 0.05
@@ -539,6 +542,6 @@ def test_trim_and_scale_robust_features():
     assert not_stable == 0, not_stable
 
 
-result_dict = joblib.load(f"../reverse_rf/{data_name}_result_dict.pkl")
+result_dict = joblib.load(f"../../results/{data_name}_result_dict.pkl")
 evaluate_feature_selection(result_dict)
 print(result_dict)
