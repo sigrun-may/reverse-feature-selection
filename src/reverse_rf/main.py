@@ -23,10 +23,8 @@ with open("../../settings.toml", "r") as file:
 # ).iloc[:, :500]
 # assert data_df.columns[0] == 'label'
 
-data_df = pd.read_csv(
-    "/home/sma19/PycharmProjects/reverse_feature_selection/data/small_50.csv"
-)
-assert data_df.columns[0] == 'label'
+data_df = pd.read_csv("/home/sma19/PycharmProjects/reverse_feature_selection/data/small_50.csv")
+assert data_df.columns[0] == "label"
 
 
 # joblib.dump(data_df.columns, f"{data_name}_feature_names.pkl")
@@ -56,12 +54,8 @@ standard_validation_score_list = []
 # k_fold = StratifiedKFold(
 #     n_splits=meta_data["cv"]["n_outer_folds"], shuffle=True, random_state=123098
 # )
-k_fold = StratifiedKFold(
-    n_splits=meta_data["cv"]["n_outer_folds"], shuffle=True, random_state=2005
-)
-for outer_cv_loop, (train_index, test_index) in enumerate(
-    k_fold.split(data_df.iloc[:, 1:], data_df["label"])
-):
+k_fold = StratifiedKFold(n_splits=meta_data["cv"]["n_outer_folds"], shuffle=True, random_state=2005)
+for outer_cv_loop, (train_index, test_index) in enumerate(k_fold.split(data_df.iloc[:, 1:], data_df["label"])):
     print(f"outer_cv_loop {outer_cv_loop} of {meta_data['cv']['n_outer_folds']}")
 
     # preprocess data for reverse feature selection
@@ -69,12 +63,14 @@ for outer_cv_loop, (train_index, test_index) in enumerate(
         train_index, test_index, data_df, correlation_matrix=True
     )
     # serialize the preprocessed data
-    with open(f"../../preprocessed_data/{meta_data['data']['name']}_preprocessed_cv_fold_outer{outer_cv_loop}_train.pkl",
-              "wb") as file:
+    with open(
+        f"../../preprocessed_data/{meta_data['data']['name']}_preprocessed_cv_fold_outer{outer_cv_loop}_train.pkl", "wb"
+    ) as file:
         pickle.dump(train_df, file, protocol=pickle.HIGHEST_PROTOCOL)
 
-    with open(f"../../preprocessed_data/{meta_data['data']['name']}_preprocessed_cv_fold_outer{outer_cv_loop}_corr.pkl",
-              "wb") as file:
+    with open(
+        f"../../preprocessed_data/{meta_data['data']['name']}_preprocessed_cv_fold_outer{outer_cv_loop}_corr.pkl", "wb"
+    ) as file:
         pickle.dump(corr_matrix_df, file, protocol=pickle.HIGHEST_PROTOCOL)
 
     # # inner cross-validation

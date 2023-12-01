@@ -8,8 +8,14 @@ from numpy import ravel
 from scipy.stats import wilcoxon
 from sklearn import clone
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import median_absolute_error, max_error, mean_absolute_error, mean_absolute_percentage_error, \
-    r2_score, mean_squared_error
+from sklearn.metrics import (
+    median_absolute_error,
+    max_error,
+    mean_absolute_error,
+    mean_absolute_percentage_error,
+    r2_score,
+    mean_squared_error,
+)
 
 from src.reverse_rf import preprocessing
 
@@ -21,7 +27,7 @@ def calculate_oob_scores(x_train, y_train, meta_data):
     oob_scores_unlabeled = []
 
     # Perform validation using different random seeds
-    for seed in meta_data['seed_list']:
+    for seed in meta_data["seed_list"]:
         # Create a RandomForestRegressor model with specified parameters
         clf1 = RandomForestRegressor(
             warm_start=False,
@@ -47,7 +53,7 @@ def calculate_oob_scores(x_train, y_train, meta_data):
         clf2 = clone(clf1)
 
         # Fit the second model to the unlabeled training data (excluding 'label' column)
-        unlabeled_x_train = x_train.loc[:, x_train.columns != 'label']
+        unlabeled_x_train = x_train.loc[:, x_train.columns != "label"]
         assert unlabeled_x_train.shape[1] == x_train.shape[1] - 1
         clf2.fit(unlabeled_x_train, y_train)
 
@@ -66,15 +72,19 @@ def calculate_mean_oob_scores_and_p_value(target_feature_name, outer_cv_loop, me
     p_value = None
 
     # Load preprocessed data for the given outer cross-validation fold
-    with open(f"../../preprocessed_data/{meta_data['data']['name']}_preprocessed_cv_fold_outer{outer_cv_loop}_train.pkl", "rb") as file:
+    with open(
+        f"../../preprocessed_data/{meta_data['data']['name']}_preprocessed_cv_fold_outer{outer_cv_loop}_train.pkl", "rb"
+    ) as file:
         train_df = pickle.load(file)
 
-    with open(f"../../preprocessed_data/{meta_data['data']['name']}_preprocessed_cv_fold_outer{outer_cv_loop}_corr.pkl", "rb") as file:
+    with open(
+        f"../../preprocessed_data/{meta_data['data']['name']}_preprocessed_cv_fold_outer{outer_cv_loop}_corr.pkl", "rb"
+    ) as file:
         corr_matrix_df = pickle.load(file)
 
     assert target_feature_name in train_df.columns
-    assert 'label' in train_df.columns
-    assert 'label' not in corr_matrix_df.columns
+    assert "label" in train_df.columns
+    assert "label" not in corr_matrix_df.columns
     assert train_df.shape[1] - 1 == corr_matrix_df.shape[0]  # corr_matrix_df does not include the label
 
     # Prepare training data
@@ -82,8 +92,9 @@ def calculate_mean_oob_scores_and_p_value(target_feature_name, outer_cv_loop, me
     # Remove the target feature from the training data
     x_train_df = train_df.loc[:, train_df.columns != target_feature_name]
     # Remove features correlated to the target feature
-    x_train = preprocessing.remove_features_correlated_to_target_feature(train_df, corr_matrix_df,
-                                                                         target_feature_name, meta_data)
+    x_train = preprocessing.remove_features_correlated_to_target_feature(
+        train_df, corr_matrix_df, target_feature_name, meta_data
+    )
     if x_train is None:
         return None, None, None
 
@@ -95,7 +106,9 @@ def calculate_mean_oob_scores_and_p_value(target_feature_name, outer_cv_loop, me
     # Check if OOB scores for labeled data are available and if training with the label is better than without the label
     if oob_scores_labeled is not None and abs(np.mean(oob_scores_labeled)) < abs(np.mean(oob_scores_unlabeled)):
         # Perform the Wilcoxon signed-rank test
-        _, p_value = wilcoxon(oob_scores_labeled, oob_scores_unlabeled, alternative="less", method="exact", correction=True)
+        _, p_value = wilcoxon(
+            oob_scores_labeled, oob_scores_unlabeled, alternative="less", method="exact", correction=True
+        )
 
         # Check if the result is statistically significant (alpha level = 0.05)
         if p_value <= 0.05:
@@ -112,12 +125,14 @@ def calculate_mean_oob_scores_and_p_value(target_feature_name, outer_cv_loop, me
             print("norm_diff", norm_diff)
 
             # Calculate the percentage difference between OOB scores
-            percentage_difference = ((mean_oob_score_labeled - mean_oob_score_unlabeled) / abs(mean_oob_score_unlabeled)) * 100
+            percentage_difference = (
+                (mean_oob_score_labeled - mean_oob_score_unlabeled) / abs(mean_oob_score_unlabeled)
+            ) * 100
             print("percentage_difference", percentage_difference)
 
             # Calculate a metric based on the difference, normalized difference, and p-value
             metric = (difference / abs(mean_oob_score_labeled)) / p_value
-            metric2 = percentage_difference/ p_value
+            metric2 = percentage_difference / p_value
             metric3 = norm_diff / p_value
             print("metric", metric, "metric2", metric2, "metric3", metric3)
             print("---------")
@@ -340,9 +355,7 @@ def calculate_mean_oob_scores_and_p_value(target_feature_name, outer_cv_loop, me
 #     return score_labeled, score_unlabeled, p_value
 
 
-def calculate_validation_metric_per_feature(
-        data_df, meta_data, outer_cv_loop
-):
+def calculate_validation_metric_per_feature(data_df, meta_data, outer_cv_loop):
     scores_labeled_list = []
     scores_unlabeled_list = []
     p_values_list = []
@@ -356,20 +369,17 @@ def calculate_validation_metric_per_feature(
 
     # parallel version
     out = Parallel(n_jobs=multiprocessing.cpu_count(), verbose=-1)(
-        delayed(calculate_mean_oob_scores_and_p_value)(target_feature_name, outer_cv_loop, meta_data) for
-        target_feature_name in data_df.columns[1:])
+        delayed(calculate_mean_oob_scores_and_p_value)(target_feature_name, outer_cv_loop, meta_data)
+        for target_feature_name in data_df.columns[1:]
+    )
 
     for score_labeled, score_unlabeled, p_value in out:
         scores_labeled_list.append(score_labeled)
         scores_unlabeled_list.append(score_unlabeled)
         p_values_list.append(p_value)
 
-    assert (
-            len(scores_labeled_list) == len(scores_unlabeled_list) == data_df.shape[1] - 1
-    )
-    result_df = pd.DataFrame(
-        data=scores_unlabeled_list, index=data_df.columns[1:], columns=["unlabeled"]
-    )
+    assert len(scores_labeled_list) == len(scores_unlabeled_list) == data_df.shape[1] - 1
+    result_df = pd.DataFrame(data=scores_unlabeled_list, index=data_df.columns[1:], columns=["unlabeled"])
     result_df["labeled"] = scores_labeled_list
     result_df["p_values"] = p_values_list
     return result_df

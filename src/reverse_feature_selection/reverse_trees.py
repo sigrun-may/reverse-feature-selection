@@ -6,8 +6,10 @@ import warnings
 import math
 from optuna import TrialPruned, pruners
 import tree_model
+
 warnings.filterwarnings("ignore")
 # import optuna_study_pruner
+
 
 def optimize(
     preprocessed_data,
@@ -42,7 +44,7 @@ def optimize(
             max_depth=trial.suggest_int("max_depth", 2, 20),
             bagging_fraction=trial.suggest_uniform("bagging_fraction", 0.1, 1.0),
             bagging_freq=trial.suggest_int("bagging_freq", 1, 10),
-            extra_trees=(method == 'extra_trees'),
+            extra_trees=(method == "extra_trees"),
             objective="regression",
             boosting_type="rf",
             verbose=0,

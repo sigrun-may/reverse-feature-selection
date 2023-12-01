@@ -58,7 +58,6 @@ def select_features(
 
         # cross validation for the optimization of alpha
         for test, train, _ in transformed_data:
-
             train_data_df = pd.DataFrame(train, columns=feature_names)
             test_data_df = pd.DataFrame(test, columns=feature_names)
 

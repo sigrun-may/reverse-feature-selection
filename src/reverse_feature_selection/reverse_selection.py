@@ -22,7 +22,6 @@ def select_features(
 
     # calculate relevance for each feature
     for target_feature_name in feature_names:
-
         # exclude the label
         if target_feature_name == "label":
             continue
@@ -115,7 +114,6 @@ def calculate_performance_metric_cv(
 
     # cross validation for HPO
     for test_data_df, train_data_df, train_correlation_matrix in preprocessed_data:
-
         # remove irrelevant features from train_correlation_matrix
         if meta_data["remove_deselected"]:
             remove_deselected_features(
@@ -138,9 +136,7 @@ def calculate_performance_metric_cv(
             train_df.drop(columns="label", inplace=True)
             test_df.drop(columns="label", inplace=True)
 
-        model, pruned = calculate_performance_metric(
-            params, test_df, train_df, target_feature_name, method
-        )
+        model, pruned = calculate_performance_metric(params, test_df, train_df, target_feature_name, method)
         x_test = test_df.drop(columns=target_feature_name).values
         y_test = test_df[target_feature_name].values
         performance_metric_list.append(r2_score(y_test, model.predict(x_test)))

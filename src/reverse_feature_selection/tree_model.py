@@ -67,9 +67,9 @@ def train_model(parameters, test_data_df, train_data_df, target_feature_name, _)
 
     if "label" in x_train.columns[0]:
         # prune trials if label coefficient is zero or model includes no coefficients
-        if model.feature_importance(importance_type='gain')[0] == 0:
+        if model.feature_importance(importance_type="gain")[0] == 0:
             prune = True
-    if np.count_nonzero(model.feature_importance(importance_type='gain')) == 0:
+    if np.count_nonzero(model.feature_importance(importance_type="gain")) == 0:
         prune = True
 
     return model, prune

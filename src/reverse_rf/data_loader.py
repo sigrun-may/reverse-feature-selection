@@ -37,11 +37,7 @@ def load_colon_data() -> Tuple[pd.DataFrame, pd.Series]:
         colon_text_data = soup.get_text()
 
         colon_text_data_lines = colon_text_data.splitlines()
-        colon_text_data_lines = [
-            [float(s) for s in line.split()]
-            for line in colon_text_data_lines
-            if len(line) > 20
-        ]
+        colon_text_data_lines = [[float(s) for s in line.split()] for line in colon_text_data_lines if len(line) > 20]
         assert len(colon_text_data_lines) == 2000
         assert len(colon_text_data_lines[0]) == 62
 
@@ -91,9 +87,7 @@ def load_prostate_data() -> Tuple[pd.DataFrame, pd.Series]:
     try:
         data, labels = joblib.load(cache_data_file)
     except:
-        df = pd.read_csv(
-            "https://web.stanford.edu/~hastie/CASI_files/DATA/prostmat.csv"
-        )
+        df = pd.read_csv("https://web.stanford.edu/~hastie/CASI_files/DATA/prostmat.csv")
         data = df.T
 
         # labels
@@ -128,9 +122,7 @@ def load_leukemia_data() -> Tuple[pd.DataFrame, pd.Series]:
     try:
         data, labels = joblib.load(cache_data_file)
     except:
-        df = pd.read_csv(
-            "https://web.stanford.edu/~hastie/CASI_files/DATA/leukemia_big.csv"
-        )
+        df = pd.read_csv("https://web.stanford.edu/~hastie/CASI_files/DATA/leukemia_big.csv")
         data = df.T
 
         # labels
