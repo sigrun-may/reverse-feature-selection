@@ -25,7 +25,6 @@ def validate(
     selected_feature_subset: Dict[str, float],
     number_of_neighbors: int,
 ) -> Tuple[list[int], list[int]]:
-
     # test_data = test[selected_feature_subset.keys()].values
     # train_data = train[selected_feature_subset.keys()].values
     # assert test_data.size == len(selected_feature_subset.keys())
@@ -126,7 +125,6 @@ def validate_standard(
     weights,
     meta_data,
 ):
-
     # # z transform to compare the distances
     # powerTransformer = PowerTransformer(
     #     copy=True, method="yeo-johnson", standardize=True
@@ -182,7 +180,6 @@ def _validate_standard(
     selected_feature_subset: Dict[str, float],
     number_of_neighbors: int,
 ) -> tuple[Any, list[Any], float, float]:
-
     test_data = test[selected_feature_subset]
     train_data = train[selected_feature_subset]
 

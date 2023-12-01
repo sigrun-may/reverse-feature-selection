@@ -26,7 +26,6 @@ from src.validation.stability_estimator import get_stability
 data_name = "colon_str15"
 
 
-
 def evaluate_feature_selection(
     feature_selection_result_dict,
 ):
@@ -38,39 +37,24 @@ def evaluate_feature_selection(
             continue
         print(method)
         performance_metrics_dict = {}
-        importance_matrix_reverse = np.empty(
-            (len(cv_result_list), cv_result_list[0].shape[0])
-        )
+        importance_matrix_reverse = np.empty((len(cv_result_list), cv_result_list[0].shape[0]))
         importance_matrix_standard = np.empty_like(importance_matrix_reverse)
 
         # iterate over cross-validation results
         for i, cv_iteration_result_pd in enumerate(cv_result_list):
-            _normalize_feature_subsets(
-                cv_iteration_result_pd, feature_selection_result_dict["meta_data"]
-            )
-            importance_matrix_reverse[i, :] = cv_iteration_result_pd[
-                "reverse_ts"
-            ].values
-            importance_matrix_standard[i, :] = cv_iteration_result_pd[
-                "standard_ts"
-            ].values
+            _normalize_feature_subsets(cv_iteration_result_pd, feature_selection_result_dict["meta_data"])
+            importance_matrix_reverse[i, :] = cv_iteration_result_pd["reverse_ts"].values
+            importance_matrix_standard[i, :] = cv_iteration_result_pd["standard_ts"].values
 
         # monitor stability of selection
         binary_importance_matrix_standard = np.zeros_like(importance_matrix_standard)
         binary_importance_matrix_reverse = np.zeros_like(importance_matrix_reverse)
-        assert (
-            binary_importance_matrix_reverse.shape
-            == binary_importance_matrix_standard.shape
-        )
+        assert binary_importance_matrix_reverse.shape == binary_importance_matrix_standard.shape
 
         binary_importance_matrix_standard[importance_matrix_standard.nonzero()] = 1
         binary_importance_matrix_reverse[importance_matrix_reverse.nonzero()] = 1
-        performance_metrics_dict["reverse_stability"] = get_stability(
-            binary_importance_matrix_reverse
-        )
-        performance_metrics_dict["standard_stability"] = get_stability(
-            binary_importance_matrix_standard
-        )
+        performance_metrics_dict["reverse_stability"] = get_stability(binary_importance_matrix_reverse)
+        performance_metrics_dict["standard_stability"] = get_stability(binary_importance_matrix_standard)
 
         reverse_subset = np.sum(importance_matrix_reverse, axis=0)
         standard_subset = np.sum(importance_matrix_standard, axis=0)
@@ -81,34 +65,27 @@ def evaluate_feature_selection(
         robust_selected_reverse = np.sum(binary_importance_matrix_reverse, axis=0)
         robust_selected_standard = np.sum(binary_importance_matrix_standard, axis=0)
         num_robust_selected_reverse = len(
-            robust_selected_reverse[
-                robust_selected_reverse == binary_importance_matrix_reverse.shape[0]
-            ]
+            robust_selected_reverse[robust_selected_reverse == binary_importance_matrix_reverse.shape[0]]
         )
         num_robust_selected_standard = len(
-            robust_selected_standard[
-                robust_selected_standard == binary_importance_matrix_standard.shape[0]
-            ]
+            robust_selected_standard[robust_selected_standard == binary_importance_matrix_standard.shape[0]]
         )
         num_close_to_robust_selected_reverse = len(
-            robust_selected_reverse[
-                robust_selected_reverse >= binary_importance_matrix_reverse.shape[0] - 1
-            ]
+            robust_selected_reverse[robust_selected_reverse >= binary_importance_matrix_reverse.shape[0] - 1]
         )
         num_close_to_robust_selected_standard = len(
-            robust_selected_standard[
-                robust_selected_standard >= binary_importance_matrix_standard.shape[0] - 1
-            ]
+            robust_selected_standard[robust_selected_standard >= binary_importance_matrix_standard.shape[0] - 1]
         )
 
     return metrics_per_method_dict
 
 
 def _normalize_feature_subsets(feature_selection_result_pd, meta_data):
-
     # normalize standard feature selection result
     assert np.min(feature_selection_result_pd["standard"].values) >= 0
-    standard_feature_importance = feature_selection_result_pd["standard"].values/max(feature_selection_result_pd["standard"].values)
+    standard_feature_importance = feature_selection_result_pd["standard"].values / max(
+        feature_selection_result_pd["standard"].values
+    )
     # eliminate normalized feature importances smaller than 0.05
     for i in range(standard_feature_importance.size):
         if standard_feature_importance[i] < 0.05:
@@ -121,9 +98,7 @@ def _normalize_feature_subsets(feature_selection_result_pd, meta_data):
     feature_selection_result_pd["standard_ts"] = standard_feature_importance
 
     # normalize reverse feature selection result
-    feature_selection_result_pd["reverse_ts"] = _calculate_feature_weights(
-        feature_selection_result_pd, meta_data
-    )
+    feature_selection_result_pd["reverse_ts"] = _calculate_feature_weights(feature_selection_result_pd, meta_data)
 
 
 def _calculate_feature_weights(result_pd, meta_data):
@@ -131,10 +106,14 @@ def _calculate_feature_weights(result_pd, meta_data):
     metrics_unlabeled_training_np = result_pd["unlabeled"].values
 
     # TODO ensure maximized metric or implement also case minimizing
-    feature_weights_np = abs(metrics_labeled_training_np - metrics_unlabeled_training_np) / abs(metrics_unlabeled_training_np)
+    feature_weights_np = abs(metrics_labeled_training_np - metrics_unlabeled_training_np) / abs(
+        metrics_unlabeled_training_np
+    )
     for i in range(metrics_unlabeled_training_np.size):
         if abs(metrics_unlabeled_training_np[i]) > 0.0:
-            feature_weights_np[i] = abs(metrics_labeled_training_np[i] - metrics_unlabeled_training_np[i]) / abs(metrics_unlabeled_training_np[i])
+            feature_weights_np[i] = abs(metrics_labeled_training_np[i] - metrics_unlabeled_training_np[i]) / abs(
+                metrics_unlabeled_training_np[i]
+            )
         else:
             feature_weights_np[i] = 0.0
     assert np.min(feature_weights_np) >= 0.0
@@ -151,15 +130,13 @@ def _calculate_feature_weights(result_pd, meta_data):
     # assert np.min(feature_weights_np) >= 0.05
     # # feature_weights_np = feature_weights_np[feature_weights_np > meta_data["validation"]["min_distance"]]
 
-    normalized_feature_weights_np = feature_weights_np/np.max(feature_weights_np)
+    normalized_feature_weights_np = feature_weights_np / np.max(feature_weights_np)
     assert np.min(normalized_feature_weights_np) >= 0.0
     assert np.max(normalized_feature_weights_np) == 1.0
     return normalized_feature_weights_np
 
 
-def calculate_performance(
-    test_train_sets, feature_names, importance_matrix, meta_data
-) -> Dict:
+def calculate_performance(test_train_sets, feature_names, importance_matrix, meta_data) -> Dict:
     """
 
     Args:
@@ -192,16 +169,10 @@ def calculate_performance(
     performance_metrics_dict["stability"] = get_stability(binary_importance_matrix)
 
     performance_metrics_dict["robust features"] = np.count_nonzero(
-        np.int_(binary_importance_matrix.sum(axis=0))
-        == binary_importance_matrix.shape[0]
+        np.int_(binary_importance_matrix.sum(axis=0)) == binary_importance_matrix.shape[0]
     )
     performance_metrics_dict["robust feature names"] = str(
-        feature_names[
-            np.where(
-                np.int_(binary_importance_matrix.sum(axis=0))
-                == binary_importance_matrix.shape[0]
-            )
-        ]
+        feature_names[np.where(np.int_(binary_importance_matrix.sum(axis=0)) == binary_importance_matrix.shape[0])]
     )
 
     # calculate correctness for artificial data
@@ -217,7 +188,7 @@ def calculate_performance(
 
 def classify_feature_subsets(
     test_train_sets,
-        # TODO series?
+    # TODO series?
     selected_feature_names,
     weights,
     meta_data,
@@ -242,9 +213,7 @@ def classify_feature_subsets(
         knn_clf.fit(train_data, train_df["label"])
 
         class_probabilities = knn_clf.predict_proba(test_data)
-        macro_auc.append(
-            roc_auc_score(list(test_df["label"]), class_probabilities[:, 1])
-        )
+        macro_auc.append(roc_auc_score(list(test_df["label"]), class_probabilities[:, 1]))
         macro_logloss.append(log_loss(list(test_df["label"]), class_probabilities))
         macro_brier_score_loss.append(
             brier_score_loss(
@@ -296,9 +265,7 @@ def calculate_micro_metrics(predicted_classes, true_classes, meta_data_dict):
             predicted_classes,
             pos_label=meta_data_dict["data"]["pos_label"],
         ),
-        "micro_balanced_accuracy_score": balanced_accuracy_score(
-            true_classes, predicted_classes
-        ),
+        "micro_balanced_accuracy_score": balanced_accuracy_score(true_classes, predicted_classes),
     }
 
 
@@ -344,9 +311,7 @@ def _measure_correctness_of_feature_selection(
     return performance_metrics_dict
 
 
-def _trim_and_scale_robust_features(
-    _importance_matrix, _threshold, reverse=False, close_to_robust=False
-):
+def _trim_and_scale_robust_features(_importance_matrix, _threshold, reverse=False, close_to_robust=False):
     """Drop feature importance below threshold.
     Args:
         _threshold:
@@ -361,24 +326,19 @@ def _trim_and_scale_robust_features(
 
     if close_to_robust:
         index_of_robust_features = np.where(
-            np.int_(binary_importance_matrix.sum(axis=0))
-            >= binary_importance_matrix.shape[0] - 1
+            np.int_(binary_importance_matrix.sum(axis=0)) >= binary_importance_matrix.shape[0] - 1
         )
         if not len(index_of_robust_features) > 0:
             index_of_robust_features = np.where(
-                np.int_(binary_importance_matrix.sum(axis=0))
-                == binary_importance_matrix.shape[0]
+                np.int_(binary_importance_matrix.sum(axis=0)) == binary_importance_matrix.shape[0]
             )
     else:
         index_of_robust_features = np.where(
-            np.int_(binary_importance_matrix.sum(axis=0))
-            == binary_importance_matrix.shape[0]
+            np.int_(binary_importance_matrix.sum(axis=0)) == binary_importance_matrix.shape[0]
         )
 
     robust_features_matrix = np.zeros_like(_importance_matrix)
-    robust_features_matrix[:, index_of_robust_features] = _importance_matrix[
-        :, index_of_robust_features
-    ]
+    robust_features_matrix[:, index_of_robust_features] = _importance_matrix[:, index_of_robust_features]
     assert np.array_equal(
         robust_features_matrix[:, index_of_robust_features],
         _importance_matrix[:, index_of_robust_features],
@@ -386,9 +346,7 @@ def _trim_and_scale_robust_features(
     if reverse:
         return _trim_and_scale_feature_weight_matrix(robust_features_matrix, _threshold)
     else:
-        return _trim_and_scale_feature_importance_matrix(
-            robust_features_matrix, _threshold
-        )
+        return _trim_and_scale_feature_importance_matrix(robust_features_matrix, _threshold)
 
 
 def _trim_and_scale_feature_importance_matrix(_importance_matrix, _threshold):
@@ -467,9 +425,7 @@ def _extract_test_data_and_results(feature_selection_result, meta_data_dict):
             # save standard methods
             if "reverse" not in selection_method:
                 if selection_method not in shap_values_dict:
-                    shap_values_dict[selection_method] = selected_features[
-                        "shap_values"
-                    ]
+                    shap_values_dict[selection_method] = selected_features["shap_values"]
                 else:
                     shap_values_dict[selection_method] = np.concatenate(
                         (
@@ -478,9 +434,7 @@ def _extract_test_data_and_results(feature_selection_result, meta_data_dict):
                         )
                     )
                 if selection_method not in macro_fi_dict:
-                    macro_fi_dict[selection_method] = selected_features[
-                        "macro_feature_importances"
-                    ]
+                    macro_fi_dict[selection_method] = selected_features["macro_feature_importances"]
                 else:
                     macro_fi_dict[selection_method] = np.concatenate(
                         (
@@ -490,9 +444,7 @@ def _extract_test_data_and_results(feature_selection_result, meta_data_dict):
                     )
                 if selected_features["micro_feature_importance"] is not None:
                     if selection_method not in micro_fi_dict:
-                        micro_fi_dict[selection_method] = selected_features[
-                            "micro_feature_importance"
-                        ]
+                        micro_fi_dict[selection_method] = selected_features["micro_feature_importance"]
                     else:
                         micro_fi_dict[selection_method] = np.concatenate(
                             (
@@ -504,9 +456,7 @@ def _extract_test_data_and_results(feature_selection_result, meta_data_dict):
                 # save reverse selection methods
                 if selection_method not in reverse_subsets_dict:
                     # calculate metric distances for reverse selection
-                    reverse_subsets_dict[
-                        selection_method
-                    ] = _get_selected_features_array(selected_features)
+                    reverse_subsets_dict[selection_method] = _get_selected_features_array(selected_features)
                 else:
                     reverse_subsets_dict[selection_method] = np.vstack(
                         (
@@ -520,15 +470,11 @@ def _extract_test_data_and_results(feature_selection_result, meta_data_dict):
         assert (
             macro_fi_dict[selection_method].shape
             == shap_values_dict[selection_method].shape
-            == (
-                meta_data_dict["cv"]["n_outer_folds"]
-                * meta_data_dict["cv"]["n_inner_folds"]
-            ),
+            == (meta_data_dict["cv"]["n_outer_folds"] * meta_data_dict["cv"]["n_inner_folds"]),
             len(meta_data_dict["data"]["columns"]) - 1,  # remove label
         ), (
             len(meta_data_dict["data"]["columns"]) - 1,
-            meta_data_dict["cv"]["n_outer_folds"]
-            * meta_data_dict["cv"]["n_inner_folds"],
+            meta_data_dict["cv"]["n_outer_folds"] * meta_data_dict["cv"]["n_inner_folds"],
         )
         if micro_fi_dict and (selection_method in micro_fi_dict):
             # remove method with incomplete matrix

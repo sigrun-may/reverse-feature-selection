@@ -55,7 +55,6 @@ def calculate_r2(
 
     # cross validation for the optimization of alpha
     for test, train, train_correlation_matrix_complete in transformed_data:
-
         train_correlation_matrix = train_correlation_matrix_complete
         train_data_df = pd.DataFrame(train, columns=feature_names)
         test_data_df = pd.DataFrame(test, columns=feature_names)
@@ -110,7 +109,6 @@ def calculate_r2(
 
         # check if train would keep at least one feature after removing label and target_feature
         if train_data_df.shape[1] - len(correlated_features) < 3:
-
             absolute_correlations = [
                 (feature_name, abs(correlation_coefficient))
                 for feature_name, correlation_coefficient in correlated_features
@@ -309,7 +307,6 @@ def select_features(transformed_test_train_splits_dict, outer_cv_loop_iteration,
     robustness_vector = []
     selected_features_dict = {}
     for target_feature_name in transformed_test_train_splits_dict["feature_names"]:
-
         # exclude the label
         if target_feature_name == "label":
             continue

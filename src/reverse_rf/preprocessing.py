@@ -69,8 +69,8 @@ def get_data(meta_data_dict) -> pd.DataFrame:
 
 
 def preprocess_validation_train_splits(
-        data_df: pd.DataFrame,
-        meta_data: Dict,
+    data_df: pd.DataFrame,
+    meta_data: Dict,
 ) -> Dict[str, List[Union[Tuple[np.array], str]]]:
     """Split and preprocess data.
 
@@ -87,9 +87,7 @@ def preprocess_validation_train_splits(
 
     """
 
-    k_fold = StratifiedKFold(
-        n_splits=meta_data["cv"]["n_inner_folds"], shuffle=True, random_state=42
-    )
+    k_fold = StratifiedKFold(n_splits=meta_data["cv"]["n_inner_folds"], shuffle=True, random_state=42)
     # k_fold_data_list = Parallel(n_jobs=meta_data["parallel"]["n_jobs_preprocessing"], verbose=5)(
     #     delayed(preprocess_data)(train_index, validation_index, )
     #     for sample_index, (train_index, validation_index) in enumerate(
@@ -97,9 +95,7 @@ def preprocess_validation_train_splits(
     #     )
     # )
     k_fold_data_list = []
-    for train_index, validation_index in k_fold.split(
-            data_df.iloc[:, 1:], data_df["label"]
-    ):
+    for train_index, validation_index in k_fold.split(data_df.iloc[:, 1:], data_df["label"]):
         k_fold_data_list.append(preprocess_data(train_index, validation_index, data_df))
     assert len(k_fold_data_list) == meta_data["cv"]["n_inner_folds"]
 
@@ -204,24 +200,15 @@ def get_cluster_dict(correlation_matrix, meta_data):
                 clusters_list.append(correlated_feature_names)
 
                 # remove features already assigned to another cluster from updated correlation matrix
-                updated_correlation_matrix.drop(
-                    labels=correlated_feature_names, inplace=True
-                )
-                updated_correlation_matrix.drop(
-                    labels=correlated_feature_names, axis=1, inplace=True
-                )
-                assert (
-                        updated_correlation_matrix.shape[0]
-                        == updated_correlation_matrix.shape[1]
-                )
+                updated_correlation_matrix.drop(labels=correlated_feature_names, inplace=True)
+                updated_correlation_matrix.drop(labels=correlated_feature_names, axis=1, inplace=True)
+                assert updated_correlation_matrix.shape[0] == updated_correlation_matrix.shape[1]
 
     # find cluster representatives:
     # the cluster member with the absolute highest correlation to all other cluster features
     clusters_dict = {}
     for cluster in clusters_list:
-        cluster_representative = _calculate_cluster_representative(
-            cluster, correlation_matrix
-        )
+        cluster_representative = _calculate_cluster_representative(cluster, correlation_matrix)
         clusters_dict[cluster_representative] = cluster
 
     for k, v in clusters_dict.items():
@@ -237,9 +224,7 @@ def get_cluster_dict(correlation_matrix, meta_data):
     return clustered_data_dict
 
 
-def cluster_data(
-        data_df: pd.DataFrame, meta_data
-) -> Tuple[pd.DataFrame, Dict[str, List[str]]]:
+def cluster_data(data_df: pd.DataFrame, meta_data) -> Tuple[pd.DataFrame, Dict[str, List[str]]]:
     ########################################################
     # Cluster correlated features
     ########################################################
@@ -254,16 +239,10 @@ def cluster_data(
                 meta_data["correlation_matrix_path"],
                 compress="lz4",
             )
-            print(
-                f'Calculated new correlation matrix and saved to {meta_data["correlation_matrix_path"]}'
-            )
+            print(f'Calculated new correlation matrix and saved to {meta_data["correlation_matrix_path"]}')
     else:
         correlation_matrix = data_df.iloc[:, 1:].corr(method="spearman")
-    assert (
-            data_df.shape[1] - 1
-            == correlation_matrix.shape[0]
-            == correlation_matrix.shape[1]
-    )
+    assert data_df.shape[1] - 1 == correlation_matrix.shape[0] == correlation_matrix.shape[1]
 
     # load or calculate clusters
     if meta_data["cluster_dict_path"]:
@@ -278,30 +257,25 @@ def cluster_data(
 
     print(
         "number of features in clustered data: ",
-        len(clustered_data_dict["clusters"].keys())
-        + len(clustered_data_dict["uncorrelated_features"]),
+        len(clustered_data_dict["clusters"].keys()) + len(clustered_data_dict["uncorrelated_features"]),
     )
 
     # generate clustered
     clustered_data_df = data_df[clustered_data_dict["uncorrelated_features"]].copy()
-    clustered_data_index = clustered_data_df.columns.union(
-        clustered_data_dict["clusters"].keys()
-    )
+    clustered_data_index = clustered_data_df.columns.union(clustered_data_dict["clusters"].keys())
     # append cluster representatives
     dict_of_cols = {}
     for key, values in clustered_data_dict["clusters"].items():
         dict_of_cols[f"cluster_{key}"] = data_df[key]
         clustered_data_index = clustered_data_index.union([key])
-    clustered_data_df = pd.concat(
-        [pd.DataFrame(dict_of_cols), clustered_data_df], axis=1
-    )
+    clustered_data_df = pd.concat([pd.DataFrame(dict_of_cols), clustered_data_df], axis=1)
     clustered_data_df.insert(0, "label", data_df["label"])
 
     assert (
-            clustered_data_df.shape[1]
-            == len(clustered_data_dict["clusters"].keys())
-            + len(clustered_data_dict["uncorrelated_features"])
-            + 1  # the label
+        clustered_data_df.shape[1]
+        == len(clustered_data_dict["clusters"].keys())
+        + len(clustered_data_dict["uncorrelated_features"])
+        + 1  # the label
     ), (
         f"clustered_data_df.shape[1] {clustered_data_df.shape[1]}= (len(cluster_dict.keys()) - 1) "
         f"{(len(clustered_data_dict['clusters'].keys()))} +len(cluster_dict['uncorrelated_features']) "
@@ -310,14 +284,10 @@ def cluster_data(
     print(clustered_data_df.shape)
 
     # save correlation matrix for clustered data
-    eliminated_features = [
-        item for item in data_df.columns[1:] if item not in clustered_data_index
-    ]
+    eliminated_features = [item for item in data_df.columns[1:] if item not in clustered_data_index]
     correlation_matrix.drop(eliminated_features, inplace=True, axis=1)
     correlation_matrix.drop(eliminated_features, inplace=True, axis=0)
-    assert (
-            correlation_matrix.shape[1] == clustered_data_df.shape[1] - 1
-    )  # exclude label
+    assert correlation_matrix.shape[1] == clustered_data_df.shape[1] - 1  # exclude label
     if meta_data["clustered_correlation_matrix_path"]:
         joblib.dump(
             correlation_matrix,
@@ -389,10 +359,8 @@ def remove_features_correlated_to_target_feature(train_df, correlation_matrix_df
 
     # Check if the maximum correlation of any uncorrelated feature with the target is within the threshold
     assert (
-            correlation_matrix_df.loc[target_feature, uncorrelated_features_mask]
-            .abs()
-            .max()
-            <= meta_data["data"]["train_correlation_threshold"]
+        correlation_matrix_df.loc[target_feature, uncorrelated_features_mask].abs().max()
+        <= meta_data["data"]["train_correlation_threshold"]
     ), f"{meta_data['data']['train_correlation_threshold']}"
 
     # Insert the 'label' as the first column
