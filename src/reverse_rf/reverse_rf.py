@@ -29,6 +29,7 @@ def calculate_oob_scores(x_train, y_train, meta_data):
     # Perform validation using different random seeds
     for seed in meta_data["seed_list"]:
         # Create a RandomForestRegressor model with specified parameters
+        # TODO move parameter setting to settings.toml
         clf1 = RandomForestRegressor(
             warm_start=False,
             max_features=None,
@@ -37,8 +38,11 @@ def calculate_oob_scores(x_train, y_train, meta_data):
             random_state=seed,
             min_samples_leaf=2,
         )
+        # Create a copy of the RandomForestRegressor (clf1)
+        clf2 = clone(clf1)
 
-        # Fit the model with training data including the label
+        # Fit the first model with training data including the label
+        assert "label" in x_train.columns
         clf1.fit(x_train, y_train)
         label_importance_zero = clf1.feature_importances_[0] == 0
 
@@ -49,12 +53,10 @@ def calculate_oob_scores(x_train, y_train, meta_data):
         # Store the OOB score for the labeled model
         oob_scores_labeled.append(clf1.oob_score_)
 
-        # Create a copy of the RandomForestRegressor (clf1)
-        clf2 = clone(clf1)
-
         # Fit the second model to the unlabeled training data (excluding 'label' column)
         unlabeled_x_train = x_train.loc[:, x_train.columns != "label"]
         assert unlabeled_x_train.shape[1] == x_train.shape[1] - 1
+        assert "label" not in unlabeled_x_train.columns
         clf2.fit(unlabeled_x_train, y_train)
 
         # Store the OOB score for the unlabeled model
@@ -89,8 +91,7 @@ def calculate_mean_oob_scores_and_p_value(target_feature_name, outer_cv_loop, me
 
     # Prepare training data
     y_train = ravel(train_df[target_feature_name])
-    # Remove the target feature from the training data
-    x_train_df = train_df.loc[:, train_df.columns != target_feature_name]
+
     # Remove features correlated to the target feature
     x_train = preprocessing.remove_features_correlated_to_target_feature(
         train_df, corr_matrix_df, target_feature_name, meta_data
@@ -106,9 +107,9 @@ def calculate_mean_oob_scores_and_p_value(target_feature_name, outer_cv_loop, me
     # Check if OOB scores for labeled data are available and if training with the label is better than without the label
     if oob_scores_labeled is not None and abs(np.mean(oob_scores_labeled)) < abs(np.mean(oob_scores_unlabeled)):
         # Perform the Wilcoxon signed-rank test
-        _, p_value = wilcoxon(
+        p_value = wilcoxon(
             oob_scores_labeled, oob_scores_unlabeled, alternative="less", method="exact", correction=True
-        )
+        ).pvalue
 
         # Check if the result is statistically significant (alpha level = 0.05)
         if p_value <= 0.05:
@@ -125,14 +126,14 @@ def calculate_mean_oob_scores_and_p_value(target_feature_name, outer_cv_loop, me
             print("norm_diff", norm_diff)
 
             # Calculate the percentage difference between OOB scores
-            percentage_difference = (
-                (mean_oob_score_labeled - mean_oob_score_unlabeled) / abs(mean_oob_score_unlabeled)
+            absolute_percentage_difference = (
+                (mean_oob_score_unlabeled - mean_oob_score_labeled) / abs(mean_oob_score_unlabeled)
             ) * 100
-            print("percentage_difference", percentage_difference)
+            print("absolute_percentage_difference", absolute_percentage_difference)
 
             # Calculate a metric based on the difference, normalized difference, and p-value
             metric = (difference / abs(mean_oob_score_labeled)) / p_value
-            metric2 = percentage_difference / p_value
+            metric2 = absolute_percentage_difference / p_value
             metric3 = norm_diff / p_value
             print("metric", metric, "metric2", metric2, "metric3", metric3)
             print("---------")
@@ -378,7 +379,7 @@ def calculate_validation_metric_per_feature(data_df, meta_data, outer_cv_loop):
         scores_unlabeled_list.append(score_unlabeled)
         p_values_list.append(p_value)
 
-    assert len(scores_labeled_list) == len(scores_unlabeled_list) == data_df.shape[1] - 1
+    assert len(scores_labeled_list) == len(scores_unlabeled_list) == data_df.shape[1] - 1  # exclude label column
     result_df = pd.DataFrame(data=scores_unlabeled_list, index=data_df.columns[1:], columns=["unlabeled"])
     result_df["labeled"] = scores_labeled_list
     result_df["p_values"] = p_values_list

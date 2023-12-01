@@ -8,7 +8,6 @@ import pandas as pd
 from sklearn.model_selection import StratifiedKFold, LeaveOneOut
 import reverse_rf
 import preprocessing
-import data_loader
 from src.reverse_rf import standard_rf
 import toml
 
@@ -35,6 +34,7 @@ assert data_df.columns[0] == "label"
 # data_df = pd.concat([data_01, data_02], join="outer", axis=1)
 
 # # data loaders
+# import data_loader
 # X, y = data_loader.standardize_sample_size(*data_loader.load_colon_data())
 # data_df = pd.DataFrame(X)
 # data_df.insert(loc=0, column="label", value=y)
@@ -51,9 +51,6 @@ cv_indices_list = []
 standard_validation_score_list = []
 
 # outer cross-validation
-# k_fold = StratifiedKFold(
-#     n_splits=meta_data["cv"]["n_outer_folds"], shuffle=True, random_state=123098
-# )
 k_fold = StratifiedKFold(n_splits=meta_data["cv"]["n_outer_folds"], shuffle=True, random_state=2005)
 for outer_cv_loop, (train_index, test_index) in enumerate(k_fold.split(data_df.iloc[:, 1:], data_df["label"])):
     print(f"outer_cv_loop {outer_cv_loop} of {meta_data['cv']['n_outer_folds']}")
