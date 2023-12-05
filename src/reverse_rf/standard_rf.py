@@ -3,9 +3,12 @@ from optuna.samplers import TPESampler, QMCSampler
 import warnings
 import math
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.inspection import permutation_importance
 from sklearn.metrics import mean_absolute_error, median_absolute_error, roc_auc_score
 
 warnings.filterwarnings("ignore")
+
+
 # import optuna_study_pruner
 
 
@@ -32,7 +35,7 @@ def optimize(train_index, validation_index, data_df, meta_data):
         # load_if_exists = True,
         direction="maximize",
         sampler=TPESampler(
-            # multivariate=True,
+            multivariate=True,
             seed=42,
         ),
     )
@@ -52,7 +55,13 @@ def optimize(train_index, validation_index, data_df, meta_data):
     clf = RandomForestClassifier()
     clf.set_params(**study.best_params)
     clf.fit(data_df.iloc[train_index, 1:], data_df.loc[train_index, "label"])
+    # L. Breiman, “Random Forests”, Machine Learning, 45(1), 5-32, 2001.
+    p_importances = permutation_importance(clf, data_df.iloc[train_index, 1:], data_df.loc[train_index, "label"],
+                                    n_repeats=10, random_state=0)["importances_mean"]
     predicted_y = clf.predict(data_df.iloc[validation_index, 1:])
     true_y = data_df.loc[validation_index, "label"]
     validation_score = roc_auc_score(true_y, predicted_y)
-    return clf.feature_importances_, validation_score
+    assert p_importances.size == data_df.iloc[train_index, 1:].shape[1] == clf.feature_importances_.size
+    print("p_importances", p_importances)
+    print("feature_importances_", clf.feature_importances_)
+    return p_importances, validation_score
