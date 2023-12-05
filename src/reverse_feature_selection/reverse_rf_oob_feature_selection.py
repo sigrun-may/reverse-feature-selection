@@ -80,7 +80,6 @@ def calculate_oob(
 
     # check if train would keep at least one feature after removing label and target_feature
     if train_data_df.shape[1] - len(correlated_features) < 3:
-
         absolute_correlations = [
             (feature_name, abs(correlation_coefficient))
             for feature_name, correlation_coefficient in correlated_features
@@ -243,7 +242,6 @@ def select_features(train_data, outer_cv_loop_iteration, meta_data):
     robustness_vector = []
     selected_features_dict = {}
     for target_feature_name in train_data.columns:
-
         # exclude the label
         if target_feature_name == "label":
             continue

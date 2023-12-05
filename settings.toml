@@ -1,0 +1,18 @@
+experiment_id = "colon2"
+description = ""
+seed_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+verbose_optuna = true
+
+[cv]
+n_outer_folds = 15
+
+[data]
+train_correlation_threshold = 0.2
+name = "colon"
+# path = "/home/sma19/PycharmProjects/reverse_feature_selection/data/small_50.csv"
+# path = ""
+
+#[rf_parameters]
+#classifier = {}
+#regressor = {}
+

@@ -88,7 +88,6 @@ def calculate_performance_metric_cv(params, preprocessed_data, trial, method):
 
 
 def calculate_performance_metric(params, train_data_df, test_data_df, method, micro=False):
-
     # prepare train/ test data
     y_train = train_data_df["label"].values.reshape(-1, 1)
     x_train = train_data_df.drop(columns="label").values

@@ -21,7 +21,6 @@ def select_features(preprocessed_data_dict, outer_cv_loop, meta_data, extra_tree
     """Optimize regularization parameter alpha for lasso regression."""
 
     def optuna_objective(trial):
-
         # if optuna_study_pruner.study_patience_pruner(
         #     trial, epsilon=0.001, warm_up_steps=20, patience=5
         # ) or optuna_study_pruner.study_no_improvement_pruner(
@@ -38,23 +37,19 @@ def select_features(preprocessed_data_dict, outer_cv_loop, meta_data, extra_tree
         # if "random" in target_feature_name or "pseudo" in target_feature_name:
         #     trial.study.stop()
 
+        # prepare train/ test data
+        # y_train = train_data_df["label"].values.reshape(-1, 1)
+        # x_train = train_data_df.drop(columns="label")
+        # x_test = test_data_df.drop(columns="label").values
+        # y_test = test_data_df["label"].values
+        #
+        # train_data = lgb.Dataset(x_train, label=y_train)
+        # test_data = lgb.Dataset(x_test, label=y_test)
 
-
-
-            # prepare train/ test data
-            # y_train = train_data_df["label"].values.reshape(-1, 1)
-            # x_train = train_data_df.drop(columns="label")
-            # x_test = test_data_df.drop(columns="label").values
-            # y_test = test_data_df["label"].values
-            #
-            # train_data = lgb.Dataset(x_train, label=y_train)
-            # test_data = lgb.Dataset(x_test, label=y_test)
-
-
-            # x_train = train_data_df.drop(columns="label")
-            # x_test = test_data_df.drop(columns="label").values
-            # train_data = lgb.Dataset(x_train, label=train_data_df["label"])
-            # test_data = lgb.Dataset(x_test, label=test_data_df["label"])
+        # x_train = train_data_df.drop(columns="label")
+        # x_test = test_data_df.drop(columns="label").values
+        # train_data = lgb.Dataset(x_train, label=train_data_df["label"])
+        # test_data = lgb.Dataset(x_test, label=test_data_df["label"])
 
         _, train_data_df, _ = preprocessed_data_dict["preprocessed_data_list"][0]
         parameters = dict(
@@ -82,8 +77,7 @@ def select_features(preprocessed_data_dict, outer_cv_loop, meta_data, extra_tree
 
         # cross validation for the optimization of alpha
         for fold_index, (test_data_df, train_data_df, _) in enumerate(preprocessed_data_dict["preprocessed_data_list"]):
-
-            model, prune = tree_model.train_model(parameters, test_data_df, train_data_df, 'label', _)
+            model, prune = tree_model.train_model(parameters, test_data_df, train_data_df, "label", _)
             # model = lgb.train(
             #     parameters,
             #     train_data,
@@ -116,7 +110,7 @@ def select_features(preprocessed_data_dict, outer_cv_loop, meta_data, extra_tree
             # shap_values = explainer(x_test)
             # raw_shap_values = np.abs(shap_values.values)[:, :, 0]
             # shap_values_list.append(np.sum(raw_shap_values, axis=0))  # TODO SHAP mean or sum
-            x_test = test_data_df.drop(columns='label').values
+            x_test = test_data_df.drop(columns="label").values
             shap_values_list.append(tree_model.get_shap_list(model, x_test))
 
         trial.set_user_attr("shap_values", np.array(shap_values_list))

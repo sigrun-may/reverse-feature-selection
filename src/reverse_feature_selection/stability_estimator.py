@@ -3,7 +3,6 @@ import numpy as np
 
 
 def get_stability(selected_features_matrix):
-
     robustness_vector = selected_features_matrix.sum(axis=0)
     print(robustness_vector[robustness_vector.nonzero()])
     subset_vector = selected_features_matrix.sum(axis=1)

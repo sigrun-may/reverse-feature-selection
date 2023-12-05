@@ -8,7 +8,6 @@ from validation import evaluate_feature_selection
 
 
 if __name__ == "__main__":
-
     experiment_id = None
     # experiment_id = "t_119"
 
@@ -28,7 +27,7 @@ if __name__ == "__main__":
     # select feature subsets
     feature_selection_result = compute_feature_subsets(data_df, meta_data_dict)
     if experiment_id:
-        meta_data_dict["data"]["columns"] = ['label']
+        meta_data_dict["data"]["columns"] = ["label"]
         meta_data_dict["data"]["columns"].extend(feature_selection_result[0][1].columns[1:].tolist())
 
     # validate feature subsets

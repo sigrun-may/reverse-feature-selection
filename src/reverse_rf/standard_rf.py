@@ -14,6 +14,7 @@ warnings.filterwarnings("ignore")
 
 def optimize(train_index, validation_index, data_df, meta_data):
     def optuna_objective(trial):
+        # TODO move parameters to settings.toml
         rf_clf = RandomForestClassifier(
             warm_start=False,
             # max_features=None,
@@ -21,15 +22,14 @@ def optimize(train_index, validation_index, data_df, meta_data):
             max_depth=trial.suggest_int("max_depth", 1, 15),
             n_estimators=300,
             random_state=42,
-            min_samples_leaf=trial.suggest_int(
-                "min_samples_leaf", 2, math.floor(len(train_index) / 2)
-            ),
+            min_samples_leaf=trial.suggest_int("min_samples_leaf", 2, math.floor(len(train_index) / 2)),
         )
         rf_clf.fit(data_df.iloc[train_index, 1:], data_df.loc[train_index, "label"])
         score = rf_clf.oob_score_
         print(score)
         return score
 
+    # TODO move direction to settings.toml
     study = optuna.create_study(
         # storage = "sqlite:///optuna_test.db",
         # load_if_exists = True,
@@ -39,10 +39,11 @@ def optimize(train_index, validation_index, data_df, meta_data):
             seed=42,
         ),
     )
-    if meta_data["parallel"]["cluster"]:  # deactivate logging on cluster
+    if not meta_data["verbose_optuna"]:  # deactivate logging on cluster
         optuna.logging.set_verbosity(optuna.logging.ERROR)
 
     # terminator = TerminatorCallback()
+    # TODO move n_trials to settings.toml
     study.optimize(
         optuna_objective,
         # n_trials=meta_data["selection_method"]["reverse_trees"]["trials"],

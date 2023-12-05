@@ -51,11 +51,9 @@ def evaluate_feature_selection(
             )
             selected_features_df[f"{key}_raw"] = np.mean(importance_matrix, axis=0)
 
-            if 'reverse' in embedded_feature_selection_method:
+            if "reverse" in embedded_feature_selection_method:
                 # process reverse selection
-                scaled_importance_matrix = _trim_and_scale_feature_weight_matrix(
-                    importance_matrix, 0.0
-                )
+                scaled_importance_matrix = _trim_and_scale_feature_weight_matrix(importance_matrix, 0.0)
                 selected_features_df[f"{key}_scaled"] = np.mean(scaled_importance_matrix, axis=0)
                 metrics_per_method_dict[f"{key}_scaled"] = calculate_performance(
                     test_train_sets, unlabeled_feature_names, scaled_importance_matrix, meta_data
@@ -64,9 +62,7 @@ def evaluate_feature_selection(
                 trimmed_importance_matrix = _trim_and_scale_feature_weight_matrix(
                     importance_matrix, meta_data["validation"]["standard_threshold"]
                 )
-                robust_importance_matrix = _trim_and_scale_robust_features(
-                    importance_matrix, 0.0, reverse=True
-                )
+                robust_importance_matrix = _trim_and_scale_robust_features(importance_matrix, 0.0, reverse=True)
                 close_to_robust_importance_matrix = _trim_and_scale_robust_features(
                     importance_matrix, 0.0, reverse=True, close_to_robust=True
                 )
@@ -78,9 +74,7 @@ def evaluate_feature_selection(
                 trimmed_importance_matrix = _trim_and_scale_feature_weight_matrix(
                     importance_matrix, meta_data["validation"]["standard_threshold"]
                 )
-                robust_importance_matrix = _trim_and_scale_robust_features(
-                    importance_matrix, 0.0
-                )
+                robust_importance_matrix = _trim_and_scale_robust_features(importance_matrix, 0.0)
                 close_to_robust_importance_matrix = _trim_and_scale_robust_features(
                     importance_matrix, 0.0, close_to_robust=True
                 )
@@ -478,4 +472,3 @@ def test_trim_and_scale_robust_features():
     # print(get_stability(perfect_stability))
     not_stable = get_stability(np.zeros((10, 20)))
     assert not_stable == 0, not_stable
-

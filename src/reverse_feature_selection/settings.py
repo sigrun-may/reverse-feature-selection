@@ -2,6 +2,7 @@ import os
 import numpy as np
 import yaml
 from sqlitedict import SqliteDict
+
 # from importlib.metadata import version
 
 
@@ -53,12 +54,15 @@ def get_meta_data():
     experiment_path = f"{folder['experiments']}/{experiment_id}"
 
     meta_data = dict(
-            cv=dict(n_outer_folds=6, n_inner_folds=5),
-            parallel=dict(n_jobs_preprocessing=1, n_jobs_cv=6, cluster=True),
+        cv=dict(n_outer_folds=6, n_inner_folds=5),
+        parallel=dict(n_jobs_preprocessing=1, n_jobs_cv=6, cluster=True),
     )
-    if meta_data['parallel']['cluster']:
-        folder = dict(data="/vol/projects/smay/develop/reverse_feature_selection/data", experiments="/vol/projects/smay/develop/reverse_feature_selection/experiments/")
-        experiment_path = f'/vol/projects/smay/develop/reverse_feature_selection/experiments/{experiment_id}'
+    if meta_data["parallel"]["cluster"]:
+        folder = dict(
+            data="/vol/projects/smay/develop/reverse_feature_selection/data",
+            experiments="/vol/projects/smay/develop/reverse_feature_selection/experiments/",
+        )
+        experiment_path = f"/vol/projects/smay/develop/reverse_feature_selection/experiments/{experiment_id}"
 
     data = dict(
         input_data_path=f"{folder['data']}/{data_name}.csv",
@@ -189,8 +193,8 @@ def get_old_meta_data(experiment_id):
 
 
 def save_meta_data(meta_data):
-    if meta_data['parallel']['cluster']:
-        data_base_path = f'/vol/projects/smay/develop/reverse_feature_selection/meta_data_db.sqlite'
+    if meta_data["parallel"]["cluster"]:
+        data_base_path = f"/vol/projects/smay/develop/reverse_feature_selection/meta_data_db.sqlite"
     else:
         data_base_path = "../../meta_data_db.sqlite"
     sqllite_mydict = SqliteDict(data_base_path, autocommit=True)
