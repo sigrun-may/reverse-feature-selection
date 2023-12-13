@@ -83,7 +83,7 @@ def preprocess_data(
         outer_cv_loop: The current loop iteration of the outer cross-validation.
         meta_data: The metadata related to the dataset and experiment.
         correlation_matrix: Whether to calculate the Spearman correlation matrix for the training data.
-                            Defaults to False.
+            Defaults to False.
 
     Returns:
         A tuple containing the validation data, training data, and optionally the training correlation matrix.
