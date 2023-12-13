@@ -1,6 +1,7 @@
 import logging
 
 import numpy as np
+import pandas as pd
 from sklearn.model_selection import StratifiedKFold
 
 import preprocessing
@@ -18,15 +19,14 @@ class CrossValidator:
     reverse feature selection and a standard random forest.
     """
 
-    def __init__(self, data_df, meta_data):
+    def __init__(self, data_df: pd.DataFrame, meta_data:dict):
         """
         Initialize the CrossValidator class with data and metadata.
 
-        Parameters:
-        data_df (DataFrame): The dataset for cross-validation.
-        meta_data (dict): The metadata related to the dataset and experiment.
+        Args:
+            data_df: The dataset for cross-validation.
+            meta_data: The metadata related to the dataset and experiment.
         """
-        ...
         self.data_df = data_df
         self.meta_data = meta_data
         self.cv_result_list = []  # List to store cross-validation results
