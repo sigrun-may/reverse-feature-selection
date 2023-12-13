@@ -65,6 +65,29 @@ def get_data(meta_data_dict) -> pd.DataFrame:
     return data
 
 
+def load_cached_data(pickle_base_path: Path, correlation_matrix: bool) -> Tuple[pd.DataFrame, pd.DataFrame, Optional[pd.DataFrame]]:
+    """
+    Load the cached preprocessed data.
+
+    Args:
+        pickle_base_path: The base path for caching the preprocessed data.
+        correlation_matrix: Whether to load the Spearman correlation matrix for the training data.
+
+    Returns:
+        A tuple containing the validation data, training data, and optionally the training correlation matrix.
+    """
+    with open(f"{pickle_base_path}/validation.pkl", "rb") as file:
+        validation_pd = pickle.load(file)
+    with open(f"{pickle_base_path}/train.pkl", "rb") as file:
+        train_pd = pickle.load(file)
+    if correlation_matrix:
+        with open(f"{pickle_base_path}/train_correlation_matrix.pkl", "rb") as file:
+            train_correlation_matrix = pickle.load(file)
+    else:
+        train_correlation_matrix = None
+    return train_pd, validation_pd, train_correlation_matrix
+
+
 def preprocess_data(
     train_index: np.ndarray,
     validation_index: np.ndarray,
@@ -94,16 +117,7 @@ def preprocess_data(
     # Check if the preprocessed data is already cached
     if pickle_base_path.exists():
         # Load the cached preprocessed data
-        with open(f"{pickle_base_path}/validation.pkl", "rb") as file:
-            validation_pd = pickle.load(file)
-        with open(f"{pickle_base_path}/train.pkl", "rb") as file:
-            train_pd = pickle.load(file)
-        if correlation_matrix:
-            with open(f"{pickle_base_path}/train_correlation_matrix.pkl", "rb") as file:
-                train_correlation_matrix = pickle.load(file)
-        else:
-            train_correlation_matrix = None
-        return train_pd, validation_pd, train_correlation_matrix
+        return load_cached_data(pickle_base_path, correlation_matrix)
 
     # Create directory for caching the preprocessed data
     pickle_base_path.mkdir(parents=True, exist_ok=True)
