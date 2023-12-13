@@ -1,6 +1,6 @@
 import pickle
 from pathlib import Path
-from typing import Tuple, Dict, List
+from typing import Tuple, Dict, List, Optional
 
 import joblib
 import numpy as np
@@ -72,23 +72,22 @@ def preprocess_data(
     outer_cv_loop: int,
     meta_data: dict,
     correlation_matrix: bool = False,
-) -> object:
-    """Split data for training and validation, calculate correlation matrix if selected and cache it.
+) -> Tuple[pd.DataFrame, pd.DataFrame, Optional[pd.DataFrame]]:
+    """
+    Split data for training and validation, calculate correlation matrix if selected and cache it.
 
     Args:
-        train_index (list or array-like): Index for the training split.
-        validation_index (list or array-like): Index for the validation split.
-         (DataFrame): Complete input data as a Pandas DataFrame.
-        correlation_matrix (bool, optional): Whether to calculate the Spearman correlation matrix for the training data.
+        train_index: Indices for the training split.
+        validation_index: Indices for the validation split.
+        data_df: Complete input data as a Pandas DataFrame.
+        outer_cv_loop: The current loop iteration of the outer cross-validation.
+        meta_data: The metadata related to the dataset and experiment.
+        correlation_matrix: Whether to calculate the Spearman correlation matrix for the training data.
+                            Defaults to False.
 
     Returns:
-        tuple: A tuple containing the validation data (DataFrame), training data (DataFrame), and optionally the training correlation matrix (DataFrame).
-        :param meta_data:
-        :param train_index:
-        :param correlation_matrix:
-        :param outer_cv_loop:
-        :param validation_index:
-        :param data_df:
+        Tuple[pd.DataFrame, pd.DataFrame, Optional[pd.DataFrame]]: A tuple containing the validation data,
+        training data, and optionally the training correlation matrix.
     """
     # Create a base path for caching the preprocessed data
     pickle_base_path = Path(
