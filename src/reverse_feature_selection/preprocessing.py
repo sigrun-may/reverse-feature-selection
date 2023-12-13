@@ -127,17 +127,17 @@ def preprocess_data(
     assert not data_df.isnull().values.any(), "Missing values detected in the input data."
 
     # Extract the training and validation data based on the provided indices
-    train_pd = data_df.iloc[train_index, :]
-    validation_pd = data_df.iloc[validation_index, :]
+    train_df = data_df.iloc[train_index, :]
+    validation_df = data_df.iloc[validation_index, :]
 
     # Ensure the shapes of training and validation data match the expected dimensions
-    assert validation_pd.shape == (len(validation_index), data_df.shape[1]), "Validation data shape mismatch."
-    assert train_pd.shape == (len(train_index), data_df.shape[1]), "Training data shape mismatch."
+    assert validation_df.shape == (len(validation_index), data_df.shape[1]), "Validation data shape mismatch."
+    assert train_df.shape == (len(train_index), data_df.shape[1]), "Training data shape mismatch."
 
     train_correlation_matrix = None
     if correlation_matrix:
         # If specified, calculate the Spearman correlation matrix for the training data
-        unlabeled_train_df = train_pd.iloc[:, 1:]  # Exclude the label column
+        unlabeled_train_df = train_df.iloc[:, 1:]  # Exclude the label column
         assert unlabeled_train_df.shape[0] == len(train_index)
         assert unlabeled_train_df.shape[1] == data_df.shape[1] - 1  # Exclude the label
 
@@ -150,12 +150,12 @@ def preprocess_data(
 
     if meta_data["pickle_preprocessed_data"]:
         with open(f"{pickle_base_path}/validation.pkl", "wb") as file:
-            pickle.dump(validation_pd, file, protocol=pickle.HIGHEST_PROTOCOL)
+            pickle.dump(validation_df, file, protocol=pickle.HIGHEST_PROTOCOL)
         with open(f"{pickle_base_path}/train.pkl", "wb") as file:
-            pickle.dump(train_pd, file, protocol=pickle.HIGHEST_PROTOCOL)
+            pickle.dump(train_df, file, protocol=pickle.HIGHEST_PROTOCOL)
 
     # Return the training and validation data along with the correlation matrix (if calculated)
-    return train_pd, validation_pd, train_correlation_matrix
+    return train_df, validation_df, train_correlation_matrix
 
 
 def remove_features_correlated_to_target_feature(
