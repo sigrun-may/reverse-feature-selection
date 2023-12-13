@@ -69,7 +69,7 @@ def preprocess_data(
     train_index: np.ndarray,
     validation_index: np.ndarray,
     data_df: pd.DataFrame,
-    outer_cv_loop: int,
+    fold_index: int,
     meta_data: dict,
     correlation_matrix: bool = False,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, Optional[pd.DataFrame]]:
@@ -80,20 +80,19 @@ def preprocess_data(
         train_index: Indices for the training split.
         validation_index: Indices for the validation split.
         data_df: Complete input data as a Pandas DataFrame.
-        outer_cv_loop: The current loop iteration of the outer cross-validation.
+        fold_index: The current loop iteration of the outer cross-validation.
         meta_data: The metadata related to the dataset and experiment.
         correlation_matrix: Whether to calculate the Spearman correlation matrix for the training data.
-            Defaults to False.
 
     Returns:
         A tuple containing the validation data, training data, and optionally the training correlation matrix.
     """
     # Create a base path for caching the preprocessed data
     pickle_base_path = Path(
-        f"../../preprocessed_data/{meta_data['data']['name']}/outer_fold_{outer_cv_loop}"
+        f"../../preprocessed_data/{meta_data['data']['name']}/outer_fold_{fold_index}"
     )
     # Check if all necessary directories exist
-    if Path(f"../../preprocessed_data/{meta_data['data']['name']}/outer_fold{outer_cv_loop}").exists():
+    if pickle_base_path.exists():
         # Check if the preprocessed data is already cached
         if meta_data["pickle_preprocessed_data"]:
             if pickle_base_path.exists():
