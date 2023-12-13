@@ -104,10 +104,10 @@ def preprocess_data(
         else:
             train_correlation_matrix = None
         return train_pd, validation_pd, train_correlation_matrix
-    else:
-        # Create directory for caching the preprocessed data
-        pickle_base_path.mkdir(parents=True, exist_ok=True)
-        assert pickle_base_path.exists()
+
+    # Create directory for caching the preprocessed data
+    pickle_base_path.mkdir(parents=True, exist_ok=True)
+    assert pickle_base_path.exists()
 
     # Check for missing values in the input DataFrame
     assert not data_df.isnull().values.any(), "Missing values detected in the input data."
@@ -119,7 +119,6 @@ def preprocess_data(
     # Ensure the shapes of training and validation data match the expected dimensions
     assert validation_pd.shape == (len(validation_index), data_df.shape[1]), "Validation data shape mismatch."
     assert train_pd.shape == (len(train_index), data_df.shape[1]), "Training data shape mismatch."
-
 
     train_correlation_matrix = None
     if correlation_matrix:
