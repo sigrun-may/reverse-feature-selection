@@ -1,7 +1,9 @@
+import math
 import multiprocessing
 import pickle
 from math import log
 from pathlib import Path
+from typing import Tuple, Optional
 
 import numpy as np
 import pandas as pd
@@ -17,17 +19,17 @@ from sklearn.metrics import (
 from src.reverse_feature_selection import preprocessing
 
 
-def calculate_oob_errors(x_train: pd.DataFrame, y_train: np.ndarray):
+def calculate_oob_errors(x_train: pd.DataFrame, y_train: np.ndarray) -> Tuple[Optional[list], Optional[list]]:
     """
-        Calculate out-of-bag (OOB) error for labeled and unlabeled training data.
+    Calculate out-of-bag (OOB) error for labeled and unlabeled training data.
 
-        Args:
-            x_train: The training data.
-            y_train: The target values for the training data.
+    Args:
+        x_train: The training data.
+        y_train: The target values for the training data.
 
-        Returns:
-            A tuple containing lists of OOB scores for labeled and unlabeled data.
-        """
+    Returns:
+        A tuple containing lists of OOB scores for labeled and unlabeled training data.
+    """
     ...
 
     oob_errors_labeled = []
@@ -50,7 +52,7 @@ def calculate_oob_errors(x_train: pd.DataFrame, y_train: np.ndarray):
         # Fit the first model with training data including the label
         assert "label" in x_train.columns
         clf1.fit(x_train, y_train)
-        label_importance_zero = clf1.feature_importances_[0] == 0
+        label_importance_zero = math.isclose(clf1.feature_importances_[0], 0.0)
 
         # If the feature importance of the label feature is zero, it means the label was not considered in the model
         if label_importance_zero:
@@ -72,14 +74,14 @@ def calculate_oob_errors(x_train: pd.DataFrame, y_train: np.ndarray):
     return oob_errors_labeled, oob_errors_unlabeled
 
 
-def calculate_mean_oob_errors_and_p_value(target_feature_name, outer_cv_loop, meta_data):
+def calculate_mean_oob_errors_and_p_value(target_feature_name: str, fold_index: int, meta_data:dict):
     """
     Calculate the mean out-of-bag (OOB) errors for random forest regressors with different random seeds
     for training data including the label and without the label for the given target feature.
 
     Args:
         target_feature_name: The name of the target feature.
-        outer_cv_loop: The current loop iteration of the outer cross-validation.
+        fold_index: The current loop iteration of the outer cross-validation.
         meta_data: The metadata related to the dataset and experiment.
 
     Returns:
@@ -93,7 +95,7 @@ def calculate_mean_oob_errors_and_p_value(target_feature_name, outer_cv_loop, me
     mean_oob_score_unlabeled = 0
     p_value = None
 
-    pickle_base_path = Path(f"../../preprocessed_data/{meta_data['data']['name']}/outer_fold_{outer_cv_loop}")
+    pickle_base_path = Path(f"../../preprocessed_data/{meta_data['data']['name']}/outer_fold_{fold_index}")
     assert pickle_base_path.exists(), f"{pickle_base_path} does not exist"
 
     # Load the cached preprocessed data for the given outer cross-validation fold
@@ -118,28 +120,28 @@ def calculate_mean_oob_errors_and_p_value(target_feature_name, outer_cv_loop, me
 
     assert target_feature_name not in x_train.columns
 
-    # Calculate out-of-bag (OOB) scores for labeled and unlabeled training data
-    oob_scores_labeled, oob_scores_unlabeled = calculate_oob_errors(x_train, y_train)
+    # Calculate out-of-bag (OOB) errors for labeled and unlabeled training data
+    oob_errors_labeled, oob_errors_unlabeled = calculate_oob_errors(x_train, y_train)
 
-    # Check if OOB scores for labeled data are available and if training with the label is better than without the label
-    if oob_scores_labeled is not None and abs(np.mean(oob_scores_labeled)) < abs(np.mean(oob_scores_unlabeled)):
-        # Calculate the percentage difference between OOB scores
+    # Check if OOB errors for labeled data are available and if training with the label is better than without the label
+    if oob_errors_labeled is not None and abs(np.mean(oob_errors_labeled)) < abs(np.mean(oob_errors_unlabeled)):
+        # Calculate the percentage difference between mean OOB errors
         absolute_percentage_difference = (
-            (np.mean(oob_scores_unlabeled) - np.mean(oob_scores_labeled)) / abs(np.mean(oob_scores_unlabeled))
+            (np.mean(oob_errors_unlabeled) - np.mean(oob_errors_labeled)) / abs(np.mean(oob_errors_unlabeled))
         ) * 100
         if abs(absolute_percentage_difference) >= 5:
             print("percentage_difference", absolute_percentage_difference)
 
         # Perform the t-test (welsh)
-        p_value = ttest_ind(oob_scores_labeled, oob_scores_unlabeled, alternative="less", equal_var=False).pvalue
+        p_value = ttest_ind(oob_errors_labeled, oob_errors_unlabeled, alternative="less", equal_var=False).pvalue
 
         # Perform the mannwhitneyu test
-        # p_value = mannwhitneyu(oob_scores_labeled, oob_scores_unlabeled, alternative="less").pvalue
+        # p_value = mannwhitneyu(oob_errors_labeled, oob_errors_unlabeled, alternative="less").pvalue
 
         # Check if the result is statistically significant (alpha level = 0.05)
         if p_value <= 0.05:
-            mean_oob_score_labeled = np.mean(oob_scores_labeled)
-            mean_oob_score_unlabeled = np.mean(oob_scores_unlabeled)
+            mean_oob_score_labeled = np.mean(oob_errors_labeled)
+            mean_oob_score_unlabeled = np.mean(oob_errors_unlabeled)
             print(f"p_value {target_feature_name} {p_value} l: {mean_oob_score_labeled} ul: {mean_oob_score_unlabeled}")
 
             # Calculate the percentage difference between OOB scores
@@ -155,7 +157,7 @@ def calculate_mean_oob_errors_and_p_value(target_feature_name, outer_cv_loop, me
     return mean_oob_score_labeled, mean_oob_score_unlabeled, p_value
 
 
-def calculate_oob_errors_per_feature(data_df, meta_data, fold_index):
+def calculate_oob_errors_per_feature(data_df: pd.DataFrame, meta_data: dict, fold_index: np.ndarray):
     scores_labeled_list = []
     scores_unlabeled_list = []
     p_values_list = []
