@@ -91,22 +91,19 @@ def preprocess_data(
     pickle_base_path = Path(
         f"../../preprocessed_data/{meta_data['data']['name']}/outer_fold_{fold_index}"
     )
-    # Check if all necessary directories exist
+    # Check if the preprocessed data is already cached
     if pickle_base_path.exists():
-        # Check if the preprocessed data is already cached
-        if meta_data["pickle_preprocessed_data"]:
-            if pickle_base_path.exists():
-                # Load the cached preprocessed data
-                with open(f"{pickle_base_path}/validation.pkl", "rb") as file:
-                    validation_pd = pickle.load(file)
-                with open(f"{pickle_base_path}/train.pkl", "rb") as file:
-                    train_pd = pickle.load(file)
-                if correlation_matrix:
-                    with open(f"{pickle_base_path}/train_correlation_matrix.pkl", "rb") as file:
-                        train_correlation_matrix = pickle.load(file)
-                else:
-                    train_correlation_matrix = None
-                return train_pd, validation_pd, train_correlation_matrix
+        # Load the cached preprocessed data
+        with open(f"{pickle_base_path}/validation.pkl", "rb") as file:
+            validation_pd = pickle.load(file)
+        with open(f"{pickle_base_path}/train.pkl", "rb") as file:
+            train_pd = pickle.load(file)
+        if correlation_matrix:
+            with open(f"{pickle_base_path}/train_correlation_matrix.pkl", "rb") as file:
+                train_correlation_matrix = pickle.load(file)
+        else:
+            train_correlation_matrix = None
+        return train_pd, validation_pd, train_correlation_matrix
     else:
         # Create directory for caching the preprocessed data
         pickle_base_path.mkdir(parents=True, exist_ok=True)
