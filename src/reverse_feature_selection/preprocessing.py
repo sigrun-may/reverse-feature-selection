@@ -120,6 +120,7 @@ def preprocess_data(
     assert validation_pd.shape == (len(validation_index), data_df.shape[1]), "Validation data shape mismatch."
     assert train_pd.shape == (len(train_index), data_df.shape[1]), "Training data shape mismatch."
 
+
     train_correlation_matrix = None
     if correlation_matrix:
         # If specified, calculate the Spearman correlation matrix for the training data
