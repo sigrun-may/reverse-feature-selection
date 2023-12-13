@@ -132,7 +132,7 @@ def calculate_mean_oob_errors_and_p_value(target_feature_name: str, fold_index: 
         if abs(absolute_percentage_difference) >= 5:
             print("percentage_difference", absolute_percentage_difference)
 
-        # Perform the t-test (welsh)
+        # Perform the t-test (Welch's test) to check if the difference is statistically significant
         p_value = ttest_ind(oob_errors_labeled, oob_errors_unlabeled, alternative="less", equal_var=False).pvalue
 
         # Perform the mannwhitneyu test
