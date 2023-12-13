@@ -86,8 +86,7 @@ def preprocess_data(
                             Defaults to False.
 
     Returns:
-        Tuple[pd.DataFrame, pd.DataFrame, Optional[pd.DataFrame]]: A tuple containing the validation data,
-        training data, and optionally the training correlation matrix.
+        A tuple containing the validation data, training data, and optionally the training correlation matrix.
     """
     # Create a base path for caching the preprocessed data
     pickle_base_path = Path(
