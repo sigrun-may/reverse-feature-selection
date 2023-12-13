@@ -1,46 +1,44 @@
+import pickle
+import datetime
 import pandas as pd
+import toml
 
-# from pandasgui import show
-import settings
-from preprocessing import get_data
-from feature_subset_selection import compute_feature_subsets
-from validation import evaluate_feature_selection
+from src.reverse_feature_selection.cross_validation import CrossValidator
 
+# parse settings from toml
+with open("../../settings.toml", "r") as file:
+    meta_data = toml.load(file)
 
-if __name__ == "__main__":
-    experiment_id = None
-    # experiment_id = "t_119"
+print(type(meta_data))
 
-    if experiment_id:
-        meta_data_dict = settings.get_old_meta_data(experiment_id)
-        meta_data_dict["validation"]["reverse_threshold"] = 0.05
-        meta_data_dict["validation"]["standard_threshold"] = 0.05
-        data_df = pd.DataFrame()
-    else:
-        meta_data_dict = settings.get_meta_data()
-        data_df = get_data(meta_data_dict)
+# load data
+data_df = pd.read_csv(meta_data["data"]["path"]).iloc[:, 1:]
+assert data_df.columns[0] == "label"
+data_df.to_csv(meta_data["data"]["path"])
 
-        # save meta data for parsed data
-        meta_data_dict["data"]["columns"] = data_df.columns.tolist()
-        settings.save_meta_data(meta_data_dict)
+# # shorten artificial data for faster testing
+# data_01 = data_df.iloc[:, 0:10]
+# data_02 = data_df.iloc[:, 200:800]
+# data_df = pd.concat([data_01, data_02], join="outer", axis=1)
 
-    # select feature subsets
-    feature_selection_result = compute_feature_subsets(data_df, meta_data_dict)
-    if experiment_id:
-        meta_data_dict["data"]["columns"] = ["label"]
-        meta_data_dict["data"]["columns"].extend(feature_selection_result[0][1].columns[1:].tolist())
+# # data loaders
+# import data_loader
+# X, y = data_loader.standardize_sample_size(*data_loader.load_colon_data())
+# data_df = pd.DataFrame(X)
+# data_df.insert(loc=0, column="label", value=y)
+# # data_df.columns = data_df.columns.astype(str)
+# data_df = data_df.reset_index(drop=True)
+# assert data_df.columns[0] == "label"
 
-    # validate feature subsets
-    evaluation_result_dict = evaluate_feature_selection(
-        feature_selection_result,
-        meta_data_dict,
-    )
-    # result output
-    result_df = pd.DataFrame()
-    for method, result in evaluation_result_dict.items():
-        print(" ")
-        print(f"#########################  {method}")
-        for k, v in result.items():
-            print(k, v)
-            result_df.loc[k, method] = v
-    result_df.to_csv(meta_data_dict["path_validation_result"])
+print(data_df.shape)
+
+start_time = datetime.datetime.utcnow()
+
+cross_validator = CrossValidator(data_df, meta_data)
+result_dict = cross_validator.cross_validate()
+
+end_time = datetime.datetime.utcnow()
+print(end_time - start_time)
+
+with open(f"../../results/{meta_data['experiment_id']}_result_dict.pkl", "wb") as file:
+    pickle.dump(result_dict, file, protocol=pickle.HIGHEST_PROTOCOL)

@@ -84,7 +84,7 @@ def select_feature_subset(
         #     reverse_lasso_feature_selection_doubleHPO.select_features(
         #     preprocessed_data_dict, outer_cv_loop_iteration, meta_data
         # ),
-        "reverse_rf": reverse_selection.select_features(
+        "reverse_feature_selection": reverse_selection.select_features(
             preprocessed_data_list,
             outer_cv_loop_iteration,
             meta_data,
