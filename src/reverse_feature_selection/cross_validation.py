@@ -39,7 +39,7 @@ class CrossValidator:
         Perform outer cross-validation on the dataset.
 
         Returns:
-        dict: A dictionary containing the results of the cross-validation.
+            Results of the cross-validation.
         """
         # StratifiedKFold outer cross-validation
         k_fold = StratifiedKFold(n_splits=self.meta_data["cv"]["n_outer_folds"], shuffle=True, random_state=2005)
