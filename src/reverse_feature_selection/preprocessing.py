@@ -65,7 +65,9 @@ def get_data(meta_data_dict) -> pd.DataFrame:
     return data
 
 
-def load_cached_data(pickle_base_path: Path, correlation_matrix: bool) -> Tuple[pd.DataFrame, pd.DataFrame, Optional[pd.DataFrame]]:
+def load_cached_data(
+    pickle_base_path: Path, correlation_matrix: bool
+) -> Tuple[pd.DataFrame, pd.DataFrame, Optional[pd.DataFrame]]:
     """
     Load the cached preprocessed data.
 
@@ -111,9 +113,7 @@ def preprocess_data(
         A tuple containing the validation data, training data, and optionally the training correlation matrix.
     """
     # Create a base path for caching the preprocessed data
-    pickle_base_path = Path(
-        f"../../preprocessed_data/{meta_data['data']['name']}/outer_fold_{fold_index}"
-    )
+    pickle_base_path = Path(f"../../preprocessed_data/{meta_data['data']['name']}/outer_fold_{fold_index}")
     # Check if the preprocessed data is already cached
     if pickle_base_path.exists():
         # Load the cached preprocessed data
@@ -158,7 +158,9 @@ def preprocess_data(
     return train_pd, validation_pd, train_correlation_matrix
 
 
-def remove_features_correlated_to_target_feature(train_df, correlation_matrix_df, target_feature, meta_data) -> pd.DataFrame:
+def remove_features_correlated_to_target_feature(
+    train_df, correlation_matrix_df, target_feature, meta_data
+) -> pd.DataFrame:
     # Remove correlations to the target feature
 
     # Extract the unlabeled training data

@@ -19,7 +19,7 @@ class CrossValidator:
     reverse feature selection and a standard random forest.
     """
 
-    def __init__(self, data_df: pd.DataFrame, meta_data:dict):
+    def __init__(self, data_df: pd.DataFrame, meta_data: dict):
         """
         Initialize the CrossValidator class with data and metadata.
 
@@ -78,7 +78,7 @@ class CrossValidator:
         Parameters:
         train_index (array-like): Indices of training samples.
         test_index (array-like): Indices of testing samples.
-        outer_cv_loop (int): The current loop iteration of the outer cross-validation.
+        fold_index (int): The current loop iteration of the outer cross-validation.
         """
         # Calculate raw metrics for feature subset calculation with reverse feature selection
         result_df = reverse_rf.calculate_oob_errors_per_feature(

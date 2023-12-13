@@ -71,9 +71,7 @@ def calculate_mean_oob_scores_and_p_value(target_feature_name, outer_cv_loop, me
     mean_oob_score_unlabeled = 0
     p_value = None
 
-    pickle_base_path = Path(
-        f"../../preprocessed_data/{meta_data['data']['name']}/outer_fold_{outer_cv_loop}"
-    )
+    pickle_base_path = Path(f"../../preprocessed_data/{meta_data['data']['name']}/outer_fold_{outer_cv_loop}")
     assert pickle_base_path.exists(), f"{pickle_base_path} does not exist"
 
     # Load the cached preprocessed data for the given outer cross-validation fold
@@ -142,7 +140,7 @@ def calculate_oob_errors_per_feature(data_df, meta_data, outer_cv_loop):
 
     # # serial version
     # for target_feature_name in data_df.columns[1:]:
-    #     score_labeled, score_unlabeled, p_value = calculate_mean_oob_scores_and_p_value(target_feature_name, outer_cv_loop, meta_data)
+    #     score_labeled, score_unlabeled, p_value = calculate_mean_oob_scores_and_p_value(target_feature_name, fold_index, meta_data)
     #     scores_labeled_list.append(score_labeled)
     #     scores_unlabeled_list.append(score_unlabeled)
     #     p_values_list.append(p_value)

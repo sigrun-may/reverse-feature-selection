@@ -11,7 +11,7 @@ n_outer_folds = 15
 [data]
 train_correlation_threshold = 0.2
 name = "data"
-path = "../../data/data.csv"
+path = "../../data/data_1026_1.csv"
 
 
 #[rf_parameters]
