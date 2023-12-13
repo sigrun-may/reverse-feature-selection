@@ -159,8 +159,23 @@ def preprocess_data(
 
 
 def remove_features_correlated_to_target_feature(
-    train_df, correlation_matrix_df, target_feature, meta_data
+    train_df: pd.DataFrame, correlation_matrix_df: pd.DataFrame, target_feature: str, meta_data: dict
 ) -> pd.DataFrame:
+    """
+    Remove features from the training data that are correlated to the target feature.
+
+    This function creates a mask for uncorrelated features based on the correlation threshold specified in the metadata.
+    It then uses this mask to select the uncorrelated features from the training data.
+
+    Args:
+        train_df: The training data.
+        correlation_matrix_df: The correlation matrix of the training data.
+        target_feature: The name of the target feature.
+        meta_data: The metadata related to the dataset and experiment.
+
+    Returns:
+        The training data with only the uncorrelated features remaining.
+    """
     # Remove correlations to the target feature
 
     # Extract the unlabeled training data
