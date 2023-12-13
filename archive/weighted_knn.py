@@ -1,19 +1,16 @@
 # coding: utf-8
-from typing import Dict, Tuple, Any, List
+import warnings
+from typing import Dict, Tuple, Any
 
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import PowerTransformer
-from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import (
     log_loss,
     roc_auc_score,
-    matthews_corrcoef,
-    classification_report,
 )
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.preprocessing import PowerTransformer
 from weighted_manhattan_distance import WeightedManhattanDistance
-
-import warnings
 
 warnings.filterwarnings("ignore")
 

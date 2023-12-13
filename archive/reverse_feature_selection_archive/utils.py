@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 
 
 def get_well_separated_data(data_df):

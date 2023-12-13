@@ -1,14 +1,13 @@
+import warnings
+
 import numpy as np
 import optuna
 from optuna.samplers import TPESampler
-from optuna import TrialPruned
-
 from relaxed_lasso import RelaxedLasso
-import reverse_selection
-
 # import celer
 from sklearn.linear_model import Lasso
-import warnings
+
+import reverse_selection
 
 warnings.filterwarnings("ignore")
 

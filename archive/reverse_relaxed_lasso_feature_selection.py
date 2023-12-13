@@ -1,17 +1,16 @@
+import warnings
+
 import numpy as np
-import pandas as pd
 import optuna
+import pandas as pd
 from optuna import TrialPruned
 from optuna.samplers import TPESampler
-from sklearn.metrics import r2_score
-import celer
 from relaxed_lasso import RelaxedLasso
-import warnings
+from sklearn.metrics import r2_score
 
 warnings.filterwarnings("ignore")
 
 #
-import optuna_study_pruner
 from utils import sort_list_of_tuples_by_index
 
 

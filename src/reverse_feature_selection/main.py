@@ -1,5 +1,6 @@
-import pickle
 import datetime
+import pickle
+
 import pandas as pd
 import toml
 

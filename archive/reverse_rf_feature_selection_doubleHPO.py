@@ -1,13 +1,10 @@
 import numpy as np
-import pandas as pd
 import optuna
+import pandas as pd
 from optuna import TrialPruned
-from optuna.samplers import TPESampler
-from sklearn.metrics import r2_score
 from sklearn.ensemble import RandomForestRegressor
-
+from sklearn.metrics import r2_score
 #
-import optuna_study_pruner
 from utils import sort_list_of_tuples_by_index
 
 

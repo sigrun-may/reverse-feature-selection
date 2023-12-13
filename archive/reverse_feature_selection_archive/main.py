@@ -2,10 +2,9 @@ import pandas as pd
 
 # from pandasgui import show
 import settings
-from preprocessing import get_data
 from feature_subset_selection import compute_feature_subsets
+from preprocessing import get_data
 from validation import evaluate_feature_selection
-
 
 if __name__ == "__main__":
     experiment_id = None

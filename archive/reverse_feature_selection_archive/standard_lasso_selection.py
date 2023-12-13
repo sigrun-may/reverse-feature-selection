@@ -1,12 +1,13 @@
-import numpy as np
-from optuna import TrialPruned
-import optuna
-from relaxed_lasso import RelaxedLasso
+import math
+
 import celer
+import numpy as np
+import optuna
+import shap
+from optuna import TrialPruned
+from relaxed_lasso import RelaxedLasso
 from sklearn.linear_model import Lasso
 from sklearn.metrics import r2_score
-import shap
-import math
 
 
 def select_features(

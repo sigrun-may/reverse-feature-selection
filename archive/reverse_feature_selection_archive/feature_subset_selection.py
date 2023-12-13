@@ -5,11 +5,15 @@ import pandas as pd
 from joblib import Parallel, delayed
 from sklearn.model_selection import StratifiedKFold
 
+import reverse_lasso
+import reverse_selection
+import reverse_trees
+import standard_lasso_selection
+import tree_feature_selection
 from preprocessing import (
     preprocess_validation_train_splits,
     transform_and_preprocess_data,
 )
-import reverse_selection, reverse_lasso, reverse_trees, standard_lasso_selection, tree_feature_selection
 
 
 def select_feature_subset(

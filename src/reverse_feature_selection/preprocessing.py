@@ -1,12 +1,10 @@
 import pickle
-
-from sklearn.preprocessing import StandardScaler, RobustScaler, PowerTransformer, MinMaxScaler
 from pathlib import Path
+from typing import Tuple, Dict, List
 
-from typing import Tuple, Dict, List, Union, Optional
+import joblib
 import numpy as np
 import pandas as pd
-import joblib
 
 
 def get_data(meta_data_dict) -> pd.DataFrame:

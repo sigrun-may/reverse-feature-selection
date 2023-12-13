@@ -1,14 +1,9 @@
-import math
+from typing import Dict
 
 import joblib
-from scipy.special import softmax
-from sklearn.preprocessing import MinMaxScaler
-from typing import Dict
-from weighted_manhattan_distance import WeightedManhattanDistance
-from sklearn.neighbors import KNeighborsClassifier
-
 import numpy as np
 import pandas as pd
+from scipy.special import softmax
 from sklearn.metrics import (
     accuracy_score,
     f1_score,
@@ -20,7 +15,10 @@ from sklearn.metrics import (
     brier_score_loss,
     top_k_accuracy_score,
 )
+from sklearn.neighbors import KNeighborsClassifier
+
 from src.validation.stability_estimator import get_stability
+from weighted_manhattan_distance import WeightedManhattanDistance
 
 # data_name = "overlapping_500_3"
 data_name = "test2"

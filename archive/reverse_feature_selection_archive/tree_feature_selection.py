@@ -1,17 +1,15 @@
 import math
-from optuna.samplers import TPESampler
-from optuna import TrialPruned, pruners
-import optuna
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-import lightgbm as lgb
-import shap
-from scipy.stats import trim_mean
-import cv_pruner
-from cv_pruner import Method
-import optuna_study_pruner
 import warnings
+
+import cv_pruner
+import lightgbm as lgb
+import numpy as np
+import optuna
+from cv_pruner import Method
+from optuna import TrialPruned, pruners
+from optuna.samplers import TPESampler
+from scipy.stats import trim_mean
+
 import tree_model
 
 warnings.filterwarnings("ignore")
