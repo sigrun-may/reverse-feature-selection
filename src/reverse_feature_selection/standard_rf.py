@@ -62,7 +62,7 @@ def optimize(train_index, validation_index, data_df, meta_data):
     clf.set_params(**study.best_params)
     clf.fit(data_df.iloc[train_index, 1:], data_df.loc[train_index, "label"])
     # # L. Breiman, “Random Forests”, Machine Learning, 45(1), 5-32, 2001.
-    # p_importances = permutation_importance(clf, X=data_df.iloc[train_index, 1:], y=data_df.loc[train_index, "label"],
+    # p_importances = permutation_importance(clf, X=data_df.iloc[train_indices, 1:], y=data_df.loc[train_indices, "label"],
     #                                        n_repeats=5, random_state=42, n_jobs=-1)
     predicted_y = clf.predict(data_df.iloc[validation_index, 1:])
     true_y = data_df.loc[validation_index, "label"]
