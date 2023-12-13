@@ -43,18 +43,18 @@ class CrossValidator:
         """
         # StratifiedKFold outer cross-validation
         k_fold = StratifiedKFold(n_splits=self.meta_data["cv"]["n_outer_folds"], shuffle=True, random_state=2005)
-        for outer_cv_loop, (train_index, test_index) in enumerate(
+        for fold_index, (train_index, test_index) in enumerate(
             k_fold.split(self.data_df.iloc[:, 1:], self.data_df["label"])
         ):
-            logging.info(f"outer_cv_loop {outer_cv_loop + 1} of {self.meta_data['cv']['n_outer_folds']}")
+            logging.info(f"fold_index {fold_index + 1} of {self.meta_data['cv']['n_outer_folds']}")
 
             # Preprocess the data and cache the results if not available yet
             preprocessing.preprocess_data(
-                train_index, test_index, self.data_df, outer_cv_loop, self.meta_data, correlation_matrix=True
+                train_index, test_index, self.data_df, fold_index, self.meta_data, correlation_matrix=True
             )
 
             # Calculate raw values for calculating feature subsets
-            self._train_to_calculate_feature_subsets(train_index, test_index, outer_cv_loop)
+            self._train_to_calculate_feature_subsets(train_index, test_index, fold_index)
 
         logging.info(f"standard_validation_metric: {np.mean(self.standard_validation_metric_list)}")
         logging.info(f"standard_training_metric: {np.mean(self.standard_training_metric_list)}")
