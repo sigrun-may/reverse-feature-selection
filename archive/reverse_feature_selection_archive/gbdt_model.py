@@ -1,7 +1,8 @@
-import lightgbm as lgb
 import math
-import shap
+
+import lightgbm as lgb
 import numpy as np
+import shap
 
 
 def train_model(test_data_df, train_data_df, target_feature, trial):

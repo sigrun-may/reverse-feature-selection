@@ -1,6 +1,8 @@
-import numpy as np
 import logging
+
+import numpy as np
 from sklearn.model_selection import StratifiedKFold
+
 import preprocessing
 import reverse_rf_random as reverse_rf
 import standard_rf

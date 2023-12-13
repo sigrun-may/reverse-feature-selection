@@ -1,10 +1,13 @@
-import numpy as np
 import optuna
 from optuna.samplers import TPESampler
-import reverse_selection
-import warnings
 import math
-from optuna import TrialPruned, pruners
+import warnings
+
+import optuna
+from optuna import pruners
+from optuna.samplers import TPESampler
+
+import reverse_selection
 import tree_model
 
 warnings.filterwarnings("ignore")

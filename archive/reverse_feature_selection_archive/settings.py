@@ -1,7 +1,8 @@
 import os
-import numpy as np
+
 import yaml
 from sqlitedict import SqliteDict
+
 
 # from importlib.metadata import version
 

@@ -1,5 +1,5 @@
-import pickle
 import multiprocessing
+import pickle
 from math import log
 from pathlib import Path
 
@@ -7,15 +7,10 @@ import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 from numpy import ravel
-from scipy.stats import wilcoxon, ttest_ind, mannwhitneyu
+from scipy.stats import ttest_ind
 from sklearn import clone
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import (
-    median_absolute_error,
-    max_error,
-    mean_absolute_error,
-    mean_absolute_percentage_error,
-    r2_score,
     mean_squared_error,
 )
 

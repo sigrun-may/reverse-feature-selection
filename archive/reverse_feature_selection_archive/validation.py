@@ -1,6 +1,4 @@
-from typing import List, Dict
-from weighted_manhattan_distance import WeightedManhattanDistance
-from sklearn.neighbors import KNeighborsClassifier
+from typing import Dict
 
 import numpy as np
 import pandas as pd
@@ -15,7 +13,10 @@ from sklearn.metrics import (
     brier_score_loss,
     top_k_accuracy_score,
 )
+from sklearn.neighbors import KNeighborsClassifier
+
 from stability_estimator import get_stability
+from weighted_manhattan_distance import WeightedManhattanDistance
 
 
 def evaluate_feature_selection(

@@ -1,11 +1,9 @@
+import celer
 import numpy as np
-import pandas as pd
 import optuna
-from optuna import TrialPruned
+import reverse_selection
 from optuna.samplers import TPESampler
 from sklearn.metrics import r2_score
-import celer
-import reverse_selection
 
 
 # import optuna_study_pruner
