@@ -30,8 +30,8 @@ def calculate_oob_errors(x_train: pd.DataFrame, y_train: np.ndarray):
         """
     ...
 
-    oob_scores_labeled = []
-    oob_scores_unlabeled = []
+    oob_errors_labeled = []
+    oob_errors_unlabeled = []
 
     # Perform validation using different random seeds
     for i in range(5):
@@ -57,7 +57,7 @@ def calculate_oob_errors(x_train: pd.DataFrame, y_train: np.ndarray):
             return None, None
 
         # Store the OOB score for the labeled model
-        oob_scores_labeled.append(clf1.oob_score_)
+        oob_errors_labeled.append(clf1.oob_score_)
 
         # Fit the second model to the unlabeled training data (excluding 'label' column)
         unlabeled_x_train = x_train.loc[:, x_train.columns != "label"]
@@ -66,10 +66,10 @@ def calculate_oob_errors(x_train: pd.DataFrame, y_train: np.ndarray):
         clf2.fit(unlabeled_x_train, y_train)
 
         # Store the OOB score for the unlabeled model
-        oob_scores_unlabeled.append(clf2.oob_score_)
+        oob_errors_unlabeled.append(clf2.oob_score_)
 
-    # print("oob_scores_labeled", oob_scores_labeled, "oob_scores_unlabeled", oob_scores_unlabeled)
-    return oob_scores_labeled, oob_scores_unlabeled
+    # print("oob_errors_labeled", oob_errors_labeled, "oob_errors_unlabeled", oob_errors_unlabeled)
+    return oob_errors_labeled, oob_errors_unlabeled
 
 
 def calculate_mean_oob_errors_and_p_value(target_feature_name, outer_cv_loop, meta_data):
