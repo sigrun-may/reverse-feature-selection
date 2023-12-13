@@ -43,18 +43,18 @@ class CrossValidator:
         """
         # StratifiedKFold outer cross-validation
         k_fold = StratifiedKFold(n_splits=self.meta_data["cv"]["n_outer_folds"], shuffle=True, random_state=2005)
-        for fold_index, (train_index, test_index) in enumerate(
+        for fold_index, (train_indices, test_indices) in enumerate(
             k_fold.split(self.data_df.iloc[:, 1:], self.data_df["label"])
         ):
             logging.info(f"fold_index {fold_index + 1} of {self.meta_data['cv']['n_outer_folds']}")
 
             # Preprocess the data and cache the results if not available yet
             preprocessing.preprocess_data(
-                train_index, test_index, self.data_df, fold_index, self.meta_data, correlation_matrix=True
+                train_indices, test_indices, self.data_df, fold_index, self.meta_data, correlation_matrix=True
             )
 
             # Calculate raw values for calculating feature subsets
-            self._train_to_calculate_feature_subsets(train_index, test_index, fold_index)
+            self._train_to_calculate_feature_subsets(train_indices, test_indices, fold_index)
 
         logging.info(f"standard_validation_metric: {np.mean(self.standard_validation_metric_list)}")
         logging.info(f"standard_training_metric: {np.mean(self.standard_training_metric_list)}")
@@ -70,25 +70,25 @@ class CrossValidator:
         }
         return cross_validation_result_dict
 
-    def _train_to_calculate_feature_subsets(self, train_index, test_index, outer_cv_loop):
+    def _train_to_calculate_feature_subsets(self, train_indices: np.ndarray, test_indices: np.ndarray, fold_index: int):
         """
         Calculate raw results to determine feature subsets using both
         reverse feature selection and a standard random forest.
 
-        Parameters:
-        train_index (array-like): Indices of training samples.
-        test_index (array-like): Indices of testing samples.
-        fold_index (int): The current loop iteration of the outer cross-validation.
+        Args:
+            train_indices: Indices of training samples.
+            test_indices: Indices of testing samples.
+            fold_index: The current loop iteration of the outer cross-validation.
         """
         # Calculate raw metrics for feature subset calculation with reverse feature selection
         result_df = reverse_rf.calculate_oob_errors_per_feature(
             data_df=self.data_df,
             meta_data=self.meta_data,
-            outer_cv_loop=outer_cv_loop,
+            fold_index=fold_index,
         )
         # Calculate feature subset with standard random forest feature importance
         feature_importance, shap_values, validation_metric, training_oob = standard_rf.optimize(
-            train_index, test_index, self.data_df, self.meta_data
+            train_indices, test_indices, self.data_df, self.meta_data
         )
         # Store the results
         result_df["standard"] = feature_importance
@@ -98,4 +98,4 @@ class CrossValidator:
         self.cv_result_list.append(result_df)
 
         # Store the indices used in cross-validation for later subset validation
-        self.cv_indices_list.append((train_index, test_index))
+        self.cv_indices_list.append((train_indices, test_indices))
