@@ -13,9 +13,8 @@ with open("../../settings.toml", "r") as file:
 print(type(meta_data))
 
 # load data
-data_df = pd.read_csv(meta_data["data"]["path"]).iloc[:, 1:]
+data_df = pd.read_csv(meta_data["data"]["path"])
 assert data_df.columns[0] == "label"
-data_df.to_csv(meta_data["data"]["path"])
 
 # # shorten artificial data for faster testing
 # data_01 = data_df.iloc[:, 0:10]

@@ -11,11 +11,9 @@ tqdm
 numpy
 pandas
 scikit-learn
-seaborn
 joblib
 scipy
 statistics
-sqlitedict
 shap
 toml
-bs4
+mltb2[data]
