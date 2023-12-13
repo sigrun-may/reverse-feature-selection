@@ -1,13 +1,12 @@
-from typing import Tuple, Dict, List, Union, Optional
+import pickle
 
-from sklearn.model_selection import KFold, StratifiedKFold
-from sklearn.preprocessing import PowerTransformer, StandardScaler
+from sklearn.preprocessing import StandardScaler, RobustScaler, PowerTransformer, MinMaxScaler
+from pathlib import Path
+
+from typing import Tuple, Dict, List, Union, Optional
 import numpy as np
 import pandas as pd
 import joblib
-from joblib import Parallel, delayed
-import utils
-import filter_methods
 
 
 def get_data(meta_data_dict) -> pd.DataFrame:
@@ -17,9 +16,10 @@ def get_data(meta_data_dict) -> pd.DataFrame:
     #           value=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
     print("input data shape:", data.shape)
 
-    # data_01 = data.iloc[:, 0:10]
-    # data_02 = data.iloc[:, 200:1200]
-    # data = pd.concat([data_01, data_02], join="outer", axis=1)
+    # shorten artificial data for faster testing
+    data_01 = data.iloc[:, 0:10]
+    data_02 = data.iloc[:, 200:700]
+    data = pd.concat([data_01, data_02], join="outer", axis=1)
 
     # exclude features selected by the user
     if meta_data_dict["data"]["excluded_features"]:
@@ -36,12 +36,12 @@ def get_data(meta_data_dict) -> pd.DataFrame:
     # # # print(filter_methods.get_scores(data.iloc[:, :100]))
     # excl_features = (filter_methods.get_scores(data.iloc[:, :102]))
     # print(excl_features)
-    # data = data.drop(labels=excl_features, axis=1)
+    # data.drop(labels=excl_features, axis=1, inplace=True)
     # print([x for x in data.columns if 'bm' in x])
     # meta_data_dict['data']['excluded_features'] = excl_features
     # import settings
     # settings.save_meta_data(meta_data_dict)
-    # # print(utils.sort_list_of_tuples_by_index(scores, ascending = False))
+    # # print(utils.sort_list_of_tuples_by_index(excl_features, ascending = False))
     # # print(f"good features (max, min): "
     # #       f"'{filter_methods.get_scores(data.iloc[:, :100])}")
 
@@ -52,7 +52,7 @@ def get_data(meta_data_dict) -> pd.DataFrame:
             assert len(data.columns) == meta_data_dict["data"]["number_of_features"]
         else:
             print(
-                f"Data shape after clustering is {data.shape}. It is not "
+                f"Data shape is {data.shape}. It is not "
                 f"possible to select "
                 f'{meta_data_dict["data"]["number_of_features"]} features.'
             )
@@ -67,124 +67,137 @@ def get_data(meta_data_dict) -> pd.DataFrame:
     return data
 
 
-def preprocess_validation_train_splits(
+def preprocess_data(
+    train_index: np.ndarray,
+    validation_index: np.ndarray,
     data_df: pd.DataFrame,
-    outer_cv_loop_iteration: int,
-    meta_data: Dict,
-) -> Dict[str, List[Union[Tuple[np.array], str]]]:
-    """Split and preprocess data.
-
-    Split data to validation and train. Transform (Yeo Johnson) and scale each split.
-    Calculate a pearson correlation matrix for each transformed and scaled train split.
+    outer_cv_loop: int,
+    meta_data: dict,
+    correlation_matrix: bool = False,
+) -> object:
+    """Split data for training and validation, calculate correlation matrix if selected and cache it.
 
     Args:
-        data_df: original data
-        outer_cv_loop_iteration: iteration of the outer cross-validation loop
-        meta_data: metadata dict (see ... )
+        train_index (list or array-like): Index for the training split.
+        validation_index (list or array-like): Index for the validation split.
+         (DataFrame): Complete input data as a Pandas DataFrame.
+        correlation_matrix (bool, optional): Whether to calculate the Spearman correlation matrix for the training data.
 
     Returns:
-        Dict with transformed and scaled test/train sets with the respective pearson correlation matrix
-        for each train set and the respective column names
-
+        tuple: A tuple containing the validation data (DataFrame), training data (DataFrame), and optionally the training correlation matrix (DataFrame).
+        :param meta_data:
+        :param train_index:
+        :param correlation_matrix:
+        :param outer_cv_loop:
+        :param validation_index:
+        :param data_df:
     """
-
-    k_fold = StratifiedKFold(n_splits=meta_data["cv"]["n_inner_folds"], shuffle=True, random_state=42)
-    transformed_data_list = Parallel(n_jobs=meta_data["parallel"]["n_jobs_preprocessing"], verbose=5)(
-        delayed(transform_and_preprocess_data)(train_index, validation_index, data_df)
-        for sample_index, (train_index, validation_index) in enumerate(
-            k_fold.split(data_df.iloc[:, 1:], data_df["label"])
-        )
+    # Create a base path for caching the preprocessed data
+    pickle_base_path = Path(
+        f"../../preprocessed_data/{meta_data['data']['name']}/outer_fold_{outer_cv_loop}"
     )
-    assert len(transformed_data_list) == meta_data["cv"]["n_inner_folds"]
-
-    if meta_data["path_preprocessed_data"] is not None:
-        joblib.dump(
-            transformed_data_list,
-            f"{meta_data['path_preprocessed_data']}_{outer_cv_loop_iteration}.pkl",
-            compress="lz4",
-        )
-
-    # return {"transformed_data": transformed_data, "feature_names": data_df.columns}
-    return transformed_data_list
-
-
-def transform_and_preprocess_data(train_index, validation_index, data_df, correlation_matrix=True):
-    """Scale and transform data and calculate train correlation matrix if specified.
-
-    BoxCox transformation is applied if all values are positive otherwise Yeo-Johnson transformation.
-    Correlation matrices are created based on Pearson.
-
-    Args:
-        train_index: Index for the train split.
-        validation_index: Index for the validation split.
-        data_df: Data to be transformed.
-        correlation_matrix: If a correlation matrix for the train data should be generated.
-
-    Returns:
-        Tuple of validation_data, train_data and train_correlation_matrix.
-    """
-    assert not data_df.isnull().values.any(), "Missing values" + data_df.head()
-
-    # remove label for transformation
-    # labels must be in col 0 (first col)
-    unlabeled_data = data_df.values[:, 1:]
-    label = data_df.values[:, 0]
-
-    # # workaround for https://github.com/scikit-learn/scikit-learn/issues/14959
-    # scaler = StandardScaler(with_std=False)
-    # scaled_train = scaler.fit_transform(unlabeled_data[train_index])
-    # scaled_test = scaler.transform(unlabeled_data[outer_cv_loop])
-    #
-    # # transform and standardize test and train data
-    # power_transformer = PowerTransformer(
-    #     copy=True, method="yeo-johnson", standardize=True
-    # )
-    # train = power_transformer.fit_transform(scaled_train)
-    # test = power_transformer.transform(scaled_test)
-
-    if np.min(unlabeled_data) > 0:
-        # transform and standardize test and train data
-        power_transformer = PowerTransformer(copy=True, method="box-cox", standardize=True)
-        train = power_transformer.fit_transform(unlabeled_data[train_index])
-        validation = power_transformer.transform(unlabeled_data[validation_index])
+    # Check if all necessary directories exist
+    if Path(f"../../preprocessed_data/{meta_data['data']['name']}/outer_fold{outer_cv_loop}").exists():
+        # Check if the preprocessed data is already cached
+        if meta_data["pickle_preprocessed_data"]:
+            if pickle_base_path.exists():
+                # Load the cached preprocessed data
+                with open(f"{pickle_base_path}/validation.pkl", "rb") as file:
+                    validation_pd = pickle.load(file)
+                with open(f"{pickle_base_path}/train.pkl", "rb") as file:
+                    train_pd = pickle.load(file)
+                if correlation_matrix:
+                    with open(f"{pickle_base_path}/train_correlation_matrix.pkl", "rb") as file:
+                        train_correlation_matrix = pickle.load(file)
+                else:
+                    train_correlation_matrix = None
+                return train_pd, validation_pd, train_correlation_matrix
     else:
-        # workaround for https://github.com/scikit-learn/scikit-learn/issues/14959
-        scaler = StandardScaler(with_std=False)
-        scaled_train = scaler.fit_transform(unlabeled_data[train_index])
-        scaled_test = scaler.transform(unlabeled_data[validation_index])
+        # Create directory for caching the preprocessed data
+        pickle_base_path.mkdir(parents=True, exist_ok=True)
+        assert pickle_base_path.exists()
 
-        # transform and standardize test and train data
-        power_transformer = PowerTransformer(copy=True, method="yeo-johnson", standardize=True)
-        train = power_transformer.fit_transform(scaled_train)
-        validation = power_transformer.transform(scaled_test)
+    # Check for missing values in the input DataFrame
+    assert not data_df.isnull().values.any(), "Missing values detected in the input data."
 
-    # # transform and standardize test and train data
-    # power_transformer = PowerTransformer(
-    #     copy=True, method="yeo-johnson", standardize=True
-    # )
-    # train = power_transformer.fit_transform(unlabeled_data[train_index])
-    # test = power_transformer.transform(unlabeled_data[outer_cv_loop])
+    # Extract the training and validation data based on the provided indices
+    train_pd = data_df.iloc[train_index, :]
+    validation_pd = data_df.iloc[validation_index, :]
 
-    assert validation.shape == (len(validation_index), unlabeled_data.shape[1])
-    assert train.shape == (len(train_index), unlabeled_data.shape[1])
-
-    validation_pd = pd.DataFrame(validation, columns=data_df.columns[1:])
-    assert not validation_pd.isnull().values.any()
-
-    # calculate correlation matrix for train data
-    train_pd = pd.DataFrame(train, columns=data_df.columns[1:])
-    assert not train_pd.isnull().values.any()
+    # Ensure the shapes of training and validation data match the expected dimensions
+    assert validation_pd.shape == (len(validation_index), data_df.shape[1]), "Validation data shape mismatch."
+    assert train_pd.shape == (len(train_index), data_df.shape[1]), "Training data shape mismatch."
 
     train_correlation_matrix = None
     if correlation_matrix:
-        train_correlation_matrix = train_pd.corr(method="pearson")
+        # If specified, calculate the Spearman correlation matrix for the training data
+        unlabeled_train_df = train_pd.iloc[:, 1:]  # Exclude the label column
+        assert unlabeled_train_df.shape[0] == len(train_index)
+        assert unlabeled_train_df.shape[1] == data_df.shape[1] - 1  # Exclude the label
 
-    # add label to transformed data
-    train_pd.insert(0, "label", label[train_index])
-    validation_pd.insert(0, "label", label[validation_index])
-    # train_data = np.column_stack((label[train_index], train))
-    # validation_data = np.column_stack((label[validation_index], validation))
-    return validation_pd, train_pd, train_correlation_matrix
+        # Calculate the Spearman correlation matrix
+        train_correlation_matrix = unlabeled_train_df.corr(method="spearman")
+        assert train_correlation_matrix.shape[0] == train_correlation_matrix.shape[1] == unlabeled_train_df.shape[1]
+        if meta_data["pickle_preprocessed_data"]:
+            with open(f"{pickle_base_path}/train_correlation_matrix.pkl", "wb") as file:
+                pickle.dump(train_correlation_matrix, file, protocol=pickle.HIGHEST_PROTOCOL)
+
+    if meta_data["pickle_preprocessed_data"]:
+        with open(f"{pickle_base_path}/validation.pkl", "wb") as file:
+            pickle.dump(validation_pd, file, protocol=pickle.HIGHEST_PROTOCOL)
+        with open(f"{pickle_base_path}/train.pkl", "wb") as file:
+            pickle.dump(train_pd, file, protocol=pickle.HIGHEST_PROTOCOL)
+
+    # Return the training and validation data along with the correlation matrix (if calculated)
+    return train_pd, validation_pd, train_correlation_matrix
+
+
+def remove_features_correlated_to_target_feature(train_df, correlation_matrix_df, target_feature, meta_data) -> pd.DataFrame:
+    # Remove correlations to the target feature
+
+    # Extract the unlabeled training data
+    assert train_df.shape[1] - 1 == correlation_matrix_df.shape[1]  # Exclude the label
+    assert train_df.columns[0] == "label"
+    unlabeled_train_df = train_df.iloc[:, 1:]
+
+    assert unlabeled_train_df.shape[1] == correlation_matrix_df.shape[0] == correlation_matrix_df.shape[1]
+
+    # Create a mask for uncorrelated features based on the correlation threshold
+    uncorrelated_features_mask = (
+        correlation_matrix_df[target_feature]
+        .abs()
+        .le(meta_data["data"]["train_correlation_threshold"], axis="index")
+        # For a correlation matrix filled only with the lower half,
+        # the first elements up to the diagonal would have to be read
+        # with axis="index" and the further elements after the diagonal
+        # with axis="column".
+    )
+    assert uncorrelated_features_mask.shape[0] == unlabeled_train_df.shape[1]
+
+    # Get the column names of uncorrelated features
+    uncorrelated_features_index = unlabeled_train_df.columns[uncorrelated_features_mask]
+
+    # Ensure that "label" is not in the list of uncorrelated features
+    assert "label" not in uncorrelated_features_index
+
+    # Check if there are any features left after removing "label" and "target_feature"
+    if uncorrelated_features_index.size == 0:
+        return None
+
+    # Check if the maximum correlation of any uncorrelated feature with the target is within the threshold
+    assert (
+        correlation_matrix_df.loc[target_feature, uncorrelated_features_mask].abs().max()
+        <= meta_data["data"]["train_correlation_threshold"]
+    ), f"{meta_data['data']['train_correlation_threshold']}"
+
+    # Insert the 'label' as the first column
+    uncorrelated_features_index = uncorrelated_features_index.insert(0, "label")
+    assert "label" in uncorrelated_features_index
+
+    assert target_feature not in uncorrelated_features_index
+
+    # Return the data frame with uncorrelated features
+    return train_df[uncorrelated_features_index]
 
 
 def get_cluster_dict(correlation_matrix, meta_data):
@@ -265,7 +278,7 @@ def cluster_data(data_df: pd.DataFrame, meta_data) -> Tuple[pd.DataFrame, Dict[s
         len(clustered_data_dict["clusters"].keys()) + len(clustered_data_dict["uncorrelated_features"]),
     )
 
-    # generate clustered data_df
+    # generate clustered
     clustered_data_df = data_df[clustered_data_dict["uncorrelated_features"]].copy()
     clustered_data_index = clustered_data_df.columns.union(clustered_data_dict["clusters"].keys())
     # append cluster representatives

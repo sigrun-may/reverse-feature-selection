@@ -59,10 +59,10 @@ def get_meta_data():
     )
     if meta_data["parallel"]["cluster"]:
         folder = dict(
-            data="/vol/projects/smay/develop/reverse_feature_selection/data",
-            experiments="/vol/projects/smay/develop/reverse_feature_selection/experiments/",
+            data="/vol/projects/smay/develop/reverse_feature_selection_archive/data",
+            experiments="/vol/projects/smay/develop/reverse_feature_selection_archive/experiments/",
         )
-        experiment_path = f"/vol/projects/smay/develop/reverse_feature_selection/experiments/{experiment_id}"
+        experiment_path = f"/vol/projects/smay/develop/reverse_feature_selection_archive/experiments/{experiment_id}"
 
     data = dict(
         input_data_path=f"{folder['data']}/{data_name}.csv",
@@ -194,7 +194,7 @@ def get_old_meta_data(experiment_id):
 
 def save_meta_data(meta_data):
     if meta_data["parallel"]["cluster"]:
-        data_base_path = f"/vol/projects/smay/develop/reverse_feature_selection/meta_data_db.sqlite"
+        data_base_path = f"/vol/projects/smay/develop/reverse_feature_selection_archive/meta_data_db.sqlite"
     else:
         data_base_path = "../../meta_data_db.sqlite"
     sqllite_mydict = SqliteDict(data_base_path, autocommit=True)

@@ -23,7 +23,7 @@ from sklearn.metrics import (
 from src.validation.stability_estimator import get_stability
 
 # data_name = "overlapping_500_3"
-data_name = "colon2"
+data_name = "test2"
 
 
 def evaluate_feature_selection(
@@ -33,28 +33,36 @@ def evaluate_feature_selection(
 
     # iterate over feature selection algorithms
     for method, cv_result_list in feature_selection_result_dict["method_result_dict"].items():
-        if method != "rf":
+        if method != "rf_cv_result":
             continue
         print(method)
         performance_metrics_dict = {}
         importance_matrix_reverse = np.empty((len(cv_result_list), cv_result_list[0].shape[0]))
         importance_matrix_standard = np.empty_like(importance_matrix_reverse)
+        importance_matrix_shap = np.empty_like(importance_matrix_standard)
 
         # iterate over cross-validation results
         for i, cv_iteration_result_pd in enumerate(cv_result_list):
             _normalize_feature_subsets(cv_iteration_result_pd, feature_selection_result_dict["meta_data"])
             importance_matrix_reverse[i, :] = cv_iteration_result_pd["reverse_ts"].values
             importance_matrix_standard[i, :] = cv_iteration_result_pd["standard_ts"].values
+            importance_matrix_shap[i, :] = cv_iteration_result_pd["shap_ts"].values
+
+            # importance_matrix_reverse[i, :] = cv_iteration_result_pd["reverse_t"].values
+            # importance_matrix_standard[i, :] = cv_iteration_result_pd["standard_t"].values
 
         # monitor stability of selection
         binary_importance_matrix_standard = np.zeros_like(importance_matrix_standard)
         binary_importance_matrix_reverse = np.zeros_like(importance_matrix_reverse)
+        binary_importance_matrix_shap = np.zeros_like(importance_matrix_shap)
         assert binary_importance_matrix_reverse.shape == binary_importance_matrix_standard.shape
 
         binary_importance_matrix_standard[importance_matrix_standard.nonzero()] = 1
         binary_importance_matrix_reverse[importance_matrix_reverse.nonzero()] = 1
+        binary_importance_matrix_shap[importance_matrix_shap.nonzero()] = 1
         performance_metrics_dict["reverse_stability"] = get_stability(binary_importance_matrix_reverse)
         performance_metrics_dict["standard_stability"] = get_stability(binary_importance_matrix_standard)
+        performance_metrics_dict["shap_stability"] = get_stability(binary_importance_matrix_shap)
 
         reverse_subset = np.sum(importance_matrix_reverse, axis=0)
         standard_subset = np.sum(importance_matrix_standard, axis=0)
@@ -89,6 +97,9 @@ def _normalize_feature_subsets(feature_selection_result_pd, meta_data):
     standard_feature_importance = feature_selection_result_pd["standard"].values / max(
         feature_selection_result_pd["standard"].values
     )
+    shap_feature_importance = feature_selection_result_pd["shap_values"].values / max(
+        feature_selection_result_pd["shap_values"].values
+    )
     # # eliminate normalized feature importances smaller than 0.05
     # for i in range(standard_feature_importance.size):
     #     if standard_feature_importance[i] < 0.05:
@@ -97,11 +108,29 @@ def _normalize_feature_subsets(feature_selection_result_pd, meta_data):
     # if np.min(standard_feature_importance) > 0.0:
     #     assert np.min(standard_feature_importance) >= 0.05
 
-    # feature_selection_result_pd["standard_ts"] = feature_selection_result_pd["standard"].values/max(feature_selection_result_pd["standard"].values)
     feature_selection_result_pd["standard_ts"] = standard_feature_importance
+    feature_selection_result_pd["shap_ts"] = shap_feature_importance
 
     # normalize reverse feature selection result
-    feature_selection_result_pd["reverse_ts"] = _calculate_feature_weights(feature_selection_result_pd, meta_data)
+    reverse_feature_importance = _calculate_feature_weights(feature_selection_result_pd, meta_data)
+    feature_selection_result_pd["reverse_ts"] = reverse_feature_importance
+
+    # # eliminate normalized feature importances smaller than 0.1
+    # for i in range(standard_feature_importance.size):
+    #     if standard_feature_importance[i] < 0.5:
+    #         standard_feature_importance[i] = 0.0
+    #
+    #     if reverse_feature_importance[i] < 0.5:
+    #         reverse_feature_importance[i] = 0.0
+
+    # if np.min(standard_feature_importance) > 0.0:
+    #     assert np.min(standard_feature_importance) >= 0.1
+
+    feature_selection_result_pd["standard_t"] = standard_feature_importance
+    feature_selection_result_pd["shap_t"] = shap_feature_importance
+
+    # normalize reverse feature selection result
+    feature_selection_result_pd["reverse_t"] = reverse_feature_importance
 
 
 def _calculate_feature_weights(result_pd, meta_data):

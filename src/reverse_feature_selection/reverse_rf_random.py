@@ -1,11 +1,13 @@
 import pickle
 import multiprocessing
+from math import log
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 from numpy import ravel
-from scipy.stats import wilcoxon
+from scipy.stats import wilcoxon, ttest_ind, mannwhitneyu
 from sklearn import clone
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import (
@@ -17,7 +19,7 @@ from sklearn.metrics import (
     mean_squared_error,
 )
 
-from src.reverse_rf import preprocessing
+from src.reverse_feature_selection import preprocessing
 
 
 def calculate_oob_scores(x_train, y_train, meta_data):
@@ -27,7 +29,7 @@ def calculate_oob_scores(x_train, y_train, meta_data):
     oob_scores_unlabeled = []
 
     # Perform validation using different random seeds
-    for seed in meta_data["seed_list"]:
+    for i in range(5):
         # Create a RandomForestRegressor model with specified parameters
         # TODO move parameter setting to settings.toml
         clf1 = RandomForestRegressor(
@@ -35,7 +37,7 @@ def calculate_oob_scores(x_train, y_train, meta_data):
             max_features=None,
             oob_score=mean_squared_error,  # Use out-of-bag score for evaluation
             n_estimators=100,
-            random_state=seed,
+            # random_state=seed,
             min_samples_leaf=2,
         )
         # Create a copy of the RandomForestRegressor (clf1)
@@ -62,6 +64,7 @@ def calculate_oob_scores(x_train, y_train, meta_data):
         # Store the OOB score for the unlabeled model
         oob_scores_unlabeled.append(clf2.oob_score_)
 
+    # print("oob_scores_labeled", oob_scores_labeled, "oob_scores_unlabeled", oob_scores_unlabeled)
     return oob_scores_labeled, oob_scores_unlabeled
 
 
@@ -73,20 +76,19 @@ def calculate_mean_oob_scores_and_p_value(target_feature_name, outer_cv_loop, me
     mean_oob_score_unlabeled = 0
     p_value = None
 
-    # Load preprocessed data for the given outer cross-validation fold
-    with open(
-        f"../../preprocessed_data/{meta_data['data']['name']}_preprocessed_cv_fold_outer{outer_cv_loop}_train.pkl", "rb"
-    ) as file:
+    pickle_base_path = Path(
+        f"../../preprocessed_data/{meta_data['data']['name']}/outer_fold_{outer_cv_loop}"
+    )
+    assert pickle_base_path.exists(), f"{pickle_base_path} does not exist"
+
+    # Load the cached preprocessed data for the given outer cross-validation fold
+    with open(f"{pickle_base_path}/train.pkl", "rb") as file:
         train_df = pickle.load(file)
-
-    with open(
-        f"../../preprocessed_data/{meta_data['data']['name']}_preprocessed_cv_fold_outer{outer_cv_loop}_corr.pkl", "rb"
-    ) as file:
+        assert target_feature_name in train_df.columns
+        assert "label" in train_df.columns
+    with open(f"{pickle_base_path}/train_correlation_matrix.pkl", "rb") as file:
         corr_matrix_df = pickle.load(file)
-
-    assert target_feature_name in train_df.columns
-    assert "label" in train_df.columns
-    assert "label" not in corr_matrix_df.columns
+        assert "label" not in corr_matrix_df.columns
     assert train_df.shape[1] - 1 == corr_matrix_df.shape[0]  # corr_matrix_df does not include the label
 
     # Prepare training data
@@ -106,10 +108,18 @@ def calculate_mean_oob_scores_and_p_value(target_feature_name, outer_cv_loop, me
 
     # Check if OOB scores for labeled data are available and if training with the label is better than without the label
     if oob_scores_labeled is not None and abs(np.mean(oob_scores_labeled)) < abs(np.mean(oob_scores_unlabeled)):
-        # Perform the Wilcoxon signed-rank test
-        p_value = wilcoxon(
-            oob_scores_labeled, oob_scores_unlabeled, alternative="less", method="exact", correction=True
-        ).pvalue
+        # Calculate the percentage difference between OOB scores
+        absolute_percentage_difference = (
+            (np.mean(oob_scores_unlabeled) - np.mean(oob_scores_labeled)) / abs(np.mean(oob_scores_unlabeled))
+        ) * 100
+        if abs(absolute_percentage_difference) >= 5:
+            print("percentage_difference", absolute_percentage_difference)
+
+        # Perform the t-test (welsh)
+        p_value = ttest_ind(oob_scores_labeled, oob_scores_unlabeled, alternative="less", equal_var=False).pvalue
+
+        # Perform the mannwhitneyu test
+        # p_value = mannwhitneyu(oob_scores_labeled, oob_scores_unlabeled, alternative="less").pvalue
 
         # Check if the result is statistically significant (alpha level = 0.05)
         if p_value <= 0.05:
@@ -119,12 +129,12 @@ def calculate_mean_oob_scores_and_p_value(target_feature_name, outer_cv_loop, me
 
             # Calculate the percentage difference between OOB scores
             absolute_percentage_difference = (
-                (mean_oob_score_unlabeled - mean_oob_score_labeled) / abs(mean_oob_score_unlabeled)
-            ) * 100
+                abs((mean_oob_score_unlabeled - mean_oob_score_labeled) / abs(mean_oob_score_unlabeled)) * 100
+            )
             print("absolute_percentage_difference", absolute_percentage_difference)
 
             # Calculate a metric based on the percentage difference and p-value
-            print("metric", absolute_percentage_difference / p_value)
+            print("metric", absolute_percentage_difference / log(p_value))
             print("---------")
 
     return mean_oob_score_labeled, mean_oob_score_unlabeled, p_value
@@ -345,7 +355,7 @@ def calculate_mean_oob_scores_and_p_value(target_feature_name, outer_cv_loop, me
 #     return score_labeled, score_unlabeled, p_value
 
 
-def calculate_validation_metric_per_feature(data_df, meta_data, outer_cv_loop):
+def calculate_oob_errors_per_feature(data_df, meta_data, outer_cv_loop):
     scores_labeled_list = []
     scores_unlabeled_list = []
     p_values_list = []
