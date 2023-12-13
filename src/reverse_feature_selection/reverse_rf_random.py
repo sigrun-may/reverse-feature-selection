@@ -17,8 +17,18 @@ from sklearn.metrics import (
 from src.reverse_feature_selection import preprocessing
 
 
-def calculate_oob_scores(x_train, y_train, meta_data):
-    # calculate oob_scores for random forest regressors with different random seeds
+def calculate_oob_errors(x_train: pd.DataFrame, y_train: np.ndarray):
+    """
+        Calculate out-of-bag (OOB) error for labeled and unlabeled training data.
+
+        Args:
+            x_train: The training data.
+            y_train: The target values for the training data.
+
+        Returns:
+            A tuple containing lists of OOB scores for labeled and unlabeled data.
+        """
+    ...
 
     oob_scores_labeled = []
     oob_scores_unlabeled = []
@@ -26,7 +36,6 @@ def calculate_oob_scores(x_train, y_train, meta_data):
     # Perform validation using different random seeds
     for i in range(5):
         # Create a RandomForestRegressor model with specified parameters
-        # TODO move parameter setting to settings.toml
         clf1 = RandomForestRegressor(
             warm_start=False,
             max_features=None,
@@ -63,7 +72,20 @@ def calculate_oob_scores(x_train, y_train, meta_data):
     return oob_scores_labeled, oob_scores_unlabeled
 
 
-def calculate_mean_oob_scores_and_p_value(target_feature_name, outer_cv_loop, meta_data):
+def calculate_mean_oob_errors_and_p_value(target_feature_name, outer_cv_loop, meta_data):
+    """
+    Calculate the mean out-of-bag (OOB) errors for random forest regressors with different random seeds
+    for training data including the label and without the label for the given target feature.
+
+    Args:
+        target_feature_name: The name of the target feature.
+        outer_cv_loop: The current loop iteration of the outer cross-validation.
+        meta_data: The metadata related to the dataset and experiment.
+
+    Returns:
+        tuple: A tuple containing the mean OOB score for labeled data, the mean OOB score for unlabeled data, and the p-value.
+    """
+
     # calculate the mean oob_scores for random forest regressors with different random seeds
     # for training data including the label and without the label for the given target feature
 
@@ -97,7 +119,7 @@ def calculate_mean_oob_scores_and_p_value(target_feature_name, outer_cv_loop, me
     assert target_feature_name not in x_train.columns
 
     # Calculate out-of-bag (OOB) scores for labeled and unlabeled training data
-    oob_scores_labeled, oob_scores_unlabeled = calculate_oob_scores(x_train, y_train, meta_data)
+    oob_scores_labeled, oob_scores_unlabeled = calculate_oob_errors(x_train, y_train)
 
     # Check if OOB scores for labeled data are available and if training with the label is better than without the label
     if oob_scores_labeled is not None and abs(np.mean(oob_scores_labeled)) < abs(np.mean(oob_scores_unlabeled)):
@@ -133,12 +155,12 @@ def calculate_mean_oob_scores_and_p_value(target_feature_name, outer_cv_loop, me
     return mean_oob_score_labeled, mean_oob_score_unlabeled, p_value
 
 
-def calculate_oob_errors_per_feature(data_df, meta_data, outer_cv_loop):
+def calculate_oob_errors_per_feature(data_df, meta_data, fold_index):
     scores_labeled_list = []
     scores_unlabeled_list = []
     p_values_list = []
 
-    # # serial version
+    # # serial version for debugging
     # for target_feature_name in data_df.columns[1:]:
     #     score_labeled, score_unlabeled, p_value = calculate_mean_oob_scores_and_p_value(target_feature_name, fold_index, meta_data)
     #     scores_labeled_list.append(score_labeled)
@@ -147,7 +169,7 @@ def calculate_oob_errors_per_feature(data_df, meta_data, outer_cv_loop):
 
     # parallel version
     out = Parallel(n_jobs=multiprocessing.cpu_count(), verbose=-1)(
-        delayed(calculate_mean_oob_scores_and_p_value)(target_feature_name, outer_cv_loop, meta_data)
+        delayed(calculate_mean_oob_errors_and_p_value)(target_feature_name, fold_index, meta_data)
         for target_feature_name in data_df.columns[1:]
     )
 
