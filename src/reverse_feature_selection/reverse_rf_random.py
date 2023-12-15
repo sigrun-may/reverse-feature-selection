@@ -8,15 +8,16 @@ from typing import Tuple, Optional
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
-from numpy import ravel
 from scipy.stats import ttest_ind
 from sklearn import clone
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import (
     mean_squared_error,
 )
-
+import logging
 from src.reverse_feature_selection import preprocessing
+
+logging.basicConfig(level=logging.INFO)
 
 
 def calculate_oob_errors(x_train: pd.DataFrame, y_train: np.ndarray) -> Tuple[Optional[list], Optional[list]]:
@@ -75,7 +76,7 @@ def calculate_oob_errors(x_train: pd.DataFrame, y_train: np.ndarray) -> Tuple[Op
 
 
 def calculate_mean_oob_errors_and_p_value(
-    target_feature_name: str, train_df: pd.DataFrame, corr_matrix_df: pd.DataFrame, meta_data: dict
+        target_feature_name: str, train_df: pd.DataFrame, corr_matrix_df: pd.DataFrame, meta_data: dict
 ):
     """
     Calculate the mean out-of-bag (OOB) errors for random forest regressors with different random seeds
@@ -117,11 +118,12 @@ def calculate_mean_oob_errors_and_p_value(
     # Check if OOB errors for labeled data are available and if training with the label is better than without the label
     if oob_errors_labeled is not None and np.mean(np.abs(oob_errors_labeled)) < np.mean(np.abs(oob_errors_unlabeled)):
         # Calculate the percentage difference between mean OOB errors
-        absolute_percentage_difference = (
-            (np.mean(oob_errors_unlabeled) - np.mean(oob_errors_labeled)) / abs(np.mean(oob_errors_unlabeled))
-        ) * 100
-        if abs(absolute_percentage_difference) >= 5:
-            print("percentage_difference", absolute_percentage_difference)
+        percentage_difference = (
+                                        (np.mean(oob_errors_labeled) - np.mean(oob_errors_unlabeled)) / np.mean(
+                                    oob_errors_unlabeled)
+                                ) * 100
+        if abs(percentage_difference) >= 5:
+            logging.info("percentage_difference > 5", percentage_difference)
 
         # Perform the t-test (Welch's test) to check if the difference is statistically significant
         p_value = ttest_ind(oob_errors_labeled, oob_errors_unlabeled, alternative="less", equal_var=False).pvalue
@@ -133,22 +135,13 @@ def calculate_mean_oob_errors_and_p_value(
         if p_value <= 0.05:
             mean_oob_error_labeled = np.mean(oob_errors_labeled)
             mean_oob_error_unlabeled = np.mean(oob_errors_unlabeled)
-            print(f"p_value {target_feature_name} {p_value} l: {mean_oob_error_labeled} ul: {mean_oob_error_unlabeled}")
-
-            # Calculate the percentage difference between OOB errors
-            absolute_percentage_difference = (
-                abs((mean_oob_error_unlabeled - mean_oob_error_labeled) / abs(mean_oob_error_unlabeled)) * 100
-            )
-            print("absolute_percentage_difference", absolute_percentage_difference)
-
-            # Calculate a metric based on the percentage difference and p-value
-            print("metric", absolute_percentage_difference / log(p_value))
-            print("---------")
+            logging.info(f"p_value {target_feature_name} {p_value} "
+                         f"l: {mean_oob_error_labeled} ul: {mean_oob_error_unlabeled} % {percentage_difference}")
 
     return mean_oob_error_labeled, mean_oob_error_unlabeled, p_value
 
 
-def calculate_oob_errors_for_each_feature(data_df: pd.DataFrame, meta_data: dict, fold_index: np.ndarray):
+def calculate_oob_errors_for_each_feature(data_df: pd.DataFrame, meta_data: dict, fold_index: int):
     """
     Calculate the mean out-of-bag (OOB) errors for random forest regressors with different random seeds
     for training data including the label and without the label for each feature.
