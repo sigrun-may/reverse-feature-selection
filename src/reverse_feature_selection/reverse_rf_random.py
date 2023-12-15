@@ -104,38 +104,43 @@ def calculate_mean_oob_errors_and_p_value(
     if x_train is None:
         return None, None, None
 
+    # set default (feature is deselected)
+    mean_abs_oob_error_labeled = math.inf
+    mean_abs_oob_error_unlabeled = math.inf
+    p_value = None
+
+    print(math.inf - math.inf)
+
     # Calculate out-of-bag (OOB) errors for labeled and unlabeled training data
     oob_errors_labeled, oob_errors_unlabeled = calculate_oob_errors(x_train, y_train)
 
-    mean_abs_oob_error_labeled = np.mean(np.abs(oob_errors_labeled))
-    mean_abs_oob_error_unlabeled = np.mean(np.abs(oob_errors_unlabeled))
-    p_value = None
+    # Check if OOB errors for labeled data are available (was the label included in the model?)
+    if oob_errors_labeled is not None:
+        # Calculate the mean absolute OOB errors for labeled and unlabeled data
+        error_labeled = np.mean(np.abs(oob_errors_labeled))
+        error_unlabeled = np.mean(np.abs(oob_errors_unlabeled))
 
-    # Check if OOB errors for labeled data are available and if training with the label is better than without the label
-    if oob_errors_labeled is not None and mean_abs_oob_error_labeled < mean_abs_oob_error_unlabeled:
         # Calculate the percentage difference between mean OOB errors
-        percentage_difference = (
-            (mean_abs_oob_error_unlabeled - mean_abs_oob_error_labeled) / mean_abs_oob_error_unlabeled
-        ) * 100
-        if abs(percentage_difference) >= 5:
-            logging.info("percentage_difference > 5", percentage_difference)
+        percentage_difference = ((error_unlabeled - error_labeled) / error_unlabeled) * 100
 
-        # Perform the t-test (Welch's test) to check if the difference is statistically significant
-        p_value = ttest_ind(oob_errors_labeled, oob_errors_unlabeled, alternative="less", equal_var=False).pvalue
+        # Check if training with the label is better than without the label
+        if error_labeled < error_unlabeled:
 
-        # Perform the mannwhitneyu test
-        # p_value = mannwhitneyu(oob_errors_labeled, oob_errors_unlabeled, alternative="less").pvalue
+            # Perform the t-test (Welch's test) to check if the difference is statistically significant
+            p_value = ttest_ind(oob_errors_labeled, oob_errors_unlabeled, alternative="less", equal_var=False).pvalue
 
-        # Check if the result is statistically significant (alpha level = 0.05)
-        if p_value <= 0.05:
-            logging.info(
-                f"p_value {target_feature_name} {p_value} "
-                f"l: {mean_abs_oob_error_labeled} ul: {mean_abs_oob_error_unlabeled}, {percentage_difference}%"
-            )
-        else:
-            # If the result is not statistically significant, deselect the feature
-            mean_abs_oob_error_labeled = math.inf
-            mean_abs_oob_error_unlabeled = math.inf
+            # Perform the mannwhitneyu test
+            # p_value = mannwhitneyu(oob_errors_labeled, oob_errors_unlabeled, alternative="less").pvalue
+
+            # Check if the result is statistically significant (alpha level = 0.05)
+            if p_value <= 0.05:
+                logging.info(
+                    f"p_value {target_feature_name} {p_value} "
+                    f"l: {error_labeled} ul: {error_unlabeled}, {percentage_difference}%"
+                )
+                # select the feature
+                mean_abs_oob_error_labeled = error_labeled
+                mean_abs_oob_error_unlabeled = error_unlabeled
 
     return mean_abs_oob_error_labeled, mean_abs_oob_error_unlabeled, p_value
 
