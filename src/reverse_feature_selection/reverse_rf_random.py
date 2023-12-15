@@ -11,7 +11,8 @@ from scipy.stats import ttest_ind
 from sklearn import clone
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import (
-    mean_squared_error, mean_absolute_error,
+    mean_squared_error,
+    mean_absolute_error,
 )
 import logging
 from src.reverse_feature_selection import preprocessing
@@ -36,13 +37,13 @@ def calculate_oob_errors(x_train: pd.DataFrame, y_train: np.ndarray) -> Tuple[Op
     oob_errors_unlabeled = []
 
     # Perform validation using different random seeds
-    for i in range(5):
+    for i in range(20):
         # Create a RandomForestRegressor model with specified parameters
         clf1 = RandomForestRegressor(
             warm_start=False,
             max_features=None,
-            oob_score=mean_absolute_error,  # Use out-of-bag score for evaluation
-            criterion="absolute_error",
+            oob_score=mean_squared_error,  # Use out-of-bag score for evaluation
+            # criterion="absolute_error",
             n_estimators=100,
             # random_state=seed,
             min_samples_leaf=2,
@@ -120,7 +121,6 @@ def calculate_mean_oob_errors_and_p_value(
 
         # Check if training with the label is better than without the label
         if error_labeled < error_unlabeled:
-
             # Perform the t-test (Welch's test) to check if the difference is statistically significant
             p_value = ttest_ind(oob_errors_labeled, oob_errors_unlabeled, alternative="less", equal_var=False).pvalue
 
