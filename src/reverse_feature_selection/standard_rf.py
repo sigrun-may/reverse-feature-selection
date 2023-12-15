@@ -14,7 +14,7 @@ warnings.filterwarnings("ignore")
 # import optuna_study_pruner
 
 
-def optimize(train_index, validation_index, data_df, meta_data):
+def optimize(train_indices, validation_indices, data_df, meta_data):
     def optuna_objective(trial):
         rf_clf = RandomForestClassifier(
             warm_start=False,
@@ -22,11 +22,11 @@ def optimize(train_index, validation_index, data_df, meta_data):
             max_depth=trial.suggest_int("max_depth", 1, 15),
             n_estimators=300,
             random_state=42,
-            min_samples_leaf=trial.suggest_int("min_samples_leaf", 2, math.floor(len(train_index) / 2)),
+            min_samples_leaf=trial.suggest_int("min_samples_leaf", 2, math.floor(len(train_indices) / 2)),
             min_impurity_decrease=trial.suggest_float("min_impurity_decrease", 0.0, 0.5),
             n_jobs=-1,
         )
-        rf_clf.fit(data_df.iloc[train_index, 1:], data_df.loc[train_index, "label"])
+        rf_clf.fit(data_df.iloc[train_indices, 1:], data_df.loc[train_indices, "label"])
         score = rf_clf.oob_score_
         print(score)
         return score
@@ -60,20 +60,20 @@ def optimize(train_index, validation_index, data_df, meta_data):
         n_jobs=-1,
     )
     clf.set_params(**study.best_params)
-    clf.fit(data_df.iloc[train_index, 1:], data_df.loc[train_index, "label"])
+    clf.fit(data_df.iloc[train_indices, 1:], data_df.loc[train_indices, "label"])
     # # L. Breiman, “Random Forests”, Machine Learning, 45(1), 5-32, 2001.
     # p_importances = permutation_importance(clf, X=data_df.iloc[train_indices, 1:], y=data_df.loc[train_indices, "label"],
     #                                        n_repeats=5, random_state=42, n_jobs=-1)
-    predicted_y = clf.predict(data_df.iloc[validation_index, 1:])
-    true_y = data_df.loc[validation_index, "label"]
+    predicted_y = clf.predict(data_df.iloc[validation_indices, 1:])
+    true_y = data_df.loc[validation_indices, "label"]
     validation_score = roc_auc_score(true_y, predicted_y)
     print("validation_score", validation_score, "oob", clf.oob_score_)
 
     # calculate shap values
     explainer = shap.TreeExplainer(clf)
-    shap_values = explainer.shap_values(data_df.iloc[train_index, 1:])
+    shap_values = explainer.shap_values(data_df.iloc[train_indices, 1:])
     assert len(shap_values) == 2
-    assert len(shap_values[0]) == len(shap_values[1]) == len(data_df.iloc[train_index, 1:])
+    assert len(shap_values[0]) == len(shap_values[1]) == len(data_df.iloc[train_indices, 1:])
 
     # sum shap values
     mean_shap_values = np.abs(shap_values[0]).mean(axis=0)
