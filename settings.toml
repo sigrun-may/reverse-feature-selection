@@ -1,7 +1,7 @@
 experiment_id = "test4"
 description = "testing" # "Colon cancer dataset with random RF, mannwhitneyu instead of welsh for colon_random"
 verbose_optuna = true
-n_trials_optuna = 100
+n_trials_optuna = 20
 
 pickle_preprocessed_data = true
 
