@@ -1,5 +1,6 @@
 import datetime
 import pickle
+from pathlib import Path
 
 import pandas as pd
 import toml
@@ -40,5 +41,9 @@ result_dict = cross_validator.cross_validate()
 end_time = datetime.datetime.utcnow()
 print(end_time - start_time)
 
-with open(f"../../results/{meta_data['experiment_id']}_result_dict.pkl", "wb") as file:
+# save results
+result_path = Path(f"../../results/{meta_data['experiment_id']}_result_dict.pkl")
+# Create directory for saving the results
+result_path.mkdir(parents=True, exist_ok=True)
+with open(result_path, "wb") as file:
     pickle.dump(result_dict, file, protocol=pickle.HIGHEST_PROTOCOL)

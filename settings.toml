@@ -1,5 +1,5 @@
-experiment_id = "test3"
-description = "testing only 5 reperitions" # "Colon cancer dataset with random RF, mannwhitneyu instead of welsh for colon_random"
+experiment_id = "test4"
+description = "testing" # "Colon cancer dataset with random RF, mannwhitneyu instead of welsh for colon_random"
 verbose_optuna = true
 n_trials_optuna = 100
 
@@ -11,7 +11,7 @@ n_outer_folds = 15
 [data]
 train_correlation_threshold = 0.2
 name = "data"
-path = "../../data/data_1026_1.csv"
+path = "../../data/data.csv"
 
 
 #[rf_parameters]
