@@ -130,7 +130,7 @@ def transform_and_preprocess_data(train_index, validation_index, data_df, correl
 
     # # workaround for https://github.com/scikit-learn/scikit-learn/issues/14959
     # scaler = StandardScaler(with_std=False)
-    # scaled_train = scaler.fit_transform(unlabeled_data[train_index])
+    # scaled_train = scaler.fit_transform(unlabeled_data[train_indices])
     # scaled_test = scaler.transform(unlabeled_data[fold_index])
     #
     # # transform and standardize test and train data
@@ -160,7 +160,7 @@ def transform_and_preprocess_data(train_index, validation_index, data_df, correl
     # power_transformer = PowerTransformer(
     #     copy=True, method="yeo-johnson", standardize=True
     # )
-    # train = power_transformer.fit_transform(unlabeled_data[train_index])
+    # train = power_transformer.fit_transform(unlabeled_data[train_indices])
     # test = power_transformer.transform(unlabeled_data[fold_index])
 
     assert validation.shape == (len(validation_index), unlabeled_data.shape[1])
@@ -180,8 +180,8 @@ def transform_and_preprocess_data(train_index, validation_index, data_df, correl
     # add label to transformed data
     train_pd.insert(0, "label", label[train_index])
     validation_pd.insert(0, "label", label[validation_index])
-    # train_data = np.column_stack((label[train_index], train))
-    # validation_data = np.column_stack((label[validation_index], validation))
+    # train_data = np.column_stack((label[train_indices], train))
+    # validation_data = np.column_stack((label[validation_indices], validation))
     return validation_pd, train_pd, train_correlation_matrix
 
 
