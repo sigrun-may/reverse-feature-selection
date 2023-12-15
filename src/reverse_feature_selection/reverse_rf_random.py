@@ -1,7 +1,6 @@
 import math
 import multiprocessing
 import pickle
-from math import log
 from pathlib import Path
 from typing import Tuple, Optional
 
@@ -76,7 +75,7 @@ def calculate_oob_errors(x_train: pd.DataFrame, y_train: np.ndarray) -> Tuple[Op
 
 
 def calculate_mean_oob_errors_and_p_value(
-        target_feature_name: str, train_df: pd.DataFrame, corr_matrix_df: pd.DataFrame, meta_data: dict
+    target_feature_name: str, train_df: pd.DataFrame, corr_matrix_df: pd.DataFrame, meta_data: dict
 ):
     """
     Calculate the mean out-of-bag (OOB) errors for random forest regressors with different random seeds
@@ -91,10 +90,6 @@ def calculate_mean_oob_errors_and_p_value(
     Returns:
         tuple: A tuple containing the mean OOB score for labeled data, the mean OOB score for unlabeled data, and the p-value.
     """
-
-    # calculate the mean oob_scores for random forest regressors with different random seeds
-    # for training data including the label and without the label for the given target feature
-
     mean_oob_error_labeled = 0
     mean_oob_error_unlabeled = 0
     p_value = None
@@ -119,9 +114,8 @@ def calculate_mean_oob_errors_and_p_value(
     if oob_errors_labeled is not None and np.mean(np.abs(oob_errors_labeled)) < np.mean(np.abs(oob_errors_unlabeled)):
         # Calculate the percentage difference between mean OOB errors
         percentage_difference = (
-                                        (np.mean(oob_errors_labeled) - np.mean(oob_errors_unlabeled)) / np.mean(
-                                    oob_errors_unlabeled)
-                                ) * 100
+            (np.mean(oob_errors_labeled) - np.mean(oob_errors_unlabeled)) / np.mean(oob_errors_unlabeled)
+        ) * 100
         if abs(percentage_difference) >= 5:
             logging.info("percentage_difference > 5", percentage_difference)
 
@@ -135,8 +129,10 @@ def calculate_mean_oob_errors_and_p_value(
         if p_value <= 0.05:
             mean_oob_error_labeled = np.mean(oob_errors_labeled)
             mean_oob_error_unlabeled = np.mean(oob_errors_unlabeled)
-            logging.info(f"p_value {target_feature_name} {p_value} "
-                         f"l: {mean_oob_error_labeled} ul: {mean_oob_error_unlabeled} % {percentage_difference}")
+            logging.info(
+                f"p_value {target_feature_name} {p_value} "
+                f"l: {mean_oob_error_labeled} ul: {mean_oob_error_unlabeled} % {percentage_difference}"
+            )
 
     return mean_oob_error_labeled, mean_oob_error_unlabeled, p_value
 
