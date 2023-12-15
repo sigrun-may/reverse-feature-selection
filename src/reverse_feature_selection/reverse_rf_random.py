@@ -114,7 +114,7 @@ def calculate_mean_oob_errors_and_p_value(
     if oob_errors_labeled is not None and np.mean(np.abs(oob_errors_labeled)) < np.mean(np.abs(oob_errors_unlabeled)):
         # Calculate the percentage difference between mean OOB errors
         percentage_difference = (
-            (np.mean(np.abs(oob_errors_labeled)) - np.mean(np.abs(oob_errors_unlabeled)))
+            (np.mean(np.abs(oob_errors_unlabeled)) - np.mean(np.abs(oob_errors_labeled)))
             / np.mean(np.abs(oob_errors_unlabeled))
         ) * 100
         if abs(percentage_difference) >= 5:
