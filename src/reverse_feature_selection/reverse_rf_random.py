@@ -105,11 +105,9 @@ def calculate_mean_oob_errors_and_p_value(
         return None, None, None
 
     # set default (feature is deselected)
-    mean_abs_oob_error_labeled = math.inf
-    mean_abs_oob_error_unlabeled = math.inf
+    mean_abs_oob_error_labeled = np.inf
+    mean_abs_oob_error_unlabeled = np.inf
     p_value = None
-
-    print(math.inf - math.inf)
 
     # Calculate out-of-bag (OOB) errors for labeled and unlabeled training data
     oob_errors_labeled, oob_errors_unlabeled = calculate_oob_errors(x_train, y_train)
@@ -119,9 +117,6 @@ def calculate_mean_oob_errors_and_p_value(
         # Calculate the mean absolute OOB errors for labeled and unlabeled data
         error_labeled = np.mean(np.abs(oob_errors_labeled))
         error_unlabeled = np.mean(np.abs(oob_errors_unlabeled))
-
-        # Calculate the percentage difference between mean OOB errors
-        percentage_difference = ((error_unlabeled - error_labeled) / error_unlabeled) * 100
 
         # Check if training with the label is better than without the label
         if error_labeled < error_unlabeled:
@@ -134,6 +129,8 @@ def calculate_mean_oob_errors_and_p_value(
 
             # Check if the result is statistically significant (alpha level = 0.05)
             if p_value <= 0.05:
+                # Calculate the percentage difference between mean OOB errors
+                percentage_difference = ((error_unlabeled - error_labeled) / error_unlabeled) * 100
                 logging.info(
                     f"p_value {target_feature_name} {p_value} "
                     f"l: {error_labeled} ul: {error_unlabeled}, {percentage_difference}%"
