@@ -11,7 +11,7 @@ from scipy.stats import ttest_ind
 from sklearn import clone
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import (
-    mean_squared_error,
+    mean_squared_error, mean_absolute_error,
 )
 import logging
 from src.reverse_feature_selection import preprocessing
@@ -41,7 +41,8 @@ def calculate_oob_errors(x_train: pd.DataFrame, y_train: np.ndarray) -> Tuple[Op
         clf1 = RandomForestRegressor(
             warm_start=False,
             max_features=None,
-            oob_score=mean_squared_error,  # Use out-of-bag score for evaluation
+            oob_score=mean_absolute_error,  # Use out-of-bag score for evaluation
+            criterion="absolute_error",
             n_estimators=100,
             # random_state=seed,
             min_samples_leaf=2,
@@ -90,10 +91,6 @@ def calculate_mean_oob_errors_and_p_value(
     Returns:
         tuple: A tuple containing the mean OOB score for labeled data, the mean OOB score for unlabeled data, and the p-value.
     """
-    mean_oob_error_labeled = 0
-    mean_oob_error_unlabeled = 0
-    p_value = None
-
     # Prepare training data
     y_train = train_df[target_feature_name].to_numpy()
 
@@ -101,21 +98,24 @@ def calculate_mean_oob_errors_and_p_value(
     x_train = preprocessing.remove_features_correlated_to_target_feature(
         train_df, corr_matrix_df, target_feature_name, meta_data
     )
+    assert target_feature_name not in x_train.columns
+
     # check if any features are uncorrelated to the target feature
     if x_train is None:
         return None, None, None
 
-    assert target_feature_name not in x_train.columns
-
     # Calculate out-of-bag (OOB) errors for labeled and unlabeled training data
     oob_errors_labeled, oob_errors_unlabeled = calculate_oob_errors(x_train, y_train)
 
+    mean_abs_oob_error_labeled = np.mean(np.abs(oob_errors_labeled))
+    mean_abs_oob_error_unlabeled = np.mean(np.abs(oob_errors_unlabeled))
+    p_value = None
+
     # Check if OOB errors for labeled data are available and if training with the label is better than without the label
-    if oob_errors_labeled is not None and np.mean(np.abs(oob_errors_labeled)) < np.mean(np.abs(oob_errors_unlabeled)):
+    if oob_errors_labeled is not None and mean_abs_oob_error_labeled < mean_abs_oob_error_unlabeled:
         # Calculate the percentage difference between mean OOB errors
         percentage_difference = (
-            (np.mean(np.abs(oob_errors_unlabeled)) - np.mean(np.abs(oob_errors_labeled)))
-            / np.mean(np.abs(oob_errors_unlabeled))
+            (mean_abs_oob_error_unlabeled - mean_abs_oob_error_labeled) / mean_abs_oob_error_unlabeled
         ) * 100
         if abs(percentage_difference) >= 5:
             logging.info("percentage_difference > 5", percentage_difference)
@@ -128,14 +128,16 @@ def calculate_mean_oob_errors_and_p_value(
 
         # Check if the result is statistically significant (alpha level = 0.05)
         if p_value <= 0.05:
-            mean_oob_error_labeled = np.mean(np.abs(oob_errors_labeled))
-            mean_oob_error_unlabeled = np.mean(np.abs(oob_errors_unlabeled))
             logging.info(
                 f"p_value {target_feature_name} {p_value} "
-                f"l: {mean_oob_error_labeled} ul: {mean_oob_error_unlabeled} % {percentage_difference}"
+                f"l: {mean_abs_oob_error_labeled} ul: {mean_abs_oob_error_unlabeled}, {percentage_difference}%"
             )
+        else:
+            # If the result is not statistically significant, deselect the feature
+            mean_abs_oob_error_labeled = math.inf
+            mean_abs_oob_error_unlabeled = math.inf
 
-    return mean_oob_error_labeled, mean_oob_error_unlabeled, p_value
+    return mean_abs_oob_error_labeled, mean_abs_oob_error_unlabeled, p_value
 
 
 def calculate_oob_errors_for_each_feature(data_df: pd.DataFrame, meta_data: dict, fold_index: int):
