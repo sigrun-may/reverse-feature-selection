@@ -74,14 +74,15 @@ def calculate_oob_errors(x_train: pd.DataFrame, y_train: np.ndarray) -> Tuple[Op
     return oob_errors_labeled, oob_errors_unlabeled
 
 
-def calculate_mean_oob_errors_and_p_value(target_feature_name: str, fold_index: int, meta_data:dict):
+def calculate_mean_oob_errors_and_p_value(target_feature_name: str, train_df, corr_matrix_df, meta_data:dict):
     """
     Calculate the mean out-of-bag (OOB) errors for random forest regressors with different random seeds
     for training data including the label and without the label for the given target feature.
 
     Args:
         target_feature_name: The name of the target feature.
-        fold_index: The current loop iteration of the outer cross-validation.
+        train_df: The training data.
+        corr_matrix_df: The correlation matrix of the training data.
         meta_data: The metadata related to the dataset and experiment.
 
     Returns:
@@ -94,19 +95,6 @@ def calculate_mean_oob_errors_and_p_value(target_feature_name: str, fold_index: 
     mean_oob_error_labeled = 0
     mean_oob_error_unlabeled = 0
     p_value = None
-
-    pickle_base_path = Path(f"../../preprocessed_data/{meta_data['data']['name']}/outer_fold_{fold_index}")
-    assert pickle_base_path.exists(), f"{pickle_base_path} does not exist"
-
-    # Load the cached preprocessed data for the given outer cross-validation fold
-    with open(f"{pickle_base_path}/train.pkl", "rb") as file:
-        train_df = pickle.load(file)
-        assert target_feature_name in train_df.columns
-        assert "label" in train_df.columns
-    with open(f"{pickle_base_path}/train_correlation_matrix.pkl", "rb") as file:
-        corr_matrix_df = pickle.load(file)
-        assert "label" not in corr_matrix_df.columns
-    assert train_df.shape[1] - 1 == corr_matrix_df.shape[0]  # corr_matrix_df does not include the label
 
     # Prepare training data
     y_train = train_df[target_feature_name].to_numpy()
@@ -157,10 +145,35 @@ def calculate_mean_oob_errors_and_p_value(target_feature_name: str, fold_index: 
     return mean_oob_error_labeled, mean_oob_error_unlabeled, p_value
 
 
-def calculate_oob_errors_per_feature(data_df: pd.DataFrame, meta_data: dict, fold_index: np.ndarray):
+def calculate_oob_errors_for_each_feature(data_df: pd.DataFrame, meta_data: dict, fold_index: np.ndarray):
+    """
+    Calculate the mean out-of-bag (OOB) errors for random forest regressors with different random seeds
+    for training data including the label and without the label for each feature.
+
+    Args:
+        data_df: The training data.
+        meta_data: The metadata related to the dataset and experiment.
+        fold_index: The current loop iteration of the outer cross-validation.
+
+    Returns:
+        A DataFrame containing the mean OOB score for labeled data, the mean OOB score for unlabeled data,
+        and the p-value for each feature.
+    """
     scores_labeled_list = []
     scores_unlabeled_list = []
     p_values_list = []
+
+    pickle_base_path = Path(f"../../preprocessed_data/{meta_data['data']['name']}/outer_fold_{fold_index}")
+
+    # Load the cached preprocessed data for the given outer cross-validation fold
+    with open(f"{pickle_base_path}/train.pkl", "rb") as file:
+        train_df = pickle.load(file)
+        assert "label" in train_df.columns
+    with open(f"{pickle_base_path}/train_correlation_matrix.pkl", "rb") as file:
+        corr_matrix_df = pickle.load(file)
+        assert "label" not in corr_matrix_df.columns
+    assert train_df.shape[1] - 1 == corr_matrix_df.shape[0]  # corr_matrix_df does not include the label
+
 
     # # serial version for debugging
     # for target_feature_name in data_df.columns[1:]:
@@ -171,7 +184,7 @@ def calculate_oob_errors_per_feature(data_df: pd.DataFrame, meta_data: dict, fol
 
     # parallel version
     out = Parallel(n_jobs=multiprocessing.cpu_count(), verbose=-1)(
-        delayed(calculate_mean_oob_errors_and_p_value)(target_feature_name, fold_index, meta_data)
+        delayed(calculate_mean_oob_errors_and_p_value)(target_feature_name, train_df, corr_matrix_df, meta_data)
         for target_feature_name in data_df.columns[1:]
     )
 

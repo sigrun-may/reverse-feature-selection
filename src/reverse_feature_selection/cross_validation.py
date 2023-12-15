@@ -81,7 +81,7 @@ class CrossValidator:
             fold_index: The current loop iteration of the outer cross-validation.
         """
         # Calculate raw metrics for feature subset calculation with reverse feature selection
-        result_df = reverse_rf.calculate_oob_errors_per_feature(
+        result_df = reverse_rf.calculate_oob_errors_for_each_feature(
             data_df=self.data_df,
             meta_data=self.meta_data,
             fold_index=fold_index,
