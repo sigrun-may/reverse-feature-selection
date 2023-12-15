@@ -74,7 +74,9 @@ def calculate_oob_errors(x_train: pd.DataFrame, y_train: np.ndarray) -> Tuple[Op
     return oob_errors_labeled, oob_errors_unlabeled
 
 
-def calculate_mean_oob_errors_and_p_value(target_feature_name: str, train_df, corr_matrix_df, meta_data:dict):
+def calculate_mean_oob_errors_and_p_value(
+    target_feature_name: str, train_df: pd.DataFrame, corr_matrix_df: pd.DataFrame, meta_data: dict
+):
     """
     Calculate the mean out-of-bag (OOB) errors for random forest regressors with different random seeds
     for training data including the label and without the label for the given target feature.
@@ -103,6 +105,7 @@ def calculate_mean_oob_errors_and_p_value(target_feature_name: str, train_df, co
     x_train = preprocessing.remove_features_correlated_to_target_feature(
         train_df, corr_matrix_df, target_feature_name, meta_data
     )
+    # check if any features are uncorrelated to the target feature
     if x_train is None:
         return None, None, None
 
@@ -173,7 +176,6 @@ def calculate_oob_errors_for_each_feature(data_df: pd.DataFrame, meta_data: dict
         corr_matrix_df = pickle.load(file)
         assert "label" not in corr_matrix_df.columns
     assert train_df.shape[1] - 1 == corr_matrix_df.shape[0]  # corr_matrix_df does not include the label
-
 
     # # serial version for debugging
     # for target_feature_name in data_df.columns[1:]:
