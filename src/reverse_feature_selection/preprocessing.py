@@ -180,4 +180,3 @@ def remove_features_correlated_to_target_feature(
 
     # Return the data frame with uncorrelated features
     return train_df[uncorrelated_feature_names]
-
