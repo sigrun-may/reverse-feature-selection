@@ -157,13 +157,13 @@ def remove_features_correlated_to_target_feature(
     assert uncorrelated_features_mask.shape[0] == unlabeled_train_df.shape[1]
 
     # Get the column names of uncorrelated features
-    uncorrelated_features_index = unlabeled_train_df.columns[uncorrelated_features_mask]
+    uncorrelated_feature_names = unlabeled_train_df.columns[uncorrelated_features_mask]
 
     # Ensure that "label" is not in the list of uncorrelated features
-    assert "label" not in uncorrelated_features_index
+    assert "label" not in uncorrelated_feature_names
 
     # Check if there are any features left after removing "label" and "target_feature"
-    if uncorrelated_features_index.size == 0:
+    if uncorrelated_feature_names.size == 0:
         return None
 
     # Check if the maximum correlation of any uncorrelated feature with the target is within the threshold
@@ -173,11 +173,11 @@ def remove_features_correlated_to_target_feature(
     ), f"{meta_data['data']['train_correlation_threshold']}"
 
     # Insert the 'label' as the first column
-    uncorrelated_features_index = uncorrelated_features_index.insert(0, "label")
-    assert "label" in uncorrelated_features_index
+    uncorrelated_feature_names = uncorrelated_feature_names.insert(0, "label")
+    assert "label" in uncorrelated_feature_names
 
-    assert target_feature not in uncorrelated_features_index
+    assert target_feature not in uncorrelated_feature_names
 
     # Return the data frame with uncorrelated features
-    return train_df[uncorrelated_features_index]
+    return train_df[uncorrelated_feature_names]
 
