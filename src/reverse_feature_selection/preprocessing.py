@@ -8,7 +8,7 @@ Functions:
     load_cached_data(pickle_base_path: Path, correlation_matrix: bool) -> Tuple[pd.DataFrame, pd.DataFrame, Optional[pd.DataFrame]]:
         Load the cached preprocessed data.
 
-    preprocess_data(train_index: np.ndarray, validation_index: np.ndarray, data_df: pd.DataFrame, fold_index: int, meta_data: dict, correlation_matrix: bool = False) -> Tuple[pd.DataFrame, pd.DataFrame, Optional[pd.DataFrame]]:
+    preprocess_data(train_indices: np.ndarray, validation_indices: np.ndarray, data_df: pd.DataFrame, fold_index: int, meta_data: dict, correlation_matrix: bool = False) -> Tuple[pd.DataFrame, pd.DataFrame, Optional[pd.DataFrame]]:
         Split data for training and validation, calculate correlation matrix if selected and cache it.
 
     remove_features_correlated_to_target_feature(train_df: pd.DataFrame, correlation_matrix_df: pd.DataFrame, target_feature: str, meta_data: dict) -> pd.DataFrame:
