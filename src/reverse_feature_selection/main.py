@@ -42,8 +42,8 @@ end_time = datetime.datetime.utcnow()
 print(end_time - start_time)
 
 # save results
-result_path = Path(f"../../results/{meta_data['experiment_id']}_result_dict.pkl")
+result_base_path = Path(f"../../results/")
 # Create directory for saving the results
-result_path.mkdir(parents=True, exist_ok=True)
-with open(result_path, "wb") as file:
+result_base_path.mkdir(parents=True, exist_ok=True)
+with open(f"{result_base_path}/{meta_data['experiment_id']}_result_dict.pkl", "wb") as file:
     pickle.dump(result_dict, file, protocol=pickle.HIGHEST_PROTOCOL)
