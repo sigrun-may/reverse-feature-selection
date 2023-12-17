@@ -2,7 +2,7 @@ import logging
 
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, LeaveOneOut
 
 import preprocessing
 import reverse_rf_random as reverse_rf
@@ -41,12 +41,15 @@ class CrossValidator:
         Returns:
             Results of the cross-validation.
         """
-        # StratifiedKFold outer cross-validation
-        k_fold = StratifiedKFold(n_splits=self.meta_data["cv"]["n_outer_folds"], shuffle=True, random_state=2005)
-        for fold_index, (train_indices, test_indices) in enumerate(
-            k_fold.split(self.data_df.iloc[:, 1:], self.data_df["label"])
-        ):
-            logging.info(f"fold_index {fold_index + 1} of {self.meta_data['cv']['n_outer_folds']}")
+        # # StratifiedKFold outer cross-validation
+        # k_fold = StratifiedKFold(n_splits=self.meta_data["cv"]["n_outer_folds"], shuffle=True, random_state=2005)
+        # for fold_index, (train_indices, test_indices) in enumerate(
+        #     k_fold.split(self.data_df.iloc[:, 1:], self.data_df["label"])
+        # ):
+        #     logging.info(f"fold_index {fold_index + 1} of {self.meta_data['cv']['n_outer_folds']}")
+        loo = LeaveOneOut()
+        for fold_index, (train_indices, test_indices) in enumerate(loo.split(self.data_df.iloc[:, 1:])):
+            logging.info(f"fold_index {fold_index + 1} of {self.data_df.shape[0]}")
 
             # Preprocess the data and cache the results if not available yet
             preprocessing.preprocess_data(
