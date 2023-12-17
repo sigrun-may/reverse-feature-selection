@@ -20,13 +20,16 @@ from src.reverse_feature_selection import preprocessing
 logging.basicConfig(level=logging.INFO)
 
 
-def calculate_oob_errors(x_train: pd.DataFrame, y_train: np.ndarray) -> Tuple[Optional[list], Optional[list]]:
+def calculate_oob_errors(
+    x_train: pd.DataFrame, y_train: np.ndarray, meta_data: dict
+) -> Tuple[Optional[list], Optional[list]]:
     """
     Calculate out-of-bag (OOB) error for labeled and unlabeled training data.
 
     Args:
         x_train: The training data.
         y_train: The target values for the training data.
+        meta_data: The metadata related to the dataset and experiment.
 
     Returns:
         A tuple containing lists of OOB scores for labeled and unlabeled training data.
@@ -37,15 +40,14 @@ def calculate_oob_errors(x_train: pd.DataFrame, y_train: np.ndarray) -> Tuple[Op
     oob_errors_unlabeled = []
 
     # Perform validation using different random seeds
-    for i in range(20):
+    for seed in meta_data["random_seeds"]:
+        # for _ in range(len(meta_data["random_seeds"])):
         # Create a RandomForestRegressor model with specified parameters
         clf1 = RandomForestRegressor(
-            warm_start=False,
-            max_features=None,
-            oob_score=mean_squared_error,  # Use out-of-bag score for evaluation
+            oob_score=mean_squared_error,  # Use out-of-bag error for evaluation
             # criterion="absolute_error",
             n_estimators=100,
-            # random_state=seed,
+            random_state=seed,
             min_samples_leaf=2,
         )
         # Create a copy of the RandomForestRegressor (clf1)
@@ -111,7 +113,7 @@ def calculate_mean_oob_errors_and_p_value(
     p_value = None
 
     # Calculate out-of-bag (OOB) errors for labeled and unlabeled training data
-    oob_errors_labeled, oob_errors_unlabeled = calculate_oob_errors(x_train, y_train)
+    oob_errors_labeled, oob_errors_unlabeled = calculate_oob_errors(x_train, y_train, meta_data)
 
     # Check if OOB errors for labeled data are available (was the label included in the model?)
     if oob_errors_labeled is not None:
