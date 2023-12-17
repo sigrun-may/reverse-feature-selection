@@ -17,7 +17,6 @@ warnings.filterwarnings("ignore")
 def optimize(train_indices, validation_indices, data_df, meta_data):
     def optuna_objective(trial):
         rf_clf = RandomForestClassifier(
-            warm_start=False,
             oob_score=roc_auc_score,
             max_depth=trial.suggest_int("max_depth", 1, 15),
             n_estimators=300,
@@ -66,7 +65,8 @@ def optimize(train_indices, validation_indices, data_df, meta_data):
     #                                        n_repeats=5, random_state=42, n_jobs=-1)
     predicted_y = clf.predict(data_df.iloc[validation_indices, 1:])
     true_y = data_df.loc[validation_indices, "label"]
-    validation_score = roc_auc_score(true_y, predicted_y)
+    # validation_score = roc_auc_score(true_y, predicted_y)
+    validation_score = 0
     print("validation_score", validation_score, "oob", clf.oob_score_)
 
     # calculate shap values
