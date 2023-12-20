@@ -146,9 +146,7 @@ def calculate_mean_oob_errors_and_p_value(
                 )
             # select the feature
             else:
-                logging.info(
-                    f"p_value {target_feature_name} {p_value_tt} not selected"
-                )
+                logging.info(f"p_value {target_feature_name} {p_value_tt} not selected")
             mean_abs_oob_error_labeled = error_labeled
             mean_abs_oob_error_unlabeled = error_unlabeled
 
