@@ -37,6 +37,8 @@ class CrossValidator:
     def cross_validate(self) -> dict:
         """
         Perform outer cross-validation on the dataset.
+        Calculate raw values for determining feature subsets using both reverse feature selection and a
+        standard random forest.
 
         Returns:
             Results of the cross-validation.
