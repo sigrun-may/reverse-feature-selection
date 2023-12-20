@@ -7,7 +7,7 @@ from typing import Tuple, Optional
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
-from scipy.stats import ttest_ind
+from scipy.stats import ttest_ind, mannwhitneyu
 from sklearn import clone
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import (
@@ -94,6 +94,12 @@ def calculate_mean_oob_errors_and_p_value(
     Returns:
         tuple: A tuple containing the mean OOB score for labeled data, the mean OOB score for unlabeled data, and the p-value.
     """
+    # check if the target feature is in the training data
+    assert target_feature_name in train_df.columns
+
+    # check if the target feature is in the correlation matrix
+    assert target_feature_name in corr_matrix_df.index
+
     # Prepare training data
     y_train = train_df[target_feature_name].to_numpy()
 
@@ -110,7 +116,8 @@ def calculate_mean_oob_errors_and_p_value(
     # set default (feature is deselected)
     mean_abs_oob_error_labeled = np.inf
     mean_abs_oob_error_unlabeled = np.inf
-    p_value = None
+    p_value_tt = None
+    p_value_mwu = None
 
     # Calculate out-of-bag (OOB) errors for labeled and unlabeled training data
     oob_errors_labeled, oob_errors_unlabeled = calculate_oob_errors(x_train, y_train, meta_data)
@@ -124,24 +131,28 @@ def calculate_mean_oob_errors_and_p_value(
         # Check if training with the label is better than without the label
         if error_labeled < error_unlabeled:
             # Perform the t-test (Welch's test) to check if the difference is statistically significant
-            p_value = ttest_ind(oob_errors_labeled, oob_errors_unlabeled, alternative="less", equal_var=False).pvalue
+            p_value_tt = ttest_ind(oob_errors_labeled, oob_errors_unlabeled, alternative="less", equal_var=False).pvalue
 
-            # Perform the mannwhitneyu test
-            # p_value = mannwhitneyu(oob_errors_labeled, oob_errors_unlabeled, alternative="less").pvalue
+            # Perform the Mann-Whitney-U test
+            p_value_mwu = mannwhitneyu(oob_errors_labeled, oob_errors_unlabeled, alternative="less").pvalue
 
             # Check if the result is statistically significant (alpha level = 0.05)
-            if p_value <= 0.05:
+            if p_value_tt <= 0.05:
                 # Calculate the percentage difference between mean OOB errors
                 percentage_difference = ((error_unlabeled - error_labeled) / error_unlabeled) * 100
                 logging.info(
-                    f"p_value {target_feature_name} {p_value} "
+                    f"p_value {target_feature_name} {p_value_tt} "
                     f"l: {error_labeled} ul: {error_unlabeled}, {percentage_difference}%"
                 )
-                # select the feature
-                mean_abs_oob_error_labeled = error_labeled
-                mean_abs_oob_error_unlabeled = error_unlabeled
+            # select the feature
+            else:
+                logging.info(
+                    f"p_value {target_feature_name} {p_value_tt} not selected"
+                )
+            mean_abs_oob_error_labeled = error_labeled
+            mean_abs_oob_error_unlabeled = error_unlabeled
 
-    return mean_abs_oob_error_labeled, mean_abs_oob_error_unlabeled, p_value
+    return mean_abs_oob_error_labeled, mean_abs_oob_error_unlabeled, p_value_tt, p_value_mwu
 
 
 def calculate_oob_errors_for_each_feature(data_df: pd.DataFrame, meta_data: dict, fold_index: int):
@@ -158,10 +169,6 @@ def calculate_oob_errors_for_each_feature(data_df: pd.DataFrame, meta_data: dict
         A DataFrame containing the mean OOB score for labeled data, the mean OOB score for unlabeled data,
         and the p-value for each feature.
     """
-    scores_labeled_list = []
-    scores_unlabeled_list = []
-    p_values_list = []
-
     pickle_base_path = Path(f"../../preprocessed_data/{meta_data['data']['name']}/outer_fold_{fold_index}")
 
     # Load the cached preprocessed data for the given outer cross-validation fold
@@ -186,13 +193,19 @@ def calculate_oob_errors_for_each_feature(data_df: pd.DataFrame, meta_data: dict
         for target_feature_name in data_df.columns[1:]
     )
 
-    for score_labeled, score_unlabeled, p_value in out:
+    scores_labeled_list = []
+    scores_unlabeled_list = []
+    p_values_tt_list = []
+    p_values_mwu_list = []
+    for score_labeled, score_unlabeled, p_value_tt, p_value_mwu in out:
         scores_labeled_list.append(score_labeled)
         scores_unlabeled_list.append(score_unlabeled)
-        p_values_list.append(p_value)
+        p_values_tt_list.append(p_value_tt)
+        p_values_mwu_list.append(p_value_mwu)
 
     assert len(scores_labeled_list) == len(scores_unlabeled_list) == data_df.shape[1] - 1  # exclude label column
     result_df = pd.DataFrame(data=scores_unlabeled_list, index=data_df.columns[1:], columns=["unlabeled"])
     result_df["labeled"] = scores_labeled_list
-    result_df["p_values"] = p_values_list
+    result_df["p_values_tt"] = p_values_tt_list
+    result_df["p_values_mwu"] = p_values_mwu_list
     return result_df
