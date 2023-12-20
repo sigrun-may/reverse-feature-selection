@@ -4,6 +4,8 @@ from pathlib import Path
 
 import pandas as pd
 import toml
+import git
+
 
 from src.reverse_feature_selection.cross_validation import CrossValidator
 
@@ -11,10 +13,14 @@ from src.reverse_feature_selection.cross_validation import CrossValidator
 with open("../../settings.toml", "r") as file:
     meta_data = toml.load(file)
 
-print(type(meta_data))
+# save git commit hash
+git_repository = git.Repo(search_parent_directories=True)
+commit_sha = git_repository.head.object.hexsha
+meta_data["git_commit_hash"] = commit_sha
+
 
 # load data
-data_df = pd.read_csv(meta_data["data"]["path"])
+data_df = pd.read_csv(meta_data["data"]["path"]).iloc[:, :500]
 assert data_df.columns[0] == "label"
 
 # # shorten artificial data for faster testing
