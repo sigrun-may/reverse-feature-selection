@@ -1,8 +1,9 @@
-experiment_id = "data_1026_eff2"
+experiment_id = "colon_loo"
 
-description = "testing, cluster1 = 5, cluster 2 = 5, scale 1.3, relevant 15, effectsize=2" # "Colon cancer dataset with random RF, mannwhitneyu instead of welsh for colon_random"
+description = "Colon cancer dataset with random RF, mannwhitneyu and welsh for reverse_fs"
 verbose_optuna = true
 n_trials_optuna = 50
+standard_metric = "roc_auc_score"
 random_seeds = [42, 234, 34, 1, 5, 18, 3, 23, 9, 7, 123, 234, 345, 456, 567, 678, 789, 890, 901, 12, 23, 34, 45, 56, 67, 78, 89, 90,]
 # random_seeds = [42,234,34,23,5,3,9,7, 123, 234,]
 # random_seeds = [42,34,23,5,3]
@@ -12,16 +13,10 @@ pickle_preprocessed_data = true
 
 [cv]
 # n_outer_folds = 15
+loo = true
 
 [data]
 train_correlation_threshold = 0.2
-name = "data_1026_eff2"
-# name = "data"
+name = "colon_loo"
 # path = "../../data/data.csv"
-path = "../../data/data_1026_eff2.csv"
-
-
-#[rf_parameters]
-#classifier = {}
-#regressor = {}
 
