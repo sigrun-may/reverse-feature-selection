@@ -21,7 +21,7 @@ from src.validation.stability_estimator import get_stability
 from weighted_manhattan_distance import WeightedManhattanDistance
 
 # data_name = "overlapping_500_3"
-data_name = "test2"
+data_name = "unseparated_data"
 
 
 def evaluate_feature_selection(
@@ -100,11 +100,11 @@ def _normalize_feature_subsets(feature_selection_result_pd, meta_data):
     )
     # # eliminate normalized feature importances smaller than 0.05
     # for i in range(standard_feature_importance.size):
-    #     if standard_feature_importance[i] < 0.05:
+    #     if standard_feature_importance[i] < 0.127:
     #         standard_feature_importance[i] = 0.0
     #
     # if np.min(standard_feature_importance) > 0.0:
-    #     assert np.min(standard_feature_importance) >= 0.05
+    #     assert np.min(standard_feature_importance) >= 0.5
 
     feature_selection_result_pd["standard_ts"] = standard_feature_importance
     feature_selection_result_pd["shap_ts"] = shap_feature_importance
@@ -140,12 +140,13 @@ def _calculate_feature_weights(result_pd, meta_data):
         metrics_unlabeled_training_np
     )
     for i in range(metrics_unlabeled_training_np.size):
-        if abs(metrics_unlabeled_training_np[i]) > 0.0:
+        if metrics_unlabeled_training_np[i] == np.inf:
+            feature_weights_np[i] = 0.0
+        else:
+            # TODO percentage difference as feature weight?
             feature_weights_np[i] = abs(metrics_labeled_training_np[i] - metrics_unlabeled_training_np[i]) / abs(
                 metrics_unlabeled_training_np[i]
             )
-        else:
-            feature_weights_np[i] = 0.0
     assert np.min(feature_weights_np) >= 0.0
 
     # # eliminate features with weights smaller than or equal to 0.05
