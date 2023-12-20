@@ -6,8 +6,8 @@ import pandas as pd
 import toml
 import git
 
-
 from src.reverse_feature_selection.cross_validation import CrossValidator
+from data_loader_tools import load_data_with_standardized_sample_size
 
 # parse settings from toml
 with open("../../settings.toml", "r") as file:
@@ -19,24 +19,17 @@ commit_sha = git_repository.head.object.hexsha
 meta_data["git_commit_hash"] = commit_sha
 
 
-# load data
-data_df = pd.read_csv(meta_data["data"]["path"]).iloc[:, :500]
-assert data_df.columns[0] == "label"
+# # load artificial data
+# data_df = pd.read_csv(meta_data["data"]["path"]).iloc[:, :500]
+# assert data_df.columns[0] == "label"
 
 # # shorten artificial data for faster testing
 # data_01 = data_df.iloc[:, 0:10]
 # data_02 = data_df.iloc[:, 200:800]
 # data_df = pd.concat([data_01, data_02], join="outer", axis=1)
 
-# # data loaders
-# import data_loader
-# X, y = data_loader.standardize_sample_size(*data_loader.load_colon_data())
-# data_df = pd.DataFrame(X)
-# data_df.insert(loc=0, column="label", value=y)
-# # data_df.columns = data_df.columns.astype(str)
-# data_df = data_df.reset_index(drop=True)
-# assert data_df.columns[0] == "label"
-
+# data loaders
+data_df = load_data_with_standardized_sample_size("colon")
 print(data_df.shape)
 
 start_time = datetime.datetime.utcnow()
