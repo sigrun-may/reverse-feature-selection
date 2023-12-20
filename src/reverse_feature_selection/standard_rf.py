@@ -79,4 +79,7 @@ def optimize(train_indices, validation_indices, data_df, meta_data):
     mean_shap_values = np.abs(shap_values[0]).mean(axis=0)
     assert len(mean_shap_values) == len(data_df.columns) - 1
 
+    feature_importances = clf.feature_importances_
+    print("num fi", np.sum(feature_importances > 0))
+
     return clf.feature_importances_, mean_shap_values, validation_score, clf.oob_score_
