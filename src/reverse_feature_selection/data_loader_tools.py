@@ -31,7 +31,7 @@ def load_data_with_standardized_sample_size(data: Literal["colon", "prostate", "
     x, y = standardize_sample_size(data, label)
     data_df = pd.DataFrame(x)
     data_df.insert(loc=0, column="label", value=y)
-    # data_df.columns = data_df.columns.astype(str)
+    data_df.columns = data_df.columns.astype(str)
 
     # reset index for cross validation splits
     data_df = data_df.reset_index(drop=True)
