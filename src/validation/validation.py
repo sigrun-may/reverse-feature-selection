@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Literal
 
 import joblib
 import numpy as np
@@ -21,13 +21,22 @@ from src.validation.stability_estimator import get_stability
 from weighted_manhattan_distance import WeightedManhattanDistance
 
 # data_name = "overlapping_500_3"
-data_name = "unseparated_data"
+data_name = "colon_loo"
+
+list_of_methods = ["standard", "shap", "reverse"]
+activate_p_value = False
+p_value_threshold = 0.05
+
+activate_threshold = True
+threshold = 0.1
 
 
 def evaluate_feature_selection(
-    feature_selection_result_dict,
+        feature_selection_result_dict,
 ):
     metrics_per_method_dict = {}
+
+    cv_result_list = feature_selection_result_dict["method_result_dict"]["rf_cv_result"]
 
     # iterate over feature selection algorithms
     for method, cv_result_list in feature_selection_result_dict["method_result_dict"].items():
@@ -39,15 +48,20 @@ def evaluate_feature_selection(
         importance_matrix_standard = np.empty_like(importance_matrix_reverse)
         importance_matrix_shap = np.empty_like(importance_matrix_standard)
 
+        importance_matrix_reverse_t = np.empty((len(cv_result_list), cv_result_list[0].shape[0]))
+        importance_matrix_standard_t = np.empty_like(importance_matrix_reverse)
+        importance_matrix_shap_t = np.empty_like(importance_matrix_standard)
+
         # iterate over cross-validation results
         for i, cv_iteration_result_pd in enumerate(cv_result_list):
-            _normalize_feature_subsets(cv_iteration_result_pd, feature_selection_result_dict["meta_data"])
+            _normalize_feature_subsets(cv_iteration_result_pd)
             importance_matrix_reverse[i, :] = cv_iteration_result_pd["reverse_ts"].values
             importance_matrix_standard[i, :] = cv_iteration_result_pd["standard_ts"].values
             importance_matrix_shap[i, :] = cv_iteration_result_pd["shap_ts"].values
 
-            # importance_matrix_reverse[i, :] = cv_iteration_result_pd["reverse_t"].values
-            # importance_matrix_standard[i, :] = cv_iteration_result_pd["standard_t"].values
+            importance_matrix_reverse_t[i, :] = cv_iteration_result_pd["reverse_t"].values
+            importance_matrix_standard_t[i, :] = cv_iteration_result_pd["standard_t"].values
+            importance_matrix_shap_t[i, :] = cv_iteration_result_pd["shap_t"].values
 
         # monitor stability of selection
         binary_importance_matrix_standard = np.zeros_like(importance_matrix_standard)
@@ -61,6 +75,18 @@ def evaluate_feature_selection(
         performance_metrics_dict["reverse_stability"] = get_stability(binary_importance_matrix_reverse)
         performance_metrics_dict["standard_stability"] = get_stability(binary_importance_matrix_standard)
         performance_metrics_dict["shap_stability"] = get_stability(binary_importance_matrix_shap)
+
+        binary_importance_matrix_standard_t = np.zeros_like(importance_matrix_standard_t)
+        binary_importance_matrix_reverse_t = np.zeros_like(importance_matrix_reverse_t)
+        binary_importance_matrix_shap_t = np.zeros_like(importance_matrix_shap_t)
+        assert binary_importance_matrix_reverse_t.shape == binary_importance_matrix_standard_t.shape
+
+        binary_importance_matrix_standard_t[importance_matrix_standard_t.nonzero()] = 1
+        binary_importance_matrix_reverse_t[importance_matrix_reverse_t.nonzero()] = 1
+        binary_importance_matrix_shap_t[importance_matrix_shap_t.nonzero()] = 1
+        performance_metrics_dict["reverse_stability_t"] = get_stability(binary_importance_matrix_reverse_t)
+        performance_metrics_dict["standard_stability_t"] = get_stability(binary_importance_matrix_standard_t)
+        performance_metrics_dict["shap_stability_t"] = get_stability(binary_importance_matrix_shap_t)
 
         reverse_subset = np.sum(importance_matrix_reverse, axis=0)
         standard_subset = np.sum(importance_matrix_standard, axis=0)
@@ -89,7 +115,126 @@ def evaluate_feature_selection(
     return metrics_per_method_dict
 
 
-def _normalize_feature_subsets(feature_selection_result_pd, meta_data):
+def evaluate_cross_validation_results(cv_result_list: list) -> dict:
+    """ Evaluate cross-validation results.
+    Args:
+        cv_result_list: List containing pandas Dataframes with corresponding cross-validation results.
+    Returns:
+        List containing pandas Dataframes with calculated cross-validation results.
+    """
+    # calculate feature weights for reverse feature selection
+    cv_result_list = _calculate_reverse_feature_selection_results(cv_result_list)
+    # normalize feature importance results
+    _normalize_results(cv_result_list)
+
+    feature_names = cv_result_list[0].index.values
+    result_dict = {}
+    selected_feature_subsets_df = pd.DataFrame()
+    for method in list_of_methods:
+        importance_matrix = _get_importance_matrix(cv_result_list, method)
+        binary_importance_matrix = _binarize_feature_importance_matrix(importance_matrix)
+
+        # calculate stability of feature selection
+        result_dict[f"stability_{method}"] = get_stability(binary_importance_matrix)
+        # calculate number of robust features
+        result_dict[f"robust_{method}"] = np.count_nonzero(
+            np.int_(binary_importance_matrix.sum(axis=0)) == binary_importance_matrix.shape[0]
+        )
+        result_dict[f"robust_{method}_names"] = str(
+            feature_names[np.where(np.int_(binary_importance_matrix.sum(axis=0)) == binary_importance_matrix.shape[0])]
+        )
+        selected_feature_subsets_df[method] = importance_matrix.sum(axis=0)
+        # calculate number of selected features
+        result_dict[f"selected_{method}"] = np.count_nonzero(importance_matrix.sum(axis=0))
+    result_dict["selected_feature_subsets"] = selected_feature_subsets_df
+    return result_dict
+
+
+def _calculate_reverse_feature_selection_results(cv_result_list: list):
+    """ Calculate feature importance results for reverse feature selection.
+    Args:
+        cv_result_list: List containing pandas Dataframes with corresponding cross-validation results.
+
+    Returns:
+        List containing pandas Dataframes with calculated cross-validation results.
+    """
+    list_of_calculated_reverse_feature_selection_results = []
+    for cv_iteration_result_df in cv_result_list:
+        reverse_feature_importance = _calculate_feature_weights(cv_iteration_result_df)
+        list_of_calculated_reverse_feature_selection_results.append(reverse_feature_importance)
+    return list_of_calculated_reverse_feature_selection_results
+
+
+def _normalize_results(cv_result_list: list):
+    """ Normalize feature importance results.
+    Args:
+        cv_result_list: List containing pandas Dataframes with corresponding cross-validation results.
+
+    Returns:
+        normalized cv_result_list: List containing pandas Dataframes with corresponding normalized cross-validation results.
+    """
+    for cv_iteration_result_df in cv_result_list:
+        _normalize_feature_subsets(cv_iteration_result_df)
+    return
+
+
+def _calculate_stability_of_feature_selection(
+        cv_result_list: list, method: str
+)-> float:
+    """ Calculate stability of feature selection.
+    Args:
+        cv_result_list: List containing pandas Dataframes with corresponding cross-validation results.
+        method: Method to evaluate. Either "standard", "shap" or "reverse".
+
+    Returns:
+        stability: Stability of feature selection.
+    """
+
+    importance_matrix = _get_importance_matrix(cv_result_list, method)
+    binary_importance_matrix = _binarize_feature_importance_matrix(importance_matrix)
+    stability = get_stability(binary_importance_matrix)
+    return stability
+
+
+def _binarize_feature_importance_matrix(_importance_matrix: np.ndarray) -> np.ndarray:
+    """Binarize feature importance matrix.
+
+    Args:
+        _importance_matrix: Matrix containing the feature importance of each feature for each cross-validation iteration.
+
+    Returns:
+        binary_importance_matrix: Matrix containing the binarized feature importance of each feature for each cross-validation iteration.
+
+    """
+    binary_importance_matrix = np.zeros_like(_importance_matrix)
+    binary_importance_matrix[_importance_matrix.nonzero()] = 1
+    return binary_importance_matrix
+
+
+def _get_importance_matrix(_cv_result_list: list, key: str) -> np.ndarray:
+    """Extract feature importance matrix from cross-validation results.
+
+    Args:
+        _cv_result_list: List containing pandas Dataframes with corresponding cross-validation results.
+        key: Key of the column to retrieve the importance from in each Dataframe.
+
+    Returns:
+        importance_matrix: Matrix containing the feature importance of each feature for each cross-validation iteration.
+
+
+
+    """
+    importance_matrix = np.empty((len(_cv_result_list), _cv_result_list[0].shape[0]))
+
+    # iterate over cross-validation results
+    for i, cv_iteration_result_pd in enumerate(_cv_result_list):
+        _normalize_feature_subsets(cv_iteration_result_pd)
+        importance_matrix[i, :] = cv_iteration_result_pd[key].values
+
+    return importance_matrix
+
+
+def _normalize_feature_subsets(feature_selection_result_pd):
     # normalize standard feature selection result
     assert np.min(feature_selection_result_pd["standard"].values) >= 0
     standard_feature_importance = feature_selection_result_pd["standard"].values / max(
@@ -98,42 +243,45 @@ def _normalize_feature_subsets(feature_selection_result_pd, meta_data):
     shap_feature_importance = feature_selection_result_pd["shap_values"].values / max(
         feature_selection_result_pd["shap_values"].values
     )
-    # # eliminate normalized feature importances smaller than 0.05
-    # for i in range(standard_feature_importance.size):
-    #     if standard_feature_importance[i] < 0.127:
-    #         standard_feature_importance[i] = 0.0
-    #
-    # if np.min(standard_feature_importance) > 0.0:
-    #     assert np.min(standard_feature_importance) >= 0.5
 
     feature_selection_result_pd["standard_ts"] = standard_feature_importance
     feature_selection_result_pd["shap_ts"] = shap_feature_importance
 
     # normalize reverse feature selection result
-    reverse_feature_importance = _calculate_feature_weights(feature_selection_result_pd, meta_data)
+    reverse_feature_importance = _calculate_feature_weights(feature_selection_result_pd)
     feature_selection_result_pd["reverse_ts"] = reverse_feature_importance
 
-    # # eliminate normalized feature importances smaller than 0.1
-    # for i in range(standard_feature_importance.size):
-    #     if standard_feature_importance[i] < 0.5:
-    #         standard_feature_importance[i] = 0.0
-    #
-    #     if reverse_feature_importance[i] < 0.5:
-    #         reverse_feature_importance[i] = 0.0
-
-    # if np.min(standard_feature_importance) > 0.0:
-    #     assert np.min(standard_feature_importance) >= 0.1
-
-    feature_selection_result_pd["standard_t"] = standard_feature_importance
-    feature_selection_result_pd["shap_t"] = shap_feature_importance
+    feature_selection_result_pd["standard_t"] = apply_threshold(standard_feature_importance, threshold)
+    feature_selection_result_pd["shap_t"] = apply_threshold(shap_feature_importance, threshold)
 
     # normalize reverse feature selection result
-    feature_selection_result_pd["reverse_t"] = reverse_feature_importance
+    feature_selection_result_pd["reverse_t"] = apply_threshold(reverse_feature_importance, threshold)
 
 
-def _calculate_feature_weights(result_pd, meta_data):
+def apply_threshold(feature_importance_array: np.ndarray, _threshold: float) -> np.ndarray:
+    """Drop feature importance below threshold.
+
+    Args:
+        _threshold:
+        feature_importance_array:
+
+    Returns:
+
+    """
+    if np.sum(feature_importance_array) > 0:
+        for fi_index in range(feature_importance_array.size):
+            # cut values below _threshold
+            if feature_importance_array[fi_index] < _threshold:
+                feature_importance_array[fi_index] = 0.0
+    assert not 0 < np.min(feature_importance_array) < threshold
+    assert np.sum(feature_importance_array) > 0
+    return feature_importance_array
+
+
+def _calculate_feature_weights(result_pd):
     metrics_labeled_training_np = result_pd["labeled"].values
     metrics_unlabeled_training_np = result_pd["unlabeled"].values
+    p_values_tt = result_pd["p_values_tt"].values
 
     # TODO ensure maximized metric or implement also case minimizing
     feature_weights_np = abs(metrics_labeled_training_np - metrics_unlabeled_training_np) / abs(
@@ -147,19 +295,9 @@ def _calculate_feature_weights(result_pd, meta_data):
             feature_weights_np[i] = abs(metrics_labeled_training_np[i] - metrics_unlabeled_training_np[i]) / abs(
                 metrics_unlabeled_training_np[i]
             )
+        if activate_p_value and p_values_tt[i] > p_value_threshold:
+            feature_weights_np[i] = 0.0
     assert np.min(feature_weights_np) >= 0.0
-
-    # # eliminate features with weights smaller than or equal to 0.05
-    # for i in range(feature_weights_np.size):
-    #     if feature_weights_np[i] < 0.05:
-    #         feature_weights_np[i] = 0.0
-    #
-    # if np.min(feature_weights_np) > 0.0:
-    #     assert np.min(feature_weights_np) >= 0.05
-
-    # feature_weights_np = feature_weights_np[feature_weights_np >= 0.05]
-    # assert np.min(feature_weights_np) >= 0.05
-    # # feature_weights_np = feature_weights_np[feature_weights_np > meta_data["validation"]["min_distance"]]
 
     normalized_feature_weights_np = feature_weights_np / np.max(feature_weights_np)
     assert np.min(normalized_feature_weights_np) >= 0.0
@@ -218,11 +356,11 @@ def calculate_performance(test_train_sets, feature_names, importance_matrix, met
 
 
 def classify_feature_subsets(
-    test_train_sets,
-    # TODO series?
-    selected_feature_names,
-    weights,
-    meta_data,
+        test_train_sets,
+        # TODO series?
+        selected_feature_names,
+        weights,
+        meta_data,
 ):
     classified_classes = []
     true_classes = []
@@ -301,10 +439,10 @@ def calculate_micro_metrics(predicted_classes, true_classes, meta_data_dict):
 
 
 def _measure_correctness_of_feature_selection(
-    performance_metrics_dict,
-    selected_features_matrix,
-    selected_feature_names,
-    meta_data,
+        performance_metrics_dict,
+        selected_features_matrix,
+        selected_feature_names,
+        meta_data,
 ):
     bm = 0
     pseudo = 0
@@ -510,11 +648,11 @@ def _extract_test_data_and_results(feature_selection_result, meta_data_dict):
         if micro_fi_dict and (selection_method in micro_fi_dict):
             # remove method with incomplete matrix
             if not (
-                micro_fi_dict[selection_method].shape
-                == (
-                    meta_data_dict["cv"]["n_outer_folds"],
-                    len(meta_data_dict["data"]["columns"]) - 1,
-                )
+                    micro_fi_dict[selection_method].shape
+                    == (
+                            meta_data_dict["cv"]["n_outer_folds"],
+                            len(meta_data_dict["data"]["columns"]) - 1,
+                    )
             ):
                 micro_fi_dict.pop(selection_method)
             else:
@@ -570,6 +708,6 @@ def test_trim_and_scale_robust_features():
     assert not_stable == 0, not_stable
 
 
-result_dict = joblib.load(f"../../results/{data_name}_result_dict.pkl")
-evaluate_feature_selection(result_dict)
-print(result_dict)
+cv_result_dict = joblib.load(f"../../results/{data_name}_result_dict.pkl")
+evaluated_results_dict = evaluate_cross_validation_results(cv_result_dict["method_result_dict"]["rf_cv_result"])
+print(evaluated_results_dict["stability_reverse"])
