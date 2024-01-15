@@ -44,11 +44,8 @@ def main():
     print(end_time - start_time)
 
     # save results
-    # check if program is running on cluster
-    if len(sys.argv) > 1:
-        result_base_path = Path(sys.argv[1])
-    else:
-        result_base_path = Path(f"./results")
+    # parse result path from input
+    result_base_path = Path(sys.argv[1])
     print("data_path: ", result_base_path)
 
     # Create directory for saving the results
