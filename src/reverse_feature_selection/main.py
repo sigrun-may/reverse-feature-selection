@@ -46,13 +46,10 @@ def main():
     # save results
     # check if program is running on cluster
     if len(sys.argv) > 1:
-        data_path = sys.argv[1]
+        result_base_path = Path(sys.argv[1])
     else:
-        data_path = Path(f"./")
-    print("data_path: ", data_path)
-
-    # Create path for saving the results
-    result_base_path = Path(os.path.join(data_path, "results"))
+        result_base_path = Path(f"./results")
+    print("data_path: ", result_base_path)
 
     # Create directory for saving the results
     result_base_path.mkdir(parents=True, exist_ok=True)
