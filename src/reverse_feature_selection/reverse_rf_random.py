@@ -15,7 +15,7 @@ from sklearn.metrics import (
     mean_absolute_error,
 )
 import logging
-from src.reverse_feature_selection import preprocessing
+import preprocessing
 
 logging.basicConfig(level=logging.INFO)
 
@@ -167,7 +167,7 @@ def calculate_oob_errors_for_each_feature(data_df: pd.DataFrame, meta_data: dict
         A DataFrame containing the mean OOB score for labeled data, the mean OOB score for unlabeled data,
         and the p-value for each feature.
     """
-    pickle_base_path = Path(f"../../preprocessed_data/{meta_data['data']['name']}/outer_fold_{fold_index}")
+    pickle_base_path = Path(f"./preprocessed_data/{meta_data['data']['name']}/outer_fold_{fold_index}")
 
     # Load the cached preprocessed data for the given outer cross-validation fold
     with open(f"{pickle_base_path}/train.pkl", "rb") as file:

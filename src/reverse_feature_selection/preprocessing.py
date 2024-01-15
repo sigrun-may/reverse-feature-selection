@@ -72,7 +72,7 @@ def preprocess_data(
         A tuple containing the validation data, training data, and optionally the training correlation matrix.
     """
     # Create a base path for caching the preprocessed data
-    pickle_base_path = Path(f"../../preprocessed_data/{meta_data['data']['name']}/outer_fold_{fold_index}")
+    pickle_base_path = Path(f"./preprocessed_data/{meta_data['data']['name']}/outer_fold_{fold_index}")
     # Check if the preprocessed data is already cached
     if pickle_base_path.exists():
         # Load the cached preprocessed data
