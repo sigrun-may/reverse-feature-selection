@@ -2,9 +2,27 @@ import numpy as np
 
 
 def get_stability(selected_features_matrix):
-    robustness_vector = selected_features_matrix.sum(axis=0)
-    print(robustness_vector[robustness_vector.nonzero()])
-    subset_vector = selected_features_matrix.sum(axis=1)
+    # preserve original matrix
+    selected_features_matrix_cp = selected_features_matrix.copy()
+
+    # check if matrix is empty
+    if selected_features_matrix_cp.size == 0:
+        return 0
+
+    # check if matrix only contains zeros
+    if np.all(selected_features_matrix_cp == 0):
+        return 0
+
+    # check if matrix is already binary
+    if not np.array_equal(np.unique(selected_features_matrix_cp), np.array([0, 1])):
+        # binarize matrix
+        selected_features_matrix_cp = np.where(selected_features_matrix_cp > 0, 1, 0)
+    assert np.array_equal(np.unique(selected_features_matrix_cp), np.array([0, 1])), np.unique(
+        selected_features_matrix_cp
+    )
+
+    robustness_vector = selected_features_matrix_cp.sum(axis=0)
+    subset_vector = selected_features_matrix_cp.sum(axis=1)
 
     number_of_features = len(robustness_vector)
     number_of_folds = len(subset_vector)
