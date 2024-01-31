@@ -32,7 +32,7 @@ threshold = 0.1
 
 
 def evaluate_feature_selection(
-        feature_selection_result_dict,
+    feature_selection_result_dict,
 ):
     metrics_per_method_dict = {}
 
@@ -116,7 +116,7 @@ def evaluate_feature_selection(
 
 
 def evaluate_cross_validation_results(cv_result_list: list) -> dict:
-    """ Evaluate cross-validation results.
+    """Evaluate cross-validation results.
     Args:
         cv_result_list: List containing pandas Dataframes with corresponding cross-validation results.
     Returns:
@@ -151,7 +151,7 @@ def evaluate_cross_validation_results(cv_result_list: list) -> dict:
 
 
 def _calculate_reverse_feature_selection_results(cv_result_list: list):
-    """ Calculate feature importance results for reverse feature selection.
+    """Calculate feature importance results for reverse feature selection.
     Args:
         cv_result_list: List containing pandas Dataframes with corresponding cross-validation results.
 
@@ -166,7 +166,7 @@ def _calculate_reverse_feature_selection_results(cv_result_list: list):
 
 
 def _normalize_results(cv_result_list: list):
-    """ Normalize feature importance results.
+    """Normalize feature importance results.
     Args:
         cv_result_list: List containing pandas Dataframes with corresponding cross-validation results.
 
@@ -178,10 +178,8 @@ def _normalize_results(cv_result_list: list):
     return
 
 
-def _calculate_stability_of_feature_selection(
-        cv_result_list: list, method: str
-)-> float:
-    """ Calculate stability of feature selection.
+def _calculate_stability_of_feature_selection(cv_result_list: list, method: str) -> float:
+    """Calculate stability of feature selection.
     Args:
         cv_result_list: List containing pandas Dataframes with corresponding cross-validation results.
         method: Method to evaluate. Either "standard", "shap" or "reverse".
@@ -356,11 +354,11 @@ def calculate_performance(test_train_sets, feature_names, importance_matrix, met
 
 
 def classify_feature_subsets(
-        test_train_sets,
-        # TODO series?
-        selected_feature_names,
-        weights,
-        meta_data,
+    test_train_sets,
+    # TODO series?
+    selected_feature_names,
+    weights,
+    meta_data,
 ):
     classified_classes = []
     true_classes = []
@@ -439,10 +437,10 @@ def calculate_micro_metrics(predicted_classes, true_classes, meta_data_dict):
 
 
 def _measure_correctness_of_feature_selection(
-        performance_metrics_dict,
-        selected_features_matrix,
-        selected_feature_names,
-        meta_data,
+    performance_metrics_dict,
+    selected_features_matrix,
+    selected_feature_names,
+    meta_data,
 ):
     bm = 0
     pseudo = 0
@@ -648,11 +646,11 @@ def _extract_test_data_and_results(feature_selection_result, meta_data_dict):
         if micro_fi_dict and (selection_method in micro_fi_dict):
             # remove method with incomplete matrix
             if not (
-                    micro_fi_dict[selection_method].shape
-                    == (
-                            meta_data_dict["cv"]["n_outer_folds"],
-                            len(meta_data_dict["data"]["columns"]) - 1,
-                    )
+                micro_fi_dict[selection_method].shape
+                == (
+                    meta_data_dict["cv"]["n_outer_folds"],
+                    len(meta_data_dict["data"]["columns"]) - 1,
+                )
             ):
                 micro_fi_dict.pop(selection_method)
             else:
