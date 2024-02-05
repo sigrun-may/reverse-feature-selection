@@ -217,9 +217,7 @@ def train_model_and_predict_y(cross_validation_indices_list, data_df, subset_eva
             ), feature_subset_weights.size  # -1 for label column
 
             # train and evaluate the model
-            knn = KNeighborsClassifier(
-                n_neighbors=k, n_jobs=-1
-            )
+            knn = KNeighborsClassifier(n_neighbors=k, n_jobs=-1)
             # knn = KNeighborsClassifier(
             #     n_neighbors=k, metric=WeightedManhattanDistance(feature_subset_weights), n_jobs=-1
             # )
@@ -341,9 +339,16 @@ def apply_p_value_as_feature_importance(
         )
         # count the number of p-values between zero and 0.05
         number_of_not_significant_p_values = np.sum((p_values_array > 0) & (p_values_array < 0.05))
-        assert number_of_not_significant_p_values + np.sum(p_values_array == 0) + np.sum(p_values_array > 0.05) == len( # noqa: E501
+        assert number_of_not_significant_p_values + np.sum(p_values_array == 0) + np.sum(
+            p_values_array > 0.05
+        ) == len(  # noqa: E501
             p_values_array
-        ), (number_of_not_significant_p_values, np.sum(p_values_array == 0), np.sum(p_values_array > 0.05), len(p_values_array))
+        ), (
+            number_of_not_significant_p_values,
+            np.sum(p_values_array == 0),
+            np.sum(p_values_array > 0.05),
+            len(p_values_array),
+        )
 
         # set the p-values smaller than 0.05 to zero
         p_values_array[p_values_array < 0.05] = 0
@@ -379,7 +384,7 @@ def apply_p_value_as_feature_importance(
             np.sum(log_p_values_fraction_array == 0),
             np.sum(p_values_array == 0),
             np.sum(np.isnan(cv_iteration_result_df[p_value].values)),
-            number_of_not_significant_p_values
+            number_of_not_significant_p_values,
         )
 
     # convert list of arrays to matrix
@@ -417,13 +422,22 @@ def apply_p_value_as_feature_importance(
 
     # calculate stability of feature selection
     update_result_dictionary(
-        result_dict, f"{feature_selection_method}_only_raw_{p_value}", "stability", stability_estimator.get_stability(p_value_importance_matrix)
+        result_dict,
+        f"{feature_selection_method}_only_raw_{p_value}",
+        "stability",
+        stability_estimator.get_stability(p_value_importance_matrix),
     )
     update_result_dictionary(
-        result_dict, f"{feature_selection_method}_neg_log_{p_value}", "stability", stability_estimator.get_stability(log_p_value_importance_matrix)
+        result_dict,
+        f"{feature_selection_method}_neg_log_{p_value}",
+        "stability",
+        stability_estimator.get_stability(log_p_value_importance_matrix),
     )
     update_result_dictionary(
-        result_dict, f"{feature_selection_method}_neg_log_{p_value}_and_fraction", "stability", stability_estimator.get_stability(log_p_value_and_fraction_importance_matrix)
+        result_dict,
+        f"{feature_selection_method}_neg_log_{p_value}_and_fraction",
+        "stability",
+        stability_estimator.get_stability(log_p_value_and_fraction_importance_matrix),
     )
 
 
