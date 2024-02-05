@@ -9,6 +9,7 @@ import pandas as pd
 from sklearn.metrics import (
     roc_curve,
     auc,
+    roc_auc_score,
     precision_recall_curve,
     average_precision_score,
     accuracy_score,
@@ -19,10 +20,6 @@ from sklearn.metrics import (
     brier_score_loss,
 )
 from sklearn.neighbors import KNeighborsClassifier
-
-import matplotlib.pyplot as plt
-import seaborn as sns
-import plotly.graph_objects as go
 import plotly.express as px
 
 import stability_estimator
@@ -72,32 +69,17 @@ def evaluate(
     subset_evaluation_result_dict = evaluate_feature_subsets(
         feature_selection_result_cv_list, feature_selection_methods, thresholds
     )
+    # evaluate performance
     performance_evaluation_result_dict = evaluate_performance(
-        data_df, cross_validation_indices_list, subset_evaluation_result_dict
+        data_df, cross_validation_indices_list, subset_evaluation_result_dict, k=9
     )
+    plot_performance(performance_evaluation_result_dict, subset_evaluation_result_dict)
+
     return subset_evaluation_result_dict, performance_evaluation_result_dict
 
 
-def calculate_auc_auprc(y_true, y_predict):
-    """
-    Calculates the area under the ROC curve and the area under the precision-recall curve.
-
-    Args:
-        y_true: The true labels.
-        y_predict: The predicted labels.
-
-    Returns:
-        The area under the ROC curve and the area under the precision-recall curve.
-    """
-    fpr, tpr, thresholds = roc_curve(y_true, y_predict)
-    auc_value = auc(fpr, tpr)
-    precision, recall, thresholds = precision_recall_curve(y_true, y_predict)
-    auprc = average_precision_score(y_true, y_predict)
-    return auc_value, auprc, fpr, tpr, thresholds
-
-
 def evaluate_performance(
-    data_df: pd.DataFrame, cross_validation_indices_list: list, subset_evaluation_result_dict: dict, k: int = 5
+    data_df: pd.DataFrame, cross_validation_indices_list: list, subset_evaluation_result_dict: dict, k: int
 ) -> dict:
     """
     Evaluates the performance of the feature selection methods.
@@ -110,206 +92,155 @@ def evaluate_performance(
         cross_validation_indices_list: A list of cross-validation indices.
         subset_evaluation_result_dict: A dictionary containing the evaluation results for each feature selection method.
         k: The number of neighbors to use. Defaults to 5.
+
+    Returns:
+        A dictionary containing the evaluation results for each feature selection method.
     """
-    performance_evaluation_result_dict = {"performance": {}}
+    prediction_result_dict = train_model_and_predict_y(
+        cross_validation_indices_list, data_df, subset_evaluation_result_dict, k
+    )
+    performance_evaluation_result_dict = {}
+    # calculate performance metrics
+    for feature_selection_method in subset_evaluation_result_dict["importance_ranking"].keys():
+        performance_evaluation_result_dict[feature_selection_method] = calculate_performance_metrics(
+            prediction_result_dict[f"{feature_selection_method}_true"],
+            prediction_result_dict[f"{feature_selection_method}_predict"],
+            prediction_result_dict[f"{feature_selection_method}_predict_proba"],
+        )
+    return performance_evaluation_result_dict
+
+
+def plot_performance(performance_evaluation_result_dict: dict, subset_evaluation_result_dict: dict):
+    # plot performance metrics for each feature selection method with plotly
+    # iterate over all performance metrics
+    for performance_metric in performance_evaluation_result_dict["standard"].keys():
+        print(performance_metric)
+        if performance_metric in ["fpr", "tpr", "thresholds"]:
+            continue
+
+        # Extract the performance metric, stability, and number of selected features
+        data = []
+        for method in performance_evaluation_result_dict.keys():
+            performance = performance_evaluation_result_dict[method][performance_metric]
+            importance_matrix = subset_evaluation_result_dict["importance_ranking"][method]
+            stability = stability_estimator.get_stability(importance_matrix)
+            subset_sizes = np.sum(np.where(importance_matrix > 0, 1, 0), axis=1)
+            num_features = np.mean(subset_sizes, axis=0)
+            data.append([method, performance, stability, num_features])
+
+        # Create a DataFrame
+        df = pd.DataFrame(data, columns=["method", "performance", "stability", "num_features"])
+
+        # plot results with plotly
+        fig = px.scatter(
+            df, x="num_features", y="performance", size="stability", color="stability", hover_data=["method"]
+        )
+        fig.update_layout(
+            title=f"{data_name}: {performance_metric} vs Number of Selected Features (colored by Stability)",
+            xaxis_title="Number of Selected Features",
+            yaxis_title=performance_metric,
+            legend_title="Stability",
+        )
+        fig.show()
+
+
+def calculate_performance_metrics(y_true, y_predict, y_predict_proba):
+    """
+    Calculates the performance metrics for the predicted labels.
+
+    Args:
+        y_true: The true labels.
+        y_predict: The predicted labels.
+        y_predict_proba: The predicted probabilities.
+
+    Returns:
+        A dictionary containing the performance metrics.
+    """
+    # calculate performance metrics
+    fpr, tpr, thresholds = roc_curve(y_true, y_predict)
+    precision, recall, thresholds = precision_recall_curve(y_true, y_predict)
+
+    # brier score loss
+    # extract the probability for the positive class
+    probability_positive_class = np.array([proba[1] for proba in y_predict_proba])
+
+    performance_dict = {
+        "accuracy": accuracy_score(y_true, y_predict),
+        "precision": precision_score(y_true, y_predict),
+        "recall": recall_score(y_true, y_predict),
+        "f1": f1_score(y_true, y_predict),
+        "auc": roc_auc_score(y_true, probability_positive_class),
+        "log_loss": log_loss(y_true, y_predict_proba),
+        "brier_score_loss": brier_score_loss(y_true, probability_positive_class),
+        "auprc": average_precision_score(y_true, y_predict),
+        "fpr": fpr,
+        "tpr": tpr,
+        "thresholds": thresholds,
+    }
+    return performance_dict
+
+
+def train_model_and_predict_y(cross_validation_indices_list, data_df, subset_evaluation_result_dict, k):
+    """
+    Trains a model and predicts the labels for the test data.
+
+    Args:
+        cross_validation_indices_list: A list of cross-validation indices.
+        data_df: The data to evaluate.
+        subset_evaluation_result_dict: A dictionary containing the feature weights for each feature selection method.
+        k: The number of neighbors to use. Defaults to 5.
+
+    Returns:
+        A dictionary containing the prediction results for each feature selection method.
+    """
+    prediction_result_dict = {}
     # iterate over cross-validation indices
-    for i, (train_indices, test_indices) in enumerate(cross_validation_indices_list):
+    for cv_iteration, (train_indices, test_indices) in enumerate(cross_validation_indices_list):
         # extract training and test data samples
         train_data_df = data_df.iloc[train_indices, :]
         test_data_df = data_df.iloc[test_indices, :]
 
-        # extract and transform x and y values
+        # extract x and y values
         x_train = train_data_df.iloc[:, 1:].values
         y_train = train_data_df.iloc[:, 0].values
         x_test = test_data_df.iloc[:, 1:].values
         y_test = test_data_df.iloc[:, 0].values
 
-        # iterate over feature selection methods rankings
+        # iterate over feature selection methods
         for feature_selection_method in subset_evaluation_result_dict["importance_ranking"].keys():
-            # extract feature subset
-            feature_subset = subset_evaluation_result_dict["importance_ranking"][feature_selection_method][i]
-            assert feature_subset.size == train_data_df.shape[1] - 1, feature_subset.size  # -1 for label column
+            # extract weights for feature subset
+            feature_subset_weights = subset_evaluation_result_dict["importance_ranking"][feature_selection_method][
+                cv_iteration
+            ]
+            assert (
+                feature_subset_weights.size == train_data_df.shape[1] - 1
+            ), feature_subset_weights.size  # -1 for label column
 
             # train and evaluate the model
             knn = KNeighborsClassifier(
-                n_neighbors=k, metric=WeightedManhattanDistance(feature_subset), algorithm="brute", n_jobs=-1
+                n_neighbors=k, n_jobs=-1
             )
+            # knn = KNeighborsClassifier(
+            #     n_neighbors=k, metric=WeightedManhattanDistance(feature_subset_weights), n_jobs=-1
+            # )
             knn.fit(x_train, y_train)
             predicted_proba_y = knn.predict_proba(x_test)[0]
             predicted_y = knn.predict(x_test)[0]
 
             # initialize list in feature_selection_method_performance_evaluation_dict
             # for current feature_selection_method
-            if f"{feature_selection_method}_predict" not in performance_evaluation_result_dict.keys():
-                performance_evaluation_result_dict[f"{feature_selection_method}_predict"] = []
-            if f"{feature_selection_method}_predict_proba" not in performance_evaluation_result_dict.keys():
-                performance_evaluation_result_dict[f"{feature_selection_method}_predict_proba"] = []
-            if f"{feature_selection_method}_true" not in performance_evaluation_result_dict.keys():
-                performance_evaluation_result_dict[f"{feature_selection_method}_true"] = []
+            if f"{feature_selection_method}_predict" not in prediction_result_dict.keys():
+                prediction_result_dict[f"{feature_selection_method}_predict"] = []
+            if f"{feature_selection_method}_predict_proba" not in prediction_result_dict.keys():
+                prediction_result_dict[f"{feature_selection_method}_predict_proba"] = []
+            if f"{feature_selection_method}_true" not in prediction_result_dict.keys():
+                prediction_result_dict[f"{feature_selection_method}_true"] = []
 
             # append score to list in feature_selection_method_performance_evaluation_dict
-            performance_evaluation_result_dict[f"{feature_selection_method}_predict"].append(predicted_y)
-            performance_evaluation_result_dict[f"{feature_selection_method}_predict_proba"].append(predicted_proba_y)
-            performance_evaluation_result_dict[f"{feature_selection_method}_true"].append(y_test[0])
-
-    # calculate performance metrics
-    for feature_selection_method in subset_evaluation_result_dict["importance_ranking"].keys():
-        # calculate performance metrics
-        accuracy = accuracy_score(
-            performance_evaluation_result_dict[f"{feature_selection_method}_true"],
-            performance_evaluation_result_dict[f"{feature_selection_method}_predict"],
-        )
-        precision = precision_score(
-            performance_evaluation_result_dict[f"{feature_selection_method}_true"],
-            performance_evaluation_result_dict[f"{feature_selection_method}_predict"],
-        )
-        recall = recall_score(
-            performance_evaluation_result_dict[f"{feature_selection_method}_true"],
-            performance_evaluation_result_dict[f"{feature_selection_method}_predict"],
-        )
-        f1 = f1_score(
-            performance_evaluation_result_dict[f"{feature_selection_method}_true"],
-            performance_evaluation_result_dict[f"{feature_selection_method}_predict"],
-        )
-        auc, auprc, fpr, tpr, thresholds = calculate_auc_auprc(
-            performance_evaluation_result_dict[f"{feature_selection_method}_true"],
-            performance_evaluation_result_dict[f"{feature_selection_method}_predict"],
-        )
-        # log loss
-        log_loss_value = log_loss(
-            performance_evaluation_result_dict[f"{feature_selection_method}_true"],
-            performance_evaluation_result_dict[f"{feature_selection_method}_predict_proba"],
-        )
-        # brier score loss
-        # extract the probability for the positive class
-        probability_positive_class = np.array(
-            [proba[1] for proba in performance_evaluation_result_dict[f"{feature_selection_method}_predict_proba"]]
-        )
-        brier_score_loss_value = brier_score_loss(
-            performance_evaluation_result_dict[f"{feature_selection_method}_true"], probability_positive_class
-        )
-
-        # initialize dictionary for performance metrics
-        performance_evaluation_result_dict["performance"][feature_selection_method] = {}
-
-        # add performance metrics to result dictionary
-        performance_evaluation_result_dict["performance"][feature_selection_method]["accuracy"] = accuracy
-        performance_evaluation_result_dict["performance"][feature_selection_method]["precision"] = precision
-        performance_evaluation_result_dict["performance"][feature_selection_method]["recall"] = recall
-        performance_evaluation_result_dict["performance"][feature_selection_method]["f1"] = f1
-        performance_evaluation_result_dict["performance"][feature_selection_method]["auc"] = auc
-        performance_evaluation_result_dict["performance"][feature_selection_method]["auprc"] = auprc
-        performance_evaluation_result_dict["performance"][feature_selection_method]["fpr"] = fpr
-        performance_evaluation_result_dict["performance"][feature_selection_method]["tpr"] = tpr
-        performance_evaluation_result_dict["performance"][feature_selection_method]["thresholds"] = thresholds
-        performance_evaluation_result_dict["performance"][feature_selection_method]["log_loss"] = log_loss_value
-        performance_evaluation_result_dict["performance"][feature_selection_method][
-            "brier_score_loss"
-        ] = brier_score_loss_value
-
-    # # plot metrics of different feature selection methods with seaborn
-    # for feature_selection_method in performance_evaluation_result_dict["performance"].keys():
-    #     # plot roc curve
-    #     plt.figure()
-    #     lw = 2
-    #     plt.plot(
-    #         performance_evaluation_result_dict["performance"][feature_selection_method]["fpr"],
-    #         performance_evaluation_result_dict["performance"][feature_selection_method]["tpr"],
-    #         color="darkorange",
-    #         lw=lw,
-    #         label=f"ROC curve (area = {performance_evaluation_result_dict['performance'][feature_selection_method]['auc']:.2f})",
-    #     )
-    #     plt.plot([0, 1], [0, 1], color="navy", lw=lw, linestyle="--")
-    #     plt.xlim([0.0, 1.05])
-    #     plt.ylim([0.0, 1.05])
-    #     plt.xlabel("False Positive Rate")
-    #     plt.ylabel("True Positive Rate")
-    #     plt.title(f"ROC curve for {feature_selection_method}")
-    #     plt.legend(loc="lower right")
-    #     # plt.savefig(f"/home/sigrun/PycharmProjects/reverse_feature_selection/results/roc_curve_{feature_selection_method}.png")
-    #     # plt.show()
-    #
-    #     # plot precision-recall curve
-    #     plt.figure()
-    #     lw = 2
-    #     plt.plot(
-    #         performance_evaluation_result_dict["performance"][feature_selection_method]["recall"],
-    #         performance_evaluation_result_dict["performance"][feature_selection_method]["precision"],
-    #         color="darkorange",
-    #         lw=lw,
-    #         label=f"PR curve (area = {performance_evaluation_result_dict['performance'][feature_selection_method]['auprc']:.2f})",
-    #     )
-    #     plt.xlim([0.0, 1.05])
-    #     plt.ylim([0.0, 1.05])
-    #     plt.xlabel("Recall")
-    #     plt.ylabel("Precision")
-    #     plt.title(f"PR curve for {feature_selection_method}")
-    #     plt.legend(loc="lower right")
-    #     # plt.savefig(f"/home/sigrun/PycharmProjects/reverse_feature_selection/pr_curve_{feature_selection_method}.png")
-    #     # plt.show()
-    # # plot f1 score
-    # f1_score_df = pd.DataFrame(
-    #     {
-    #         # "feature_selection_method": list(performance_evaluation_result_dict["performance"].keys()),
-    #         "f1_score": [value["f1"] for value in performance_evaluation_result_dict["performance"].values()],
-    #     },
-    #     index=list(performance_evaluation_result_dict["performance"].keys()),
-    # )
-    # # seaborn barchart based on f1_score_series
-    # sns.set_theme(style="whitegrid")
-    # sns.set(font_scale=1)
-    # sns.set(rc={"figure.figsize": (11.7, 12.0)})
-    # ax = sns.barplot(x=f1_score_df.index, y=f1_score_df["f1_score"])
-    # ax.set_xticks(ax.get_xticks(), labels=list(f1_score_df.index), rotation=45, horizontalalignment="right")
-    # ax.set(xlabel=list(f1_score_df.index), ylabel="F1 Score")
-    # plt.savefig("/home/sigrun/PycharmProjects/reverse_feature_selection/f1_score.png")
-    # plt.show()
-
-    # sns.set_theme(style="whitegrid")
-    # sns.set(rc={"figure.figsize": (11.7, 8.27)})
-    # sns.set(font_scale=1.5)
-    # ax = sns.barplot(data=f1_score_df, y="f1_score")
-    # # set xticks to be rotated
-    # # ax.set_xticks(ax.get_xticks(), labels=f1_score_df["feature_selection_method"], rotation=45, horizontalalignment="right")
-    # ax.set(xlabel="Feature Selection Method", ylabel="F1 Score")
-    # # plt.savefig("/home/sigrun/PycharmProjects/reverse_feature_selection/results/f1_score.png")
-    # plt.show()
-
-    # # plot auc
-    # auc_df = pd.DataFrame(
-    #     {
-    #         "feature_selection_method": list(performance_evaluation_result_dict["performance"].keys()),
-    #         "auc": [value["auc"] for value in performance_evaluation_result_dict["performance"].values()],
-    #     }
-    # )
-    # sns.set_theme(style="whitegrid")
-    # # sns.set(rc={"figure.figsize": (21.7, 18.27)})
-    # ax = auc_df.plot.bar(x="feature_selection_method", y="auc")
-    # ax.set(xlabel=auc_df["feature_selection_method"].values, ylabel="AUC")
-    # plt.savefig("/home/sigrun/PycharmProjects/reverse_feature_selection/auc.png")
-    # plt.show()
-
-    return performance_evaluation_result_dict
-
-
-def feature_weighted_knn(
-    train_data: pd.DataFrame, test_data: pd.DataFrame, feature_weights_cv_list: list[pd.Series], k: int
-):
-    """
-    Calculates the feature weighted k-nearest neighbors.
-
-    Args:
-        train_data: The training data.
-        test_data: The test data.
-        feature_weights_cv_list: A list of feature weights for each cross-validation result.
-        k: The number of neighbors to use.
-    """
-    # calculate feature weighted k-nearest neighbors
-    # iterate over cross-validation results
-    for feature_weights_series in feature_weights_cv_list:
-        pass
-
-    pass
+            prediction_result_dict[f"{feature_selection_method}_predict"].append(predicted_y)
+            prediction_result_dict[f"{feature_selection_method}_predict_proba"].append(predicted_proba_y)
+            prediction_result_dict[f"{feature_selection_method}_true"].append(y_test[0])
+    return prediction_result_dict
 
 
 def evaluate_feature_subsets(
@@ -359,16 +290,16 @@ def evaluate_feature_subsets(
                     thresholds,
                 )
                 # apply negative log p-values as feature importances
-                apply_log_p_value_as_feature_importance(
+                apply_p_value_as_feature_importance(
                     result_dict,
-                    f"{feature_selection_method}_log_{p_value}",
+                    feature_selection_method,
                     feature_selection_result_cv_list,
                     p_value,
                 )
     return result_dict
 
 
-def apply_log_p_value_as_feature_importance(
+def apply_p_value_as_feature_importance(
     result_dict: dict,
     feature_selection_method: str,
     feature_selection_result_cv_list: list,
@@ -389,27 +320,111 @@ def apply_log_p_value_as_feature_importance(
                  or "p_values_mwu" for Mann–Whitney U test.
     """
     p_value_importance_list = []
+    log_p_value_importance_list = []
+    log_p_value_and_fraction_importance_list = []
     # iterate over cross-validation results
     for cv_iteration_result_df in feature_selection_result_cv_list:
+        # extract fraction
+        fraction_array = cv_iteration_result_df[f"percent_{p_value}"].values
+
         # extract p-values
         p_values_array = cv_iteration_result_df[p_value].values
+        # check if any p-values are zero
+        assert not np.any(p_values_array == 0), p_values_array
         # replace nan values with zero
         p_values_array = np.nan_to_num(p_values_array)
+        assert not np.isnan(p_values_array).any(), p_values_array
+        # check if number of zero values equals number of nan values
+        assert np.sum(p_values_array == 0) == np.sum(np.isnan(cv_iteration_result_df[p_value].values)), (
+            np.sum(p_values_array == 0),
+            np.sum(np.isnan(cv_iteration_result_df[p_value].values)),
+        )
+        # count the number of p-values between zero and 0.05
+        number_of_not_significant_p_values = np.sum((p_values_array > 0) & (p_values_array < 0.05))
+        assert number_of_not_significant_p_values + np.sum(p_values_array == 0) + np.sum(p_values_array > 0.05) == len( # noqa: E501
+            p_values_array
+        ), (number_of_not_significant_p_values, np.sum(p_values_array == 0), np.sum(p_values_array > 0.05), len(p_values_array))
+
         # set the p-values smaller than 0.05 to zero
         p_values_array[p_values_array < 0.05] = 0
-        # calculate negative log of the nonzero p-values
-        p_values_array[p_values_array > 0] = -np.log(p_values_array[p_values_array > 0])
+        # check if any p-values are between 0 and 0.05
+        assert not np.any((p_values_array > 0) & (p_values_array < 0.05)), p_values_array
         p_value_importance_list.append(p_values_array)
+
+        # calculate negative log of the nonzero p-values
+        log_p_values_array = np.copy(p_values_array)
+        log_p_values_array[p_values_array > 0] = -np.log(p_values_array[p_values_array > 0])
+        assert np.all(log_p_values_array >= 0), log_p_values_array
+        assert math.isclose(np.min(log_p_values_array), 0), log_p_values_array
+        log_p_value_importance_list.append(log_p_values_array)
+
+        # combine negative log p-values and fraction
+        log_p_values_fraction_array = np.copy(log_p_values_array)
+        # add fraction where log p-value is not zero
+        log_p_values_fraction_array[log_p_values_array > 0] = (
+            fraction_array[log_p_values_array > 0] + log_p_values_array[log_p_values_array > 0]
+        )
+        assert np.all(log_p_values_fraction_array >= 0), log_p_values_fraction_array
+        assert math.isclose(np.min(log_p_values_fraction_array), 0), log_p_values_fraction_array
+        log_p_value_and_fraction_importance_list.append(log_p_values_fraction_array)
+
+        # check number of zeros in all p_values arrays
+        assert (
+            np.sum(p_values_array == 0)
+            == np.sum(log_p_values_array == 0)
+            == np.sum(log_p_values_fraction_array == 0)
+            == np.sum(np.isnan(cv_iteration_result_df[p_value].values)) + number_of_not_significant_p_values
+        ), (
+            np.sum(log_p_values_array == 0),
+            np.sum(log_p_values_fraction_array == 0),
+            np.sum(p_values_array == 0),
+            np.sum(np.isnan(cv_iteration_result_df[p_value].values)),
+            number_of_not_significant_p_values
+        )
 
     # convert list of arrays to matrix
     p_value_importance_matrix = np.vstack(p_value_importance_list)
-    assert p_value_importance_matrix.shape == (
-        len(feature_selection_result_cv_list),
-        feature_selection_result_cv_list[0].shape[0],
+    log_p_value_importance_matrix = np.vstack(log_p_value_importance_list)
+    log_p_value_and_fraction_importance_matrix = np.vstack(log_p_value_and_fraction_importance_list)
+
+    # check the shape of the feature importance matrix
+    assert (
+        p_value_importance_matrix.shape
+        == log_p_value_importance_matrix.shape
+        == log_p_value_and_fraction_importance_matrix.shape
+        == (
+            len(feature_selection_result_cv_list),
+            feature_selection_result_cv_list[0].shape[0],
+        )
     ), p_value_importance_matrix.shape
 
+    # check if the matrices are different
+    assert not np.all(p_value_importance_matrix == log_p_value_importance_matrix), (
+        p_value_importance_matrix,
+        log_p_value_importance_matrix,
+    )
+    assert not np.all(log_p_value_importance_matrix == log_p_value_and_fraction_importance_matrix), (
+        log_p_value_importance_matrix,
+        log_p_value_and_fraction_importance_matrix,
+    )
+
     # update result dictionary with p_value feature importance matrix
-    result_dict["importance_ranking"][feature_selection_method] = p_value_importance_matrix
+    result_dict["importance_ranking"][f"{feature_selection_method}_only_raw_{p_value}"] = p_value_importance_matrix
+    result_dict["importance_ranking"][f"{feature_selection_method}_neg_log_{p_value}"] = log_p_value_importance_matrix
+    result_dict["importance_ranking"][
+        f"{feature_selection_method}_neg_log_{p_value}_and_fraction"
+    ] = log_p_value_and_fraction_importance_matrix
+
+    # calculate stability of feature selection
+    update_result_dictionary(
+        result_dict, f"{feature_selection_method}_only_raw_{p_value}", "stability", stability_estimator.get_stability(p_value_importance_matrix)
+    )
+    update_result_dictionary(
+        result_dict, f"{feature_selection_method}_neg_log_{p_value}", "stability", stability_estimator.get_stability(log_p_value_importance_matrix)
+    )
+    update_result_dictionary(
+        result_dict, f"{feature_selection_method}_neg_log_{p_value}_and_fraction", "stability", stability_estimator.get_stability(log_p_value_and_fraction_importance_matrix)
+    )
 
 
 def update_result_dictionary(result_dict: dict, feature_selection_method: str, metric_name: str, metric_value: Any):
@@ -665,95 +680,12 @@ def optimize_threshold(feature_importance_matrix):
 
 thresholds_dict = {"standard": 0.1, "standard_shap": 0.002, "reverse": 0.05}
 # thresholds = None
-input_data_df = load_data_with_standardized_sample_size("prostate")
+data_name = "leukemia"
+input_data_df = load_data_with_standardized_sample_size("leukemia_big")
+# TODO rest of the data as test data
 subset_result_dict_final, performance_result_dict_final = evaluate(
     input_data_df,
-    "/home/sigrun/PycharmProjects/reverse_feature_selection/results/prostate_loo_result_dict.pkl",
+    f"/home/sigrun/PycharmProjects/reverse_feature_selection/results/{data_name}_loo_result_dict.pkl",
     feature_selection_methods=["standard", "standard_shap", "reverse"],
     thresholds=thresholds_dict,
 )
-for key, value in subset_result_dict_final["stability"].items():
-    print(key, ":", value)
-    print("mean subset size: ", subset_result_dict_final["mean_subset_size"][key])
-    print("  ")
-
-# iterate over all performance metrics
-for performance_metric in performance_result_dict_final["performance"]["standard"].keys():
-    print(performance_metric)
-    if performance_metric == "fpr" or performance_metric == "tpr" or performance_metric == "thresholds":
-        continue
-
-    # Extract the performance metric, stability, and number of selected features
-    data = []
-    for method in performance_result_dict_final["performance"].keys():
-        performance = performance_result_dict_final["performance"][method][performance_metric]
-        importance_matrix = subset_result_dict_final["importance_ranking"][method]
-        stability = stability_estimator.get_stability(importance_matrix)
-        subset_sizes = np.sum(np.where(importance_matrix > 0, 1, 0), axis=1)
-        num_features = np.mean(subset_sizes, axis=0)
-        data.append([method, performance, stability, num_features])
-
-    # Create a DataFrame
-    df = pd.DataFrame(data, columns=["method", "performance", "stability", "num_features"])
-
-    # # Plot
-    # plt.figure(figsize=(10, 26))
-    # scatter = plt.scatter(df["num_features"], df["performance"], c=df["stability"], cmap='viridis')
-    # plt.colorbar(scatter, label="Stability")
-    # plt.xlabel("Number of Selected Features")
-    # plt.ylabel("Performance Metric")
-    # plt.title("Performance vs Number of Selected Features (colored by Stability)")
-    # plt.savefig("/home/sigrun/PycharmProjects/reverse_feature_selection/results/feature_selection_performance.png")
-    # plt.show()
-
-    # # Iterate over unique methods
-    # for method in df["method"].unique():
-    #     # Create a scatter plot for each method
-    #     subset_df = df[df["method"] == method]
-    #     scatter = plt.scatter(subset_df["num_features"], subset_df["performance"], c=subset_df["stability"], cmap='viridis', label=method)
-    # plt.figure(figsize=(10, 26))
-    # plt.colorbar(scatter, label="Stability")
-    # plt.xlabel("Number of Selected Features")
-    # plt.ylabel("Performance Metric")
-    # plt.title("Performance vs Number of Selected Features (colored by Stability)")
-    # # add legend
-    # handles, labels = scatter.legend_elements(prop="colors", alpha=0.6)
-    # legend1 = plt.legend(handles, labels, loc="upper right", title="Stability")
-    # plt.gca().add_artist(legend1)
-    # plt.show()
-
-    # Create a new figure
-    plt.figure(figsize=(24, 8))
-
-    # Iterate over unique methods
-    for method in df["method"].unique():
-        # Create a scatter plot for each method
-        subset_df = df[df["method"] == method]
-        scatter = plt.scatter(
-            subset_df["num_features"], subset_df["performance"], c=subset_df["stability"], cmap="viridis", label=method
-        )
-
-    # Add colorbar, labels, and title
-    plt.colorbar(scatter, label="Stability")
-    plt.xlabel("Number of Selected Features")
-    plt.ylabel("Performance Metric")
-    plt.title(f"{performance_metric} vs Number of Selected Features (colored by Stability)")
-
-    # Add legend
-    handles, labels = plt.gca().get_legend_handles_labels()
-    plt.legend(handles, labels, title="Methods", bbox_to_anchor=(1.2, 1), loc="upper left", borderaxespad=0)
-
-    # Save the figure
-    plt.savefig(
-        f"/home/sigrun/PycharmProjects/reverse_feature_selection/feature_selection_performance_{performance_metric}.png"
-    )
-
-    # convert the figure to plotly
-    fig = px.scatter(df, x="num_features", y="performance", color="stability", hover_data=["method"])
-    fig.update_layout(
-        title=f"{performance_metric} vs Number of Selected Features (colored by Stability)",
-        xaxis_title="Number of Selected Features",
-        yaxis_title=performance_metric,
-        legend_title="Stability",
-    )
-    fig.show()
