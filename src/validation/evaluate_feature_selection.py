@@ -20,7 +20,9 @@ from sklearn.metrics import (
     brier_score_loss,
 )
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.preprocessing import RobustScaler
 import plotly.express as px
+import plotly.io as pio
 
 import stability_estimator
 from src.reverse_feature_selection.data_loader_tools import load_data_with_standardized_sample_size
@@ -71,7 +73,7 @@ def evaluate(
     )
     # evaluate performance
     performance_evaluation_result_dict = evaluate_performance(
-        data_df, cross_validation_indices_list, subset_evaluation_result_dict, k=9
+        data_df, cross_validation_indices_list, subset_evaluation_result_dict, k=7
     )
     plot_performance(performance_evaluation_result_dict, subset_evaluation_result_dict)
 
@@ -120,27 +122,59 @@ def plot_performance(performance_evaluation_result_dict: dict, subset_evaluation
 
         # Extract the performance metric, stability, and number of selected features
         data = []
-        for method in performance_evaluation_result_dict.keys():
+        methods = ["standard", "reverse_fraction_p_values_tt"]  # performance_evaluation_result_dict.keys()
+        for method in methods:
             performance = performance_evaluation_result_dict[method][performance_metric]
             importance_matrix = subset_evaluation_result_dict["importance_ranking"][method]
             stability = stability_estimator.get_stability(importance_matrix)
             subset_sizes = np.sum(np.where(importance_matrix > 0, 1, 0), axis=1)
             num_features = np.mean(subset_sizes, axis=0)
-            data.append([method, performance, stability, num_features])
+            if "standard" in method:
+                method_name = "Standard RF"
+            elif "reverse" in method:
+                method_name = "Reverse RF"
+            data.append([method_name, performance, stability, num_features])
 
         # Create a DataFrame
         df = pd.DataFrame(data, columns=["method", "performance", "stability", "num_features"])
 
+        # # plot results with plotly
+        # fig = px.scatter(
+        #     df, x="num_features", y="performance", size="stability", color="stability", hover_data=["method"],
+        #     # color_continuous_scale='Viridis_r'  # Reverse the color scale
+        #     color_continuous_scale='Greys'  # Use a grey color scale
+        # )
+        # fig.update_layout(
+        #     title=f"{data_name}: {performance_metric} vs Number of Selected Features (colored by Stability)",
+        #     xaxis_title="Number of Selected Features",
+        #     yaxis_title=performance_metric,
+        #     legend_title="Stability",
+        # )
         # plot results with plotly
         fig = px.scatter(
-            df, x="num_features", y="performance", size="stability", color="stability", hover_data=["method"]
+            df, x="stability", y="performance", size="num_features", color="num_features", hover_data=["method"],
+            text="method",   # Add method name to each data point
+            template="plotly_white",
+            # color_continuous_scale=px.colors.qualitative.Pastel2,
+            color_continuous_scale=px.colors.qualitative.Set2,
+            # color_continuous_scale='Viridis_r'  # Reverse the color scale
+            # color_continuous_scale='Greys'  # Use a grey color scale
         )
         fig.update_layout(
-            title=f"{data_name}: {performance_metric} vs Number of Selected Features (colored by Stability)",
-            xaxis_title="Number of Selected Features",
+            title=f"{data_name}: {performance_metric} vs Stability (colored and shaped by Number of Selected Features)",
+            xaxis_title="Stability of Feature Selection",
             yaxis_title=performance_metric,
-            legend_title="Stability",
+            legend_title="Number of Selected Features",
+            legend=dict(
+                yanchor="top",
+                y=0.99,
+                xanchor="left",
+                x=0.01
+            )
         )
+        if performance_metric == "auc":
+            # save figure as pdf
+            pio.write_image(fig, f'{performance_metric}_performance.pdf')
         fig.show()
 
 
@@ -169,7 +203,7 @@ def calculate_performance_metrics(y_true, y_predict, y_predict_proba):
         "precision": precision_score(y_true, y_predict),
         "recall": recall_score(y_true, y_predict),
         "f1": f1_score(y_true, y_predict),
-        "auc": roc_auc_score(y_true, probability_positive_class),
+        "auc": auc(fpr, tpr),
         "log_loss": log_loss(y_true, y_predict_proba),
         "brier_score_loss": brier_score_loss(y_true, probability_positive_class),
         "auprc": average_precision_score(y_true, y_predict),
@@ -215,15 +249,35 @@ def train_model_and_predict_y(cross_validation_indices_list, data_df, subset_eva
             assert (
                 feature_subset_weights.size == train_data_df.shape[1] - 1
             ), feature_subset_weights.size  # -1 for label column
+            assert np.count_nonzero(feature_subset_weights) > 0, np.count_nonzero(feature_subset_weights)
+
+            # select relevant feature subset
+            # extract indices of selected features where feature_subset_weights is nonzero
+            relevant_feature_subset_indices = np.flatnonzero(feature_subset_weights)
+            feature_subset_x_train = x_train[:, relevant_feature_subset_indices]
+            assert feature_subset_x_train.shape == (
+                train_data_df.shape[0],
+                np.count_nonzero(feature_subset_weights),
+            ), feature_subset_x_train.shape
+            feature_subset_x_test = x_test[:, relevant_feature_subset_indices]
+            assert feature_subset_x_test.shape == (
+                test_data_df.shape[0],
+                np.count_nonzero(feature_subset_weights),
+            ), feature_subset_x_test.shape
+
+            # scale data: choose robust scaler due to the presence of outliers
+            robust_scaler = RobustScaler()
+            preprocessed_x_train = robust_scaler.fit_transform(feature_subset_x_train)
+            preprocessed_x_test = robust_scaler.transform(feature_subset_x_test)
 
             # train and evaluate the model
             knn = KNeighborsClassifier(n_neighbors=k, n_jobs=-1)
             # knn = KNeighborsClassifier(
             #     n_neighbors=k, metric=WeightedManhattanDistance(feature_subset_weights), n_jobs=-1
             # )
-            knn.fit(x_train, y_train)
-            predicted_proba_y = knn.predict_proba(x_test)[0]
-            predicted_y = knn.predict(x_test)[0]
+            knn.fit(preprocessed_x_train, y_train)
+            predicted_proba_y = knn.predict_proba(preprocessed_x_test)[0]
+            predicted_y = knn.predict(preprocessed_x_test)[0]
 
             # initialize list in feature_selection_method_performance_evaluation_dict
             # for current feature_selection_method
@@ -327,6 +381,10 @@ def apply_p_value_as_feature_importance(
 
         # extract p-values
         p_values_array = cv_iteration_result_df[p_value].values
+
+        # Count the number of not NaN values
+        not_nan_count = np.count_nonzero(~np.isnan(p_values_array))
+
         # check if any p-values are zero
         assert not np.any(p_values_array == 0), p_values_array
         # replace nan values with zero
@@ -338,22 +396,22 @@ def apply_p_value_as_feature_importance(
             np.sum(np.isnan(cv_iteration_result_df[p_value].values)),
         )
         # count the number of p-values between zero and 0.05
-        number_of_not_significant_p_values = np.sum((p_values_array > 0) & (p_values_array < 0.05))
-        assert number_of_not_significant_p_values + np.sum(p_values_array == 0) + np.sum(
-            p_values_array > 0.05
-        ) == len(  # noqa: E501
+        number_of_significant_p_values = np.sum((p_values_array > 0) & (p_values_array < 0.05))
+        number_of_not_significant_p_values = np.sum(p_values_array > 0.05)
+        assert number_of_significant_p_values + number_of_not_significant_p_values + np.sum(p_values_array == 0) == len(
             p_values_array
         ), (
-            number_of_not_significant_p_values,
+            number_of_significant_p_values,
             np.sum(p_values_array == 0),
             np.sum(p_values_array > 0.05),
             len(p_values_array),
         )
-
-        # set the p-values smaller than 0.05 to zero
-        p_values_array[p_values_array < 0.05] = 0
-        # check if any p-values are between 0 and 0.05
-        assert not np.any((p_values_array > 0) & (p_values_array < 0.05)), p_values_array
+        # set the p-values greater than 0.05 to zero
+        p_values_array[p_values_array > 0.05] = 0
+        # check if all p-values are between 0 and 0.05
+        assert np.all((p_values_array >= 0) & (p_values_array <= 0.05)), p_values_array
+        # Check the number of not NaN values
+        assert number_of_significant_p_values == np.count_nonzero(p_values_array)
         p_value_importance_list.append(p_values_array)
 
         # calculate negative log of the nonzero p-values
@@ -438,6 +496,12 @@ def apply_p_value_as_feature_importance(
         f"{feature_selection_method}_neg_log_{p_value}_and_fraction",
         "stability",
         stability_estimator.get_stability(log_p_value_and_fraction_importance_matrix),
+    )
+
+    assert (
+        stability_estimator.get_stability(log_p_value_and_fraction_importance_matrix)
+        == stability_estimator.get_stability(log_p_value_importance_matrix)
+        == stability_estimator.get_stability(p_value_importance_matrix)
     )
 
 
@@ -694,12 +758,15 @@ def optimize_threshold(feature_importance_matrix):
 
 thresholds_dict = {"standard": 0.1, "standard_shap": 0.002, "reverse": 0.05}
 # thresholds = None
-data_name = "leukemia"
-input_data_df = load_data_with_standardized_sample_size("leukemia_big")
+# data_name = "leukemia"
+# input_data_df = load_data_with_standardized_sample_size("leukemia_big")
+# data_name = "colon"
+data_name = "prostate"
+input_data_df = load_data_with_standardized_sample_size(data_name)
 # TODO rest of the data as test data
 subset_result_dict_final, performance_result_dict_final = evaluate(
     input_data_df,
     f"/home/sigrun/PycharmProjects/reverse_feature_selection/results/{data_name}_loo_result_dict.pkl",
     feature_selection_methods=["standard", "standard_shap", "reverse"],
-    thresholds=thresholds_dict,
+    thresholds=None,
 )
