@@ -25,23 +25,21 @@ import plotly.io as pio
 
 import stability_estimator
 from src.reverse_feature_selection.data_loader_tools import load_data_with_standardized_sample_size
-from weighted_manhattan_distance import WeightedManhattanDistance
 
 
 def evaluate(
-    data_df: pd.DataFrame, pickled_result_path: str, feature_selection_methods: list[str], thresholds: dict = None
+    data_df: pd.DataFrame, pickled_result_path: str, feature_selection_methods: list[str]
 ) -> Tuple[dict, dict]:
     """
     Evaluates the feature selection results.
 
     This function loads the pickled results from the specified path, extracts the feature selection results,
-    and evaluates them based on the provided feature selection methods and thresholds.
+    and evaluates them for each provided feature selection method.
 
     Args:
         data_df: The data to evaluate.
         pickled_result_path: The path to the pickled results file.
         feature_selection_methods: A list of feature selection methods to evaluate.
-        thresholds: A dictionary of thresholds for each feature selection method. Defaults to None.
 
     Returns:
         A dictionary containing the evaluation results for each feature selection method.
@@ -51,8 +49,6 @@ def evaluate(
         raise ValueError(f"The file {pickled_result_path} does not exist.")
     if not isinstance(feature_selection_methods, list):
         raise TypeError("feature_selection_methods should be a list.")
-    if thresholds is not None and not isinstance(thresholds, dict):
-        raise TypeError("thresholds should be a dictionary or None.")
 
     # unpickle the results
     with open(pickled_result_path, "rb") as file:
@@ -68,7 +64,7 @@ def evaluate(
 
     # evaluate feature selection results
     subset_evaluation_result_dict = evaluate_feature_subsets(
-        feature_selection_result_cv_list, feature_selection_methods, thresholds
+        feature_selection_result_cv_list, feature_selection_methods
     )
     # evaluate performance
     performance_evaluation_result_dict = evaluate_performance(
@@ -116,12 +112,12 @@ def plot_performance(performance_evaluation_result_dict: dict, subset_evaluation
     # iterate over all performance metrics
     for performance_metric in performance_evaluation_result_dict["standard"].keys():
         print(performance_metric)
-        if performance_metric in ["fpr", "tpr", "thresholds"]:
+        if performance_metric in ["fpr", "tpr", "thresholds", "recall", "precision", "auprc"]:
             continue
 
         # Extract the performance metric, stability, and number of selected features
         data = []
-        methods = ["standard", "reverse_fraction_p_values_tt"]  # performance_evaluation_result_dict.keys()
+        methods = ["standard", "reverse_fraction_p_values_tt", "reverse_fraction_p_values_mwu"]  # performance_evaluation_result_dict.keys()
         for method in methods:
             performance = performance_evaluation_result_dict[method][performance_metric]
             importance_matrix = subset_evaluation_result_dict["importance_ranking"][method]
@@ -130,10 +126,12 @@ def plot_performance(performance_evaluation_result_dict: dict, subset_evaluation
             num_features = np.mean(subset_sizes, axis=0)
             if "standard" in method:
                 method_name = "Standard RF"
-            elif "reverse" in method:
-                method_name = "Reverse RF"
             else:
-                raise ValueError("Unknown method.")
+                method_name = method
+            # elif "reverse" in method:
+            #     method_name = "Reverse RF"
+            # else:
+            #     raise ValueError("Unknown method.")
             data.append([method_name, performance, stability, num_features])
 
         # Create a DataFrame
@@ -287,23 +285,19 @@ def train_model_and_predict_y(cross_validation_indices_list, data_df, subset_eva
 def evaluate_feature_subsets(
     feature_selection_result_cv_list: list,
     feature_selection_methods: list[str],
-    thresholds: dict = None,
 ) -> dict:
     """
-    Evaluates feature subsets based on different feature selection methods and thresholds.
+    Evaluates feature subsets for different feature selection methods.
 
     This function iterates over each feature selection method provided, extracts the raw feature selection results,
-    and analyzes the feature importance matrix. If a thresholds dictionary is provided, it scales the feature importance
-    matrix, applies the threshold specific to the current feature selection method, and analyzes the trimmed feature
-    importance matrix. If the feature selection method is "reverse", it applies a p-metric_value to select feature
-    subsets for reverse feature selection. It calculates the significant difference of reverse feature selection
-    results with p-values based on t-test and Mann-Whitney-U test. It then analyzes the feature importance matrix
-    with and without applying the threshold (if provided).
+    and analyzes the feature importance matrix.If the feature selection method is "reverse", it applies a
+    p-metric_value to select feature subsets for reverse feature selection. It calculates the significant difference
+    of reverse feature selection results with p-values based on t-test and Mann-Whitney-U test. It then analyzes the
+    feature importance matrix.
 
     Args:
         feature_selection_result_cv_list (list): A list of cross-validation results.
         feature_selection_methods (list[str]): A list of feature selection methods to evaluate.
-        thresholds (dict, optional): A dictionary of thresholds for each feature selection method. Defaults to None.
 
     Returns:
         dict: A dictionary containing the evaluation results for each feature selection method.
@@ -314,8 +308,11 @@ def evaluate_feature_subsets(
         feature_importance_matrix = extract_feature_importance_matrix(
             feature_selection_result_cv_list, feature_selection_method
         )
-        analyze_and_apply_threshold(result_dict, feature_selection_method, feature_importance_matrix, thresholds)
-
+        analyze_feature_importance_matrix(
+            result_dict,
+            feature_selection_method,
+            feature_importance_matrix,
+        )
         # apply p-metric_value to select feature subsets for reverse feature selection
         if feature_selection_method == "reverse":
             # calculate significant difference of reverse feature selection results with p-values based on t-test
@@ -324,11 +321,10 @@ def evaluate_feature_subsets(
                 feature_importance_matrix = extract_feature_importance_matrix(
                     feature_selection_result_cv_list, feature_selection_method, p_value
                 )
-                analyze_and_apply_threshold(
+                analyze_feature_importance_matrix(
                     result_dict,
                     f"{feature_selection_method}_fraction_{p_value}",
                     feature_importance_matrix,
-                    thresholds,
                 )
                 # apply negative log p-values as feature importances
                 apply_p_value_as_feature_importance(
@@ -553,31 +549,6 @@ def analyze_feature_importance_matrix(
     update_result_dictionary(result_dict, feature_selection_method, "importance_ranking", feature_importance_matrix)
 
 
-def analyze_and_apply_threshold(result_dict, feature_selection_method, feature_importance_matrix, thresholds=None):
-    """
-    Analyzes a feature importance matrix and applies a threshold if provided.
-
-    This function first evaluates the feature importances, then checks if a threshold is provided. If so, it scales
-    the feature importance matrix, applies the threshold, and analyzes the trimmed feature importance matrix.
-
-    Args:
-        result_dict: The result dictionary to update.
-        feature_selection_method: The feature selection method used.
-        feature_importance_matrix: The feature importance matrix to analyze.
-        thresholds: A dictionary of thresholds for each feature selection method.
-    """
-    analyze_feature_importance_matrix(result_dict, feature_selection_method, feature_importance_matrix)
-
-    if thresholds is not None:
-        print("method= ", feature_selection_method)
-        trimmed_feature_importance_matrix, threshold = optimize_threshold(feature_importance_matrix)
-        analyze_feature_importance_matrix(
-            result_dict,
-            f"{feature_selection_method}_threshold_{threshold}",
-            trimmed_feature_importance_matrix,
-        )
-
-
 def scale_feature_importance_matrix(feature_importance_matrix: np.ndarray):
     # check if the sum of all columns is one or zero
     if np.all(
@@ -600,31 +571,10 @@ def scale_feature_importance_matrix(feature_importance_matrix: np.ndarray):
     return transformed_importance_matrix
 
 
-def apply_threshold(feature_importance_matrix: np.ndarray, threshold: float):
-    if threshold is None:
-        raise ValueError("Threshold must not be None.")
-
-    # # check if threshold is in the desired range
-    if not feature_importance_matrix.max() > threshold > feature_importance_matrix.min():
-        # return matrix of zeros if threshold is not in the desired range
-        return np.zeros(feature_importance_matrix.shape)
-
-    # preserve the original feature importance matrix
-    feature_importance_matrix_cp = feature_importance_matrix.copy()
-
-    # apply threshold and set all values below threshold to zero
-    feature_importance_matrix_cp[feature_importance_matrix_cp < threshold] = 0
-    assert feature_importance_matrix_cp.min() == 0 or feature_importance_matrix_cp.min() >= threshold, str(
-        feature_importance_matrix_cp.min()
-    )
-    return feature_importance_matrix_cp
-
-
 def extract_feature_importance_matrix(
     feature_selection_result_cv_list: list,
     method: str,
     p_value: str = None,
-    threshold: float = None,
 ):
     # extract feature selection matrix
     feature_importance_matrix = np.empty(
@@ -635,7 +585,7 @@ def extract_feature_importance_matrix(
     for i, cv_iteration_result_df in enumerate(feature_selection_result_cv_list):
         # _normalize_feature_subsets(cv_iteration_result_pd)
         feature_importance_matrix[i, :] = get_selected_feature_subset(
-            cv_iteration_result_df, method, p_value, threshold
+            cv_iteration_result_df, method, p_value
         ).values
 
     # check of each row contains at least one nonzero metric_value
@@ -653,7 +603,7 @@ def extract_feature_importance_matrix(
 
 
 def get_selected_feature_subset(
-    cv_fold_result_df: pd.DataFrame, method: str, p_value: str = None, threshold: float = None
+    cv_fold_result_df: pd.DataFrame, method: str, p_value: str = None
 ) -> pd.Series:
     if method == "standard":
         assert p_value is None
@@ -669,10 +619,6 @@ def get_selected_feature_subset(
         feature_subset_series = get_feature_subset_for_reverse_feature_selection(cv_fold_result_df, p_value)
     else:
         raise ValueError("Unknown feature_selection_method.")
-
-    if threshold is not None:
-        # apply threshold
-        feature_subset_series = feature_subset_series >= threshold
 
     assert feature_subset_series.sum() > 0, feature_subset_series.sum()
 
@@ -707,34 +653,14 @@ def get_feature_subset_for_reverse_feature_selection(cv_fold_result_df: pd.DataF
     cv_fold_result_df.insert(2, f"percent_{p_value}", selected_feature_subset, allow_duplicates=False)
 
     if p_value is not None:
-        # apply p-metric_value threshold
+        # apply p_value significance level of 0.05 to select feature subset for reverse feature selection
         for feature in selected_feature_subset.index:
             if cv_fold_result_df[p_value][feature] >= 0.05:
                 selected_feature_subset[feature] = 0
-            elif not math.isnan(cv_fold_result_df[p_value][feature]):
-                # print(-np.log(cv_fold_result_df[p_value][feature]))
-                pass
 
     return selected_feature_subset
 
 
-def optimize_threshold(feature_importance_matrix):
-    def objective(trial):
-        threshold = trial.suggest_float(
-            "threshold", np.min(feature_importance_matrix), np.max(feature_importance_matrix) - 0.000001
-        )
-        trimmed_feature_importance_matrix = apply_threshold(feature_importance_matrix, threshold)
-        return stability_estimator.get_stability(trimmed_feature_importance_matrix)
-
-    study = optuna.create_study(direction="maximize")
-    study.optimize(objective, n_trials=50)
-
-    print(study.best_params)
-    return apply_threshold(feature_importance_matrix, study.best_params["threshold"]), study.best_params["threshold"]
-
-
-thresholds_dict = {"standard": 0.1, "standard_shap": 0.002, "reverse": 0.05}
-# thresholds = None
 # data_name = "leukemia"
 # input_data_df = load_data_with_standardized_sample_size("leukemia_big")
 # data_name = "colon"
@@ -745,5 +671,4 @@ subset_result_dict_final, performance_result_dict_final = evaluate(
     input_data_df,
     f"/home/sigrun/PycharmProjects/reverse_feature_selection/results/{data_name}_loo_result_dict.pkl",
     feature_selection_methods=["standard", "standard_shap", "reverse"],
-    thresholds=None,
 )
