@@ -9,7 +9,6 @@ import pandas as pd
 from sklearn.metrics import (
     roc_curve,
     auc,
-    roc_auc_score,
     precision_recall_curve,
     average_precision_score,
     accuracy_score,
@@ -133,23 +132,13 @@ def plot_performance(performance_evaluation_result_dict: dict, subset_evaluation
                 method_name = "Standard RF"
             elif "reverse" in method:
                 method_name = "Reverse RF"
+            else:
+                raise ValueError("Unknown method.")
             data.append([method_name, performance, stability, num_features])
 
         # Create a DataFrame
         df = pd.DataFrame(data, columns=["method", "performance", "stability", "num_features"])
 
-        # # plot results with plotly
-        # fig = px.scatter(
-        #     df, x="num_features", y="performance", size="stability", color="stability", hover_data=["method"],
-        #     # color_continuous_scale='Viridis_r'  # Reverse the color scale
-        #     color_continuous_scale='Greys'  # Use a grey color scale
-        # )
-        # fig.update_layout(
-        #     title=f"{data_name}: {performance_metric} vs Number of Selected Features (colored by Stability)",
-        #     xaxis_title="Number of Selected Features",
-        #     yaxis_title=performance_metric,
-        #     legend_title="Stability",
-        # )
         # plot results with plotly
         fig = px.scatter(
             df, x="stability", y="performance", size="num_features", color="num_features", hover_data=["method"],
@@ -306,10 +295,10 @@ def evaluate_feature_subsets(
     This function iterates over each feature selection method provided, extracts the raw feature selection results,
     and analyzes the feature importance matrix. If a thresholds dictionary is provided, it scales the feature importance
     matrix, applies the threshold specific to the current feature selection method, and analyzes the trimmed feature
-    importance matrix. If the feature selection method is "reverse", it applies a p-metric_value to select feature subsets for
-    reverse feature selection. It calculates the significant difference of reverse feature selection results with p-values
-    based on t-test and Mann-Whitney-U test. It then analyzes the feature importance matrix with and without applying the
-    threshold (if provided).
+    importance matrix. If the feature selection method is "reverse", it applies a p-metric_value to select feature
+    subsets for reverse feature selection. It calculates the significant difference of reverse feature selection
+    results with p-values based on t-test and Mann-Whitney-U test. It then analyzes the feature importance matrix
+    with and without applying the threshold (if provided).
 
     Args:
         feature_selection_result_cv_list (list): A list of cross-validation results.
@@ -381,9 +370,6 @@ def apply_p_value_as_feature_importance(
 
         # extract p-values
         p_values_array = cv_iteration_result_df[p_value].values
-
-        # Count the number of not NaN values
-        not_nan_count = np.count_nonzero(~np.isnan(p_values_array))
 
         # check if any p-values are zero
         assert not np.any(p_values_array == 0), p_values_array
@@ -567,14 +553,6 @@ def analyze_feature_importance_matrix(
     update_result_dictionary(result_dict, feature_selection_method, "importance_ranking", feature_importance_matrix)
 
 
-def calculate_feature_weights(feature_selection_method: str, feature_importance_matrix: np.ndarray):
-    # TODO calculate feature weights
-    # oob improvement fraction
-    # check robustness
-    feature_weights = np.sum(feature_importance_matrix, axis=1)
-    return feature_weights
-
-
 def analyze_and_apply_threshold(result_dict, feature_selection_method, feature_importance_matrix, thresholds=None):
     """
     Analyzes a feature importance matrix and applies a threshold if provided.
@@ -600,7 +578,7 @@ def analyze_and_apply_threshold(result_dict, feature_selection_method, feature_i
         )
 
 
-def scale_feature_importance_matrix(feature_importance_matrix: np.ndarray, scaler=None):
+def scale_feature_importance_matrix(feature_importance_matrix: np.ndarray):
     # check if the sum of all columns is one or zero
     if np.all(
         np.isclose(np.sum(feature_importance_matrix, axis=1), 1)
@@ -681,7 +659,6 @@ def get_selected_feature_subset(
         assert p_value is None
         feature_subset_series = cv_fold_result_df["standard"]
         # sum of all values in the feature subset series must be one
-        res = feature_subset_series.sum()
         assert np.isclose(feature_subset_series.sum(), 1.0), feature_subset_series.sum()
     elif method == "standard_shap":
         assert p_value is None
