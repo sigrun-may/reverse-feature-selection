@@ -10,7 +10,13 @@ from mltb2.data import load_colon, load_prostate, load_leukemia_big
 import pandas as pd
 
 
+<<<<<<< HEAD
 def load_data_with_standardized_sample_size(data: Literal["colon", "prostate", "leukemia_big"] = "colon") -> pd.DataFrame:
+=======
+def load_data_with_standardized_sample_size(
+    data: Literal["colon", "prostate", "leukemia_big"] = "colon"
+) -> pd.DataFrame:
+>>>>>>> main
     """Load data with standardized sample size.
 
     The data is loaded and parsed from the internet.

@@ -1,6 +1,10 @@
 experiment_id = "colon_loo"
 
+<<<<<<< HEAD
 description = "Colon cancer dataset with random RF, mannwhitneyu and welsh for reverse_fs"
+=======
+# description = "Colon cancer dataset with random RF, mannwhitneyu and welsh for reverse_fs"
+>>>>>>> main
 verbose_optuna = true
 n_trials_optuna = 50
 standard_metric = "roc_auc_score"
@@ -18,5 +22,9 @@ loo = true
 [data]
 train_correlation_threshold = 0.2
 name = "colon_loo"
+<<<<<<< HEAD
 # path = "../../data/data.csv"
+=======
+# path = "./data/data.csv"
+>>>>>>> main
 
