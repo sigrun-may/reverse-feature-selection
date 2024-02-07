@@ -7,13 +7,9 @@ from typing import Tuple, Optional
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
-from scipy.stats import ttest_ind, mannwhitneyu
 from sklearn import clone
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import (
-    mean_squared_error,
-    mean_absolute_error,
-)
+from sklearn.metrics import mean_squared_error
 import logging
 import preprocessing
 
@@ -78,9 +74,9 @@ def calculate_oob_errors(
     return oob_errors_labeled, oob_errors_unlabeled
 
 
-def calculate_mean_oob_errors_and_p_value(
+def evaluate_oob_errors(
     target_feature_name: str, train_df: pd.DataFrame, corr_matrix_df: pd.DataFrame, meta_data: dict
-):
+) -> Tuple[Optional[list], Optional[list]]:
     """
     Calculate the mean out-of-bag (OOB) errors for random forest regressors with different random seeds
     for training data including the label and without the label for the given target feature.
@@ -92,7 +88,9 @@ def calculate_mean_oob_errors_and_p_value(
         meta_data: The metadata related to the dataset and experiment.
 
     Returns:
-        tuple: A tuple containing the mean OOB score for labeled data, the mean OOB score for unlabeled data, and the p-value.
+        A tuple containing the OOB scores lists for labeled and unlabeled data, if the label was included in the model
+        and the OOB score for the labeled data was better than the OOB score for the unlabeled data. Otherwise,
+        the lists are empty.
     """
     # check if the target feature is in the training data
     assert target_feature_name in train_df.columns
@@ -111,49 +109,24 @@ def calculate_mean_oob_errors_and_p_value(
 
     # check if any features are uncorrelated to the target feature
     if x_train is None:
-        return None, None, None
-
-    # set default (feature is deselected)
-    mean_abs_oob_error_labeled = np.inf
-    mean_abs_oob_error_unlabeled = np.inf
-    p_value_tt = None
-    p_value_mwu = None
+        return None, None
 
     # Calculate out-of-bag (OOB) errors for labeled and unlabeled training data
     oob_errors_labeled, oob_errors_unlabeled = calculate_oob_errors(x_train, y_train, meta_data)
 
     # Check if OOB errors for labeled data are available (was the label included in the model?)
     if oob_errors_labeled is not None:
-        # Calculate the mean absolute OOB errors for labeled and unlabeled data
-        error_labeled = np.mean(np.abs(oob_errors_labeled))
-        error_unlabeled = np.mean(np.abs(oob_errors_unlabeled))
-
         # Check if training with the label is better than without the label
-        if error_labeled < error_unlabeled:
-            # Perform the t-test (Welch's test) to check if the difference is statistically significant
-            p_value_tt = ttest_ind(oob_errors_labeled, oob_errors_unlabeled, alternative="less", equal_var=False).pvalue
+        if not np.mean(np.abs(oob_errors_labeled)) < np.mean(np.abs(oob_errors_unlabeled)):
+            oob_errors_labeled = []
+            oob_errors_unlabeled = []
 
-            # Perform the Mann-Whitney-U test
-            p_value_mwu = mannwhitneyu(oob_errors_labeled, oob_errors_unlabeled, alternative="less").pvalue
-
-            # Check if the result is statistically significant (alpha level = 0.05)
-            if p_value_tt <= 0.05:
-                # Calculate the percentage difference between mean OOB errors
-                percentage_difference = ((error_unlabeled - error_labeled) / error_unlabeled) * 100
-                logging.info(
-                    f"p_value {target_feature_name} {p_value_tt} "
-                    f"l: {error_labeled} ul: {error_unlabeled}, {percentage_difference}%"
-                )
-            # select the feature
-            else:
-                logging.info(f"p_value {target_feature_name} {p_value_tt} not selected")
-            mean_abs_oob_error_labeled = error_labeled
-            mean_abs_oob_error_unlabeled = error_unlabeled
-
-    return mean_abs_oob_error_labeled, mean_abs_oob_error_unlabeled, p_value_tt, p_value_mwu
+    return oob_errors_labeled, oob_errors_unlabeled
 
 
-def calculate_oob_errors_for_each_feature(data_df: pd.DataFrame, meta_data: dict, fold_index: int):
+def calculate_oob_errors_for_each_feature(
+    data_df: pd.DataFrame, meta_data: dict, fold_index: int, train_indices: np.ndarray
+):
     """
     Calculate the mean out-of-bag (OOB) errors for random forest regressors with different random seeds
     for training data including the label and without the label for each feature.
@@ -162,48 +135,45 @@ def calculate_oob_errors_for_each_feature(data_df: pd.DataFrame, meta_data: dict
         data_df: The training data.
         meta_data: The metadata related to the dataset and experiment.
         fold_index: The current loop iteration of the outer cross-validation.
+        train_indices: Indices for the training split.
 
     Returns:
         A DataFrame containing the mean OOB score for labeled data, the mean OOB score for unlabeled data,
         and the p-value for each feature.
     """
     pickle_base_path = Path(f"./preprocessed_data/{meta_data['data']['name']}/outer_fold_{fold_index}")
+    assert pickle_base_path.exists()
+
+    assert "label" in data_df.columns
+    train_df = data_df.iloc[train_indices]
 
     # Load the cached preprocessed data for the given outer cross-validation fold
-    with open(f"{pickle_base_path}/train.pkl", "rb") as file:
-        train_df = pickle.load(file)
-        assert "label" in train_df.columns
     with open(f"{pickle_base_path}/train_correlation_matrix.pkl", "rb") as file:
         corr_matrix_df = pickle.load(file)
         assert "label" not in corr_matrix_df.columns
     assert train_df.shape[1] - 1 == corr_matrix_df.shape[0]  # corr_matrix_df does not include the label
 
     # # serial version for debugging
+    # scores_labeled_list = []
+    # scores_unlabeled_list = []
     # for target_feature_name in data_df.columns[1:]:
-    #     score_labeled, score_unlabeled, p_value = calculate_mean_oob_scores_and_p_value(target_feature_name, fold_index, meta_data)
-    #     scores_labeled_list.append(score_labeled)
-    #     scores_unlabeled_list.append(score_unlabeled)
-    #     p_values_list.append(p_value)
+    #     scores_labeled, scores_unlabeled = evaluate_oob_errors(target_feature_name, train_df, corr_matrix_df, meta_data)
+    #     scores_labeled_list.append(scores_labeled)
+    #     scores_unlabeled_list.append(scores_unlabeled)
 
     # parallel version
     out = Parallel(n_jobs=multiprocessing.cpu_count(), verbose=-1)(
-        delayed(calculate_mean_oob_errors_and_p_value)(target_feature_name, train_df, corr_matrix_df, meta_data)
+        delayed(evaluate_oob_errors)(target_feature_name, train_df, corr_matrix_df, meta_data)
         for target_feature_name in data_df.columns[1:]
     )
-
     scores_labeled_list = []
     scores_unlabeled_list = []
-    p_values_tt_list = []
-    p_values_mwu_list = []
-    for score_labeled, score_unlabeled, p_value_tt, p_value_mwu in out:
-        scores_labeled_list.append(score_labeled)
-        scores_unlabeled_list.append(score_unlabeled)
-        p_values_tt_list.append(p_value_tt)
-        p_values_mwu_list.append(p_value_mwu)
+    for scores_labeled, scores_unlabeled in out:
+        scores_labeled_list.append(scores_labeled)
+        scores_unlabeled_list.append(scores_unlabeled)
 
     assert len(scores_labeled_list) == len(scores_unlabeled_list) == data_df.shape[1] - 1  # exclude label column
-    result_df = pd.DataFrame(data=scores_unlabeled_list, index=data_df.columns[1:], columns=["unlabeled"])
+    result_df = pd.DataFrame(index=data_df.columns[1:])
+    result_df["unlabeled"] = scores_unlabeled_list
     result_df["labeled"] = scores_labeled_list
-    result_df["p_values_tt"] = p_values_tt_list
-    result_df["p_values_mwu"] = p_values_mwu_list
     return result_df

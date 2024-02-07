@@ -55,7 +55,10 @@ class CrossValidator:
 
             # Preprocess the data and cache the results if not available yet
             preprocessing.preprocess_data(
-                train_indices, test_indices, self.data_df, fold_index, self.meta_data, correlation_matrix=True
+                train_indices,
+                self.data_df,
+                fold_index,
+                self.meta_data,
             )
 
             # Calculate raw values for calculating feature subsets
@@ -90,6 +93,7 @@ class CrossValidator:
             data_df=self.data_df,
             meta_data=self.meta_data,
             fold_index=fold_index,
+            train_indices=train_indices,
         )
         # Calculate feature subset with standard random forest feature importance
         feature_importance, shap_values, validation_metric, training_oob = standard_rf.optimize(
