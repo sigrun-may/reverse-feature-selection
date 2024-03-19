@@ -30,7 +30,7 @@ from src.reverse_feature_selection.data_loader_tools import load_data_with_stand
 
 
 def evaluate(
-        data_df: pd.DataFrame, pickled_result_path: str, feature_selection_methods: list[str]
+    data_df: pd.DataFrame, pickled_result_path: str, feature_selection_methods: list[str]
 ) -> Tuple[dict, dict]:
     """
     Evaluates the feature selection results.
@@ -78,7 +78,7 @@ def evaluate(
 
 
 def evaluate_performance(
-        data_df: pd.DataFrame, cross_validation_indices_list: list, subset_evaluation_result_dict: dict, k: int
+    data_df: pd.DataFrame, cross_validation_indices_list: list, subset_evaluation_result_dict: dict, k: int
 ) -> dict:
     """
     Evaluates the performance of the feature selection methods.
@@ -240,7 +240,7 @@ def train_model_and_predict_y(cross_validation_indices_list, data_df, subset_eva
                 cv_iteration
             ]
             assert (
-                    feature_subset_weights.size == train_data_df.shape[1] - 1
+                feature_subset_weights.size == train_data_df.shape[1] - 1
             ), feature_subset_weights.size  # -1 for label column
             assert np.count_nonzero(feature_subset_weights) > 0, np.count_nonzero(feature_subset_weights)
 
@@ -289,8 +289,8 @@ def train_model_and_predict_y(cross_validation_indices_list, data_df, subset_eva
 
 
 def evaluate_feature_subsets(
-        feature_selection_result_cv_list: list,
-        feature_selection_methods: list[str],
+    feature_selection_result_cv_list: list,
+    feature_selection_methods: list[str],
 ) -> dict:
     """
     Evaluates feature subsets for different feature selection methods.
@@ -340,10 +340,10 @@ def evaluate_feature_subsets(
 
 
 def apply_p_value_as_feature_importance(
-        result_dict: dict,
-        feature_selection_method: str,
-        feature_selection_result_cv_list: list,
-        p_value: str,
+    result_dict: dict,
+    feature_selection_method: str,
+    feature_selection_result_cv_list: list,
+    p_value: str,
 ):
     """
     Applies the negative log of the p-value as feature importance.
@@ -410,7 +410,7 @@ def apply_p_value_as_feature_importance(
         log_p_values_fraction_array = np.copy(log_p_values_array)
         # add fraction where log p-value is not zero
         log_p_values_fraction_array[log_p_values_array > 0] = (
-                fraction_array[log_p_values_array > 0] + log_p_values_array[log_p_values_array > 0]
+            fraction_array[log_p_values_array > 0] + log_p_values_array[log_p_values_array > 0]
         )
         assert np.all(log_p_values_fraction_array >= 0), log_p_values_fraction_array
         assert math.isclose(np.min(log_p_values_fraction_array), 0), log_p_values_fraction_array
@@ -418,10 +418,10 @@ def apply_p_value_as_feature_importance(
 
         # check number of zeros in all p_values arrays
         assert (
-                np.sum(p_values_array == 0)
-                == np.sum(log_p_values_array == 0)
-                == np.sum(log_p_values_fraction_array == 0)
-                == np.sum(np.isnan(cv_iteration_result_df[p_value].values)) + number_of_not_significant_p_values
+            np.sum(p_values_array == 0)
+            == np.sum(log_p_values_array == 0)
+            == np.sum(log_p_values_fraction_array == 0)
+            == np.sum(np.isnan(cv_iteration_result_df[p_value].values)) + number_of_not_significant_p_values
         ), (
             np.sum(log_p_values_array == 0),
             np.sum(log_p_values_fraction_array == 0),
@@ -437,13 +437,13 @@ def apply_p_value_as_feature_importance(
 
     # check the shape of the feature importance matrix
     assert (
-            p_value_importance_matrix.shape
-            == log_p_value_importance_matrix.shape
-            == log_p_value_and_fraction_importance_matrix.shape
-            == (
-                len(feature_selection_result_cv_list),
-                feature_selection_result_cv_list[0].shape[0],
-            )
+        p_value_importance_matrix.shape
+        == log_p_value_importance_matrix.shape
+        == log_p_value_and_fraction_importance_matrix.shape
+        == (
+            len(feature_selection_result_cv_list),
+            feature_selection_result_cv_list[0].shape[0],
+        )
     ), p_value_importance_matrix.shape
 
     # check if the matrices are different
@@ -484,9 +484,9 @@ def apply_p_value_as_feature_importance(
     )
 
     assert (
-            stability_estimator.get_stability(log_p_value_and_fraction_importance_matrix)
-            == stability_estimator.get_stability(log_p_value_importance_matrix)
-            == stability_estimator.get_stability(p_value_importance_matrix)
+        stability_estimator.get_stability(log_p_value_and_fraction_importance_matrix)
+        == stability_estimator.get_stability(log_p_value_importance_matrix)
+        == stability_estimator.get_stability(p_value_importance_matrix)
     )
 
 
@@ -509,7 +509,7 @@ def update_result_dictionary(result_dict: dict, feature_selection_method: str, m
 
 
 def analyze_feature_importance_matrix(
-        result_dict: dict, feature_selection_method: str, feature_importance_matrix: np.ndarray
+    result_dict: dict, feature_selection_method: str, feature_importance_matrix: np.ndarray
 ) -> None:
     """
     Analyzes a feature importance matrix and updates a result dictionary with various metrics.
@@ -555,8 +555,8 @@ def analyze_feature_importance_matrix(
 def scale_feature_importance_matrix(feature_importance_matrix: np.ndarray):
     # check if the sum of all columns is one or zero
     if np.all(
-            np.isclose(np.sum(feature_importance_matrix, axis=1), 1)
-            | np.isclose(np.sum(feature_importance_matrix, axis=1), 0)
+        np.isclose(np.sum(feature_importance_matrix, axis=1), 1)
+        | np.isclose(np.sum(feature_importance_matrix, axis=1), 0)
     ):
         return feature_importance_matrix
 
@@ -575,8 +575,8 @@ def scale_feature_importance_matrix(feature_importance_matrix: np.ndarray):
 
 
 def extract_feature_importance_matrix(
-        feature_selection_result_cv_list: List[pd.DataFrame],
-        method: str,
+    feature_selection_result_cv_list: List[pd.DataFrame],
+    method: str,
 ) -> np.ndarray:
     """
     Extracts the feature importance matrix from the cross-validation results.
@@ -635,7 +635,9 @@ def get_feature_subset_for_reverse_feature_selection(cv_fold_result_df: pd.DataF
     selected_feature_subset = np.zeros_like(cv_fold_result_df["labeled"].values)
 
     # iterate over all error distributions
-    for i, (labeled_error_distribution, unlabeled_error_distribution) in enumerate(zip(array_of_labeled_oob_errors, array_of_unlabeled_oob_errors)):
+    for i, (labeled_error_distribution, unlabeled_error_distribution) in enumerate(
+        zip(array_of_labeled_oob_errors, array_of_unlabeled_oob_errors)
+    ):
         # TODO Fehler finden
 
         # calculate the p-value for the two distributions
@@ -653,7 +655,9 @@ def get_feature_subset_for_reverse_feature_selection(cv_fold_result_df: pd.DataF
         # apply p_value significance level of 0.05 to select feature subset for reverse feature selection
         if p_value < 0.05:
             # calculate the fraction difference of the two means of the distributions
-            fraction = (np.mean(unlabeled_error_distribution) - np.mean(labeled_error_distribution)) / np.mean(unlabeled_error_distribution)
+            fraction = (np.mean(unlabeled_error_distribution) - np.mean(labeled_error_distribution)) / np.mean(
+                unlabeled_error_distribution
+            )
             selected_feature_subset[i] = fraction
 
     return selected_feature_subset
