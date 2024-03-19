@@ -23,7 +23,8 @@ def main():
 
     # # load artificial data
     # import pandas as pd
-    # data_df = pd.read_csv(meta_data["data"]["path"]).iloc[:, :50]
+    #
+    # data_df = pd.read_csv(meta_data["data"]["path"]).iloc[:, :30]
     # assert data_df.columns[0] == "label"
 
     # # shorten artificial data for faster testing
@@ -32,13 +33,16 @@ def main():
     # data_df = pd.concat([data_01, data_02], join="outer", axis=1)
 
     # data loaders
-    data_df = load_data_with_standardized_sample_size("colon")
-    print(data_df.shape)
+    # data_df = load_data_with_standardized_sample_size("colon")
+
+    # print(data_df.shape)
 
     start_time = datetime.datetime.utcnow()
 
-    cross_validator = CrossValidator(data_df, meta_data)
-    result_dict = cross_validator.cross_validate()
+    # cross_validator = CrossValidator(data_df, meta_data)
+    # result_dict = cross_validator.cross_validate()
+
+    result_dict = meta_data
 
     end_time = datetime.datetime.utcnow()
     print(end_time - start_time)
