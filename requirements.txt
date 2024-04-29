@@ -22,7 +22,6 @@ GitPython
 requests
 bs4
 plotly
-yaml
 pyyaml
 sqlitedict
 lightgbm
