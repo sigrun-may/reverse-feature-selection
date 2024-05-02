@@ -3,22 +3,20 @@ environment:
   image: library/python:3.11
 code: ./
 command: |
-  python3 --version
-  cat requirements.txt
-  python3 -m pip install --no-cache-dir --upgrade pip
-  python3 -m pip install -r requirements.txt
-  python3 -m pip install -e .
+  python3 -m venv virtual-env
+  source virtual-env/bin/activate
+  pip install -r requirements.txt
+  pip list
   python3 src/reverse_feature_selection/main.py ${{outputs.outdir}}
-# compute: 'cpu-16'
-compute: 'cpu-1-core'
+compute: 'cpu-120-cores'
 resources:
   instance_count: 1
 outputs:
   outdir:
     type: uri_folder
-    path: azureml://subscriptions/ebcfd0f7-1a0a-443d-b869-0c9c696bfb0b/resourcegroups/sigrun.may-rg/workspaces/diss_ws/datastores/workspaceblobstore/paths/experiments/
+    path: azureml://subscriptions/ebcfd0f7-1a0a-443d-b869-0c9c696bfb0b/resourcegroups/DefaultResourceGroup-westeurope/workspaces/default-west-europe-ws/datastores/workspaceblobstore/paths/experiments/
     mode: rw_mount
 experiment_name: test1
 display_name: test1
 
-# az ml job create --file azure_config.yaml --workspace-name diss_ws --resource-group sigrun.may-rg
+# az ml job create --file azure_config.yaml --workspace-name default-west-europe-ws --resource-group DefaultResourceGroup-westeurope
