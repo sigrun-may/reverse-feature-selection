@@ -18,10 +18,11 @@ Functions:
 
 import pickle
 from pathlib import Path
-from typing import Tuple, Optional
+from typing import Tuple
 
 import numpy as np
 import pandas as pd
+from sklearn.preprocessing import RobustScaler
 
 
 def preprocess_data(
@@ -29,7 +30,7 @@ def preprocess_data(
     data_df: pd.DataFrame,
     fold_index: int,
     meta_data: dict,
-) -> Tuple[pd.DataFrame, pd.DataFrame, Optional[pd.DataFrame]]:
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Split data for training and validation, calculate Spearman correlation matrix and cache it.
 
@@ -42,36 +43,48 @@ def preprocess_data(
     Returns:
         A tuple containing the validation data, training data, and the training correlation matrix.
     """
+    # Check for missing values in the input DataFrame
+    assert not data_df.isnull().values.any(), "Missing values detected in the input data."
+
+    # Extract the training data based on the provided indices
+    assert "label" in data_df.columns
+    train_df = data_df.iloc[train_index, :]
+    assert train_df.shape == (len(train_index), data_df.shape[1]), "Training data shape mismatch."
+
+    # Scale the training data
+    if meta_data["data"]["scale"]:
+        robust_scaler = RobustScaler()
+        train_df.iloc[:, 1:] = robust_scaler.fit_transform(train_df.iloc[:, 1:])
+
     # Create a base path for caching the preprocessed data
     pickle_base_path = Path(f"./preprocessed_data/{meta_data['data']['name']}/outer_fold_{fold_index}")
+    pickle_path = Path(f"{pickle_base_path}/train_correlation_matrix.pkl")
     # Check if the preprocessed data is already cached
-    if pickle_base_path.exists():
+    if pickle_path.exists():
         # Load the cached preprocessed data
-        with open(f"{pickle_base_path}/train_correlation_matrix.pkl", "rb") as file:
-            return pickle.load(file)
+        with open(pickle_path, "rb") as file:
+            return pickle.load(file), train_df
 
     # Create directory for caching the preprocessed data
     pickle_base_path.mkdir(parents=True, exist_ok=True)
     assert pickle_base_path.exists()
 
-    # Check for missing values in the input DataFrame
-    assert not data_df.isnull().values.any(), "Missing values detected in the input data."
-
-    # Extract the training data based on the provided indices
-    train_df = data_df.iloc[train_index, :]
-    assert train_df.shape == (len(train_index), data_df.shape[1]), "Training data shape mismatch."
-
     # Calculate the Spearman correlation matrix for the training data
     unlabeled_train_df = train_df.loc[:, train_df.columns != "label"]  # Exclude the label column
+    assert "label" not in unlabeled_train_df.columns, "Label column found in unlabeled training data."
     assert unlabeled_train_df.shape[0] == len(train_index)
     assert unlabeled_train_df.shape[1] == data_df.shape[1] - 1  # Exclude the label
 
     train_correlation_matrix = unlabeled_train_df.corr(method="spearman")
     assert train_correlation_matrix.shape[0] == train_correlation_matrix.shape[1] == unlabeled_train_df.shape[1]
-    if meta_data["pickle_preprocessed_data"]:
+    # exclude label column from train_df
+    assert (
+        train_df.shape[1] - 1 == train_correlation_matrix.shape[0]
+    ), f"{train_df.shape[1]} - 1 == {train_correlation_matrix.shape[1]}"
+    if meta_data["cv"]["pickle_preprocessed_data"]:
         with open(f"{pickle_base_path}/train_correlation_matrix.pkl", "wb") as file:
             pickle.dump(train_correlation_matrix, file, protocol=pickle.HIGHEST_PROTOCOL)
-    return train_correlation_matrix
+    return train_correlation_matrix, train_df
 
 
 def remove_features_correlated_to_target_feature(
@@ -92,7 +105,11 @@ def remove_features_correlated_to_target_feature(
     Returns:
         The training data with only the uncorrelated features remaining.
     """
-    # Remove correlations to the target feature
+    # check if the target feature is in the training data
+    assert target_feature in train_df.columns
+
+    # check if the target feature is in the correlation matrix
+    assert target_feature in correlation_matrix_df.index
 
     # Extract the unlabeled training data
     assert train_df.shape[1] - 1 == correlation_matrix_df.shape[1]  # Exclude the label
@@ -105,7 +122,7 @@ def remove_features_correlated_to_target_feature(
     uncorrelated_features_mask = (
         correlation_matrix_df[target_feature]
         .abs()
-        .le(meta_data["data"]["train_correlation_threshold"], axis="index")
+        .le(meta_data["train_correlation_threshold"], axis="index")
         # For a correlation matrix filled only with the lower half,
         # the first elements up to the diagonal would have to be read
         # with axis="index" and the further elements after the diagonal
@@ -119,21 +136,28 @@ def remove_features_correlated_to_target_feature(
     # Ensure that "label" is not in the list of uncorrelated features
     assert "label" not in uncorrelated_feature_names
 
-    # Check if there are any features left after removing "label" and "target_feature"
+    # Check if there aren't any features left after removing "label" and "target_feature"
     if uncorrelated_feature_names.size == 0:
-        return None
+        raise ValueError(
+            f"No features uncorrelated to {target_feature} with absolute correlation threshold "
+            f"{meta_data['train_correlation_threshold']}"
+        )
 
     # Check if the maximum correlation of any uncorrelated feature with the target is within the threshold
     assert (
         correlation_matrix_df.loc[target_feature, uncorrelated_features_mask].abs().max()
-        <= meta_data["data"]["train_correlation_threshold"]
-    ), f"{meta_data['data']['train_correlation_threshold']}"
+        <= meta_data["train_correlation_threshold"]
+    ), f"{meta_data['train_correlation_threshold']}"
 
     # Insert the 'label' as the first column
     uncorrelated_feature_names = uncorrelated_feature_names.insert(0, "label")
-    assert "label" in uncorrelated_feature_names
 
-    assert target_feature not in uncorrelated_feature_names
+    # Remove correlated features from the training data
+    uncorrlated_train_df = train_df[uncorrelated_feature_names]
+    assert target_feature not in uncorrlated_train_df.columns
+    assert "label" == uncorrlated_train_df.columns[0], f"{uncorrlated_train_df.columns[0]}"
+    assert uncorrlated_train_df.shape[0] == train_df.shape[0]
+    assert uncorrlated_train_df.shape[1] == uncorrelated_feature_names.size
 
     # Return the data frame with uncorrelated features
-    return train_df[uncorrelated_feature_names]
+    return uncorrlated_train_df

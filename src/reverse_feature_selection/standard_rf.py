@@ -11,10 +11,7 @@ from sklearn.metrics import roc_auc_score
 warnings.filterwarnings("ignore")
 
 
-# import optuna_study_pruner
-
-
-def optimize(train_indices, validation_indices, data_df, meta_data):
+def optimize(train_indices, data_df, meta_data):
     def optuna_objective(trial):
         rf_clf = RandomForestClassifier(
             oob_score=roc_auc_score,
@@ -27,10 +24,8 @@ def optimize(train_indices, validation_indices, data_df, meta_data):
         )
         rf_clf.fit(data_df.iloc[train_indices, 1:], data_df.loc[train_indices, "label"])
         score = rf_clf.oob_score_
-        print(score)
         return score
 
-    # TODO move direction to settings.toml
     study = optuna.create_study(
         # storage = "sqlite:///optuna_test.db",
         # load_if_exists = True,
@@ -44,12 +39,11 @@ def optimize(train_indices, validation_indices, data_df, meta_data):
         optuna.logging.set_verbosity(optuna.logging.ERROR)
 
     # terminator = TerminatorCallback()
-    # TODO move n_trials to settings.toml
     study.optimize(
         optuna_objective,
         n_trials=meta_data["n_trials_optuna"],
         # callbacks=[terminator],
-        timeout=120,
+        # timeout=120,
     )
 
     clf = RandomForestClassifier(
@@ -63,23 +57,17 @@ def optimize(train_indices, validation_indices, data_df, meta_data):
     # # L. Breiman, “Random Forests”, Machine Learning, 45(1), 5-32, 2001.
     # p_importances = permutation_importance(clf, X=data_df.iloc[train_indices, 1:], y=data_df.loc[train_indices, "label"],
     #                                        n_repeats=5, random_state=42, n_jobs=-1)
-    predicted_y = clf.predict(data_df.iloc[validation_indices, 1:])
-    true_y = data_df.loc[validation_indices, "label"]
-    # validation_score = roc_auc_score(true_y, predicted_y)
-    validation_score = 0
-    print("validation_score", validation_score, "oob", clf.oob_score_)
 
     # calculate shap values
     explainer = shap.TreeExplainer(clf)
     shap_values = explainer.shap_values(data_df.iloc[train_indices, 1:])
-    assert len(shap_values) == 2
-    assert len(shap_values[0]) == len(shap_values[1]) == len(data_df.iloc[train_indices, 1:])
-
-    # sum shap values
-    mean_shap_values = np.abs(shap_values[0]).mean(axis=0)
-    assert len(mean_shap_values) == len(data_df.columns) - 1
+    # calculate mean shap values
+    sum_shap_values = np.zeros(data_df.shape[1] - 1)
+    for values_per_sample in shap_values:
+        positive_shap_values = np.abs(values_per_sample[:, 0])
+        sum_shap_values += positive_shap_values
 
     feature_importances = clf.feature_importances_
-    print("num fi", np.sum(feature_importances > 0))
+    print("number of selected features: ", np.sum(feature_importances > 0))
 
-    return clf.feature_importances_, mean_shap_values, validation_score, clf.oob_score_
+    return clf.feature_importances_, sum_shap_values, clf.oob_score_

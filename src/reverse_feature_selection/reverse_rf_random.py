@@ -1,7 +1,5 @@
 import math
 import multiprocessing
-import pickle
-from pathlib import Path
 from typing import Tuple, Optional
 
 import numpy as np
@@ -17,27 +15,35 @@ logging.basicConfig(level=logging.INFO)
 
 
 def calculate_oob_errors(
-    x_train: pd.DataFrame, y_train: np.ndarray, meta_data: dict
+    target_feature_name: str, train_df: pd.DataFrame, corr_matrix_df: pd.DataFrame, meta_data: dict
 ) -> Tuple[Optional[list], Optional[list]]:
     """
     Calculate out-of-bag (OOB) error for labeled and unlabeled training data.
 
     Args:
-        x_train: The training data.
-        y_train: The target values for the training data.
+        target_feature_name: The name of the target feature.
+        train_df: The training data.
+        corr_matrix_df: The correlation matrix of the training data.
         meta_data: The metadata related to the dataset and experiment.
 
     Returns:
         A tuple containing lists of OOB scores for labeled and unlabeled training data.
     """
-    ...
+    # Prepare training data
+    assert target_feature_name in train_df.columns
+    y_train = train_df[target_feature_name].to_numpy()
+
+    # Remove features correlated to the target feature
+    x_train = preprocessing.remove_features_correlated_to_target_feature(
+        train_df, corr_matrix_df, target_feature_name, meta_data
+    )
 
     oob_errors_labeled = []
     oob_errors_unlabeled = []
 
     # Perform validation using different random seeds
     for seed in meta_data["random_seeds"]:
-        # for _ in range(len(meta_data["random_seeds"])):
+        assert isinstance(seed, int)
         # Create a RandomForestRegressor model with specified parameters
         clf1 = RandomForestRegressor(
             oob_score=mean_squared_error,  # Use out-of-bag error for evaluation
@@ -46,7 +52,8 @@ def calculate_oob_errors(
             random_state=seed,
             min_samples_leaf=2,
         )
-        # Create a copy of the RandomForestRegressor (clf1)
+        # Create an exact clone of the RandomForestRegressor (clf1)
+        # https://scikit-learn.org/stable/modules/generated/sklearn.base.clone.html
         clf2 = clone(clf1)
 
         # Fit the first model with training data including the label
@@ -70,57 +77,8 @@ def calculate_oob_errors(
         # Store the OOB score for the unlabeled model
         oob_errors_unlabeled.append(clf2.oob_score_)
 
+    assert len(oob_errors_labeled) == len(oob_errors_unlabeled) == len(meta_data["random_seeds"])
     # print("oob_errors_labeled", oob_errors_labeled, "oob_errors_unlabeled", oob_errors_unlabeled)
-    return oob_errors_labeled, oob_errors_unlabeled
-
-
-def evaluate_oob_errors(
-    target_feature_name: str, train_df: pd.DataFrame, corr_matrix_df: pd.DataFrame, meta_data: dict
-) -> Tuple[Optional[list], Optional[list]]:
-    """
-    Calculate the mean out-of-bag (OOB) errors for random forest regressors with different random seeds
-    for training data including the label and without the label for the given target feature.
-
-    Args:
-        target_feature_name: The name of the target feature.
-        train_df: The training data.
-        corr_matrix_df: The correlation matrix of the training data.
-        meta_data: The metadata related to the dataset and experiment.
-
-    Returns:
-        A tuple containing the OOB scores lists for labeled and unlabeled data, if the label was included in the model
-        and the OOB score for the labeled data was better than the OOB score for the unlabeled data. Otherwise,
-        the lists are empty.
-    """
-    # check if the target feature is in the training data
-    assert target_feature_name in train_df.columns
-
-    # check if the target feature is in the correlation matrix
-    assert target_feature_name in corr_matrix_df.index
-
-    # Prepare training data
-    y_train = train_df[target_feature_name].to_numpy()
-
-    # Remove features correlated to the target feature
-    x_train = preprocessing.remove_features_correlated_to_target_feature(
-        train_df, corr_matrix_df, target_feature_name, meta_data
-    )
-    assert target_feature_name not in x_train.columns
-
-    # check if any features are uncorrelated to the target feature
-    if x_train is None:
-        return None, None
-
-    # Calculate out-of-bag (OOB) errors for labeled and unlabeled training data
-    oob_errors_labeled, oob_errors_unlabeled = calculate_oob_errors(x_train, y_train, meta_data)
-
-    # Check if OOB errors for labeled data are available (was the label included in the model?)
-    if oob_errors_labeled is not None:
-        # Check if training with the label is better than without the label
-        if not np.mean(np.abs(oob_errors_labeled)) < np.mean(np.abs(oob_errors_unlabeled)):
-            oob_errors_labeled = []
-            oob_errors_unlabeled = []
-
     return oob_errors_labeled, oob_errors_unlabeled
 
 
@@ -138,20 +96,16 @@ def calculate_oob_errors_for_each_feature(
         train_indices: Indices for the training split.
 
     Returns:
-        A DataFrame containing the mean OOB score for labeled data, the mean OOB score for unlabeled data,
-        and the p-value for each feature.
+        A DataFrame containing lists of OOB scores for repeated analyzes of labeled and unlabeled data.
     """
-    pickle_base_path = Path(f"./preprocessed_data/{meta_data['data']['name']}/outer_fold_{fold_index}")
-    assert pickle_base_path.exists()
 
-    assert "label" in data_df.columns
-    train_df = data_df.iloc[train_indices]
-
-    # Load the cached preprocessed data for the given outer cross-validation fold
-    with open(f"{pickle_base_path}/train_correlation_matrix.pkl", "rb") as file:
-        corr_matrix_df = pickle.load(file)
-        assert "label" not in corr_matrix_df.columns
-    assert train_df.shape[1] - 1 == corr_matrix_df.shape[0]  # corr_matrix_df does not include the label
+    # Preprocess the data and cache the results if not available yet
+    corr_matrix_df, train_df = preprocessing.preprocess_data(
+        train_indices,
+        data_df,
+        fold_index,
+        meta_data,
+    )
 
     # # serial version for debugging
     # scores_labeled_list = []
@@ -163,7 +117,7 @@ def calculate_oob_errors_for_each_feature(
 
     # parallel version
     out = Parallel(n_jobs=multiprocessing.cpu_count(), verbose=-1)(
-        delayed(evaluate_oob_errors)(target_feature_name, train_df, corr_matrix_df, meta_data)
+        delayed(calculate_oob_errors)(target_feature_name, train_df, corr_matrix_df, meta_data)
         for target_feature_name in data_df.columns[1:]
     )
     scores_labeled_list = []
