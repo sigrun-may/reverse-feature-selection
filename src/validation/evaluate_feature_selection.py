@@ -57,20 +57,12 @@ def evaluate(
         raw_result_dict = pickle.load(file)
     assert isinstance(raw_result_dict, dict)
 
-    # extract cross-validation results
-    feature_selection_result_dict = raw_result_dict["method_result_dict"]
-    feature_selection_result_cv_list = feature_selection_result_dict["rf_cv_result"]
-    cross_validation_indices_list = raw_result_dict["indices"]
-    assert isinstance(feature_selection_result_cv_list, list)
-    assert isinstance(cross_validation_indices_list, list)
-
     # evaluate feature selection results
-    subset_evaluation_result_dict = evaluate_feature_subsets(
-        feature_selection_result_cv_list, feature_selection_methods
-    )
+    subset_evaluation_result_dict = evaluate_feature_subsets(raw_result_dict)
+
     # evaluate performance
     performance_evaluation_result_dict = evaluate_performance(
-        data_df, cross_validation_indices_list, subset_evaluation_result_dict, k=7
+        data_df, raw_result_dict["indices"], subset_evaluation_result_dict, k=7
     )
     plot_performance(performance_evaluation_result_dict, subset_evaluation_result_dict)
 
@@ -95,6 +87,9 @@ def evaluate_performance(
     Returns:
         A dictionary containing the evaluation results for each feature selection method.
     """
+    # check the correct type of the cross-validation indices list
+    assert isinstance(cross_validation_indices_list, list), type(cross_validation_indices_list)
+
     prediction_result_dict = train_model_and_predict_y(
         cross_validation_indices_list, data_df, subset_evaluation_result_dict, k
     )
@@ -112,19 +107,19 @@ def evaluate_performance(
 def plot_performance(performance_evaluation_result_dict: dict, subset_evaluation_result_dict: dict):
     # plot performance metrics for each feature selection method with plotly
     # iterate over all performance metrics
-    for performance_metric in performance_evaluation_result_dict["standard"].keys():
+    for performance_metric in performance_evaluation_result_dict["standard_random_forest"].keys():
         print(performance_metric)
         if performance_metric in ["fpr", "tpr", "thresholds", "recall", "precision", "auprc"]:
             continue
 
         # Extract the performance metric, stability, and number of selected features
         data = []
-        methods = [
-            "standard",
-            "reverse_fraction_p_values_tt",
-            "reverse_fraction_p_values_mwu",
-        ]  # performance_evaluation_result_dict.keys()
-        for method in methods:
+        # methods = [
+        #     "standard_random_forest",
+        #     "reverse_fraction_p_values_tt",
+        #     "reverse_fraction_p_values_mwu",
+        # ]  # performance_evaluation_result_dict.keys()
+        for method in performance_evaluation_result_dict.keys():
             performance = performance_evaluation_result_dict[method][performance_metric]
             importance_matrix = subset_evaluation_result_dict["importance_ranking"][method]
             stability = stability_estimator.get_stability(importance_matrix)
@@ -289,53 +284,51 @@ def train_model_and_predict_y(cross_validation_indices_list, data_df, subset_eva
 
 
 def evaluate_feature_subsets(
-    feature_selection_result_cv_list: list,
-    feature_selection_methods: list[str],
+    raw_result_dict: dict,
 ) -> dict:
     """
     Evaluates feature subsets for different feature selection methods.
 
-    This function iterates over each feature selection method provided, extracts the raw feature selection results,
+    This function extracts for each provided feature selection method the raw feature selection results,
     and analyzes the feature importance matrix.If the feature selection method is "reverse", it applies a
     p-metric_value to select feature subsets for reverse feature selection. It calculates the significant difference
     of reverse feature selection results with p-values based on t-test and Mann-Whitney-U test. It then analyzes the
     feature importance matrix.
 
     Args:
-        feature_selection_result_cv_list (list): A list of cross-validation results.
-        feature_selection_methods (list[str]): A list of feature selection methods to evaluate.
+        raw_result_dict: The raw results dictionary to evaluate.
 
     Returns:
-        dict: A dictionary containing the evaluation results for each feature selection method.
+        A dictionary containing the evaluation results for each feature selection method.
     """
     result_dict = {}
-    for feature_selection_method in feature_selection_methods:
+    for key in raw_result_dict.keys():
         # select feature subsets for reverse feature selection
-        if feature_selection_method == "reverse":
+        if key.startswith("reverse"):
             # calculate significant difference of reverse feature selection results
             # based on statistical test
             statistical_tests = ["ttest_ind", "mannwhitneyu", "welsh", "fraction"]
             for test in statistical_tests:
-                method_name = f"{feature_selection_method}_{test}"
+                method_name = f"{key}_{test}"
                 print(f"Calculating feature subsets for {method_name}")
-                feature_importance_matrix = extract_feature_importance_matrix(
-                    feature_selection_result_cv_list, method_name
-                )
+                feature_importance_matrix = extract_feature_importance_matrix(raw_result_dict[key], method_name)
                 analyze_feature_importance_matrix(
                     result_dict,
                     method_name,
                     feature_importance_matrix,
                 )
         # select feature subsets for standard feature selection
-        else:
-            feature_importance_matrix = extract_feature_importance_matrix(
-                feature_selection_result_cv_list, feature_selection_method
-            )
+        elif key.startswith("standard"):
+            feature_importance_matrix = extract_feature_importance_matrix(raw_result_dict[key], key)
             analyze_feature_importance_matrix(
                 result_dict,
-                feature_selection_method,
+                key,
                 feature_importance_matrix,
             )
+        else:
+            continue
+    # check if the result dictionary is not empty
+    assert bool(result_dict)
     return result_dict
 
 
@@ -589,7 +582,7 @@ def extract_feature_importance_matrix(
         A tuple containing the feature importance matrix and the method name.
     """
     # extract feature selection matrix
-    feature_importance_matrix = np.empty(
+    feature_importance_matrix = np.zeros(
         (len(feature_selection_result_cv_list), feature_selection_result_cv_list[0].shape[0])
     )
     # iterate over cross-validation results
@@ -611,11 +604,11 @@ def extract_feature_importance_matrix(
 
 
 def get_selected_feature_subset(cv_fold_result_df: pd.DataFrame, method: str) -> np.ndarray:
-    if method == "standard":
+    if method.startswith("standard"):
         feature_subset_series = cv_fold_result_df["standard"].values
         # sum of all values in the feature subset series must be one
         assert np.isclose(feature_subset_series.sum(), 1.0), feature_subset_series.sum()
-    elif method == "standard_shap":
+    elif method.startswith("standard_shap"):
         feature_subset_series = cv_fold_result_df["shap_values"].values
         # TODO: sum of all values in the feature subset series must be one?
     elif "reverse" in method:
@@ -628,38 +621,42 @@ def get_selected_feature_subset(cv_fold_result_df: pd.DataFrame, method: str) ->
 
 
 def get_feature_subset_for_reverse_feature_selection(cv_fold_result_df: pd.DataFrame, method_name: str) -> np.ndarray:
-    array_of_labeled_oob_errors = cv_fold_result_df["labeled"].values
-    array_of_unlabeled_oob_errors = cv_fold_result_df["unlabeled"].values
+    array_of_labeled_oob_error_lists = cv_fold_result_df["labeled"].values
+    array_of_unlabeled_oob_error_lists = cv_fold_result_df["unlabeled"].values
 
-    # initialize selected feature subset
+    # initialize selected feature subset with zeros as no feature is selected
     selected_feature_subset = np.zeros_like(cv_fold_result_df["labeled"].values)
 
     # iterate over all error distributions
     for i, (labeled_error_distribution, unlabeled_error_distribution) in enumerate(
-        zip(array_of_labeled_oob_errors, array_of_unlabeled_oob_errors)
+        zip(array_of_labeled_oob_error_lists, array_of_unlabeled_oob_error_lists)
     ):
-        # TODO Fehler finden
+        if labeled_error_distribution is None:
+            continue
 
         # calculate the p-value for the two distributions
         if "ttest_ind" in method_name:
-            p_value = ttest_ind(labeled_error_distribution, unlabeled_error_distribution).pvalue
+            p_value = ttest_ind(labeled_error_distribution, unlabeled_error_distribution, alternative="less").pvalue
         elif "mannwhitneyu" in method_name:
-            p_value = mannwhitneyu(labeled_error_distribution, unlabeled_error_distribution).pvalue
+            p_value = mannwhitneyu(labeled_error_distribution, unlabeled_error_distribution, alternative="less").pvalue
         elif "welsh" in method_name:
-            p_value = ttest_ind(labeled_error_distribution, unlabeled_error_distribution, equal_var=False).pvalue
+            p_value = ttest_ind(
+                labeled_error_distribution, unlabeled_error_distribution, equal_var=False, alternative="less"
+            ).pvalue
         elif "fraction" in method_name:
             # to not apply the p-value to select the feature subset for reverse feature selection
             p_value = -np.inf
         else:
             raise ValueError(f"Unknown method_name: {method_name}")
+
         # apply p_value significance level of 0.05 to select feature subset for reverse feature selection
-        if p_value < 0.05:
+        if p_value < 0.01 and np.mean(unlabeled_error_distribution) > np.mean(labeled_error_distribution):
             # calculate the fraction difference of the two means of the distributions
             fraction = (np.mean(unlabeled_error_distribution) - np.mean(labeled_error_distribution)) / np.mean(
                 unlabeled_error_distribution
             )
+            # select feature
             selected_feature_subset[i] = fraction
-
     return selected_feature_subset
 
     #
@@ -702,7 +699,7 @@ def get_feature_subset_for_reverse_feature_selection(cv_fold_result_df: pd.DataF
 with open("./settings.toml", "r") as file:
     meta_data = toml.load(file)
 data_name = "test_delete_me"
-input_data_df = pd.read_csv(meta_data["data"]["path"]).iloc[:, :30]
+input_data_df = pd.read_csv(meta_data["data"]["path"]).iloc[:, :221]
 # data_name = "colon"
 # # data_name = "prostate"
 # input_data_df = load_data_with_standardized_sample_size(data_name)
