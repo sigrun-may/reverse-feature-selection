@@ -1,22 +1,26 @@
-experiment_id = "colon_loo"
-
+experiment_id = "test_delete_me"
 # description = "Colon cancer dataset with random RF, mannwhitneyu and welsh for reverse_fs"
+
+# method = "reverse_random_forest"
+method = "standard_random_forest"
+
+
+# standard parameters
 verbose_optuna = true
 n_trials_optuna = 50
-standard_metric = "roc_auc_score"
-random_seeds = [42, 234, 34, 1, 5, 18, 3, 23, 9, 7, 123, 234, 345, 456, 567, 678, 789, 890, 901, 12, 23, 34, 45, 56, 67, 78, 89, 90,]
+
+# reverse selection parameters
+random_seeds = [29, 10,  17, 42, 234, 34, 1, 5, 19, 3, 23, 9, 7, 123, 234, 345, 456, 567, 678, 789, 890, 15, 23, 34, 45, 56, 67, 78, 89, 90,]
 # random_seeds = [42,234,34,23,5,3,9,7, 123, 234,]
 # random_seeds = [42,34,23,5,3]
-
-
-pickle_preprocessed_data = true
+train_correlation_threshold = 0.2
 
 [cv]
-# n_outer_folds = 15
+n_outer_folds = 0
 loo = true
+pickle_preprocessed_data = true
 
 [data]
-train_correlation_threshold = 0.2
-name = "colon_loo"
-# path = "./data/data.csv"
-
+name = "artificial_biomarker_data_2"
+path = "./data/artificial_biomarker_data_2.csv"
+scale = false
