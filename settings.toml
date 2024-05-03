@@ -1,4 +1,4 @@
-experiment_id = "colon02"
+experiment_id = "colon03"
 description = "Colon cancer dataset"
 
 method = "reverse_random_forest"
@@ -18,7 +18,7 @@ train_correlation_threshold = 0.2
 [cv]
 n_outer_folds = 0
 loo = true
-pickle_preprocessed_data = true
+pickle_preprocessed_data = false
 
 [data]
 name = "colon"
