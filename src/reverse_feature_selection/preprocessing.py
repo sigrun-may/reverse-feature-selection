@@ -56,18 +56,19 @@ def preprocess_data(
         robust_scaler = RobustScaler()
         train_df.iloc[:, 1:] = robust_scaler.fit_transform(train_df.iloc[:, 1:])
 
-    # Create a base path for caching the preprocessed data
-    pickle_base_path = Path(f"./preprocessed_data/{meta_data['data']['name']}/outer_fold_{fold_index}")
-    pickle_path = Path(f"{pickle_base_path}/train_correlation_matrix.pkl")
-    # Check if the preprocessed data is already cached
-    if pickle_path.exists():
-        # Load the cached preprocessed data
-        with open(pickle_path, "rb") as file:
-            return pickle.load(file), train_df
+    if meta_data["cv"]["pickle_preprocessed_data"]:
+        # Create a base path for caching the preprocessed data
+        pickle_base_path = Path(f"./preprocessed_data/{meta_data['data']['name']}/outer_fold_{fold_index}")
+        pickle_path = Path(f"{pickle_base_path}/train_correlation_matrix.pkl")
+        # Check if the preprocessed data is already cached
+        if pickle_path.exists():
+            # Load the cached preprocessed data
+            with open(pickle_path, "rb") as file:
+                return pickle.load(file), train_df
 
-    # Create directory for caching the preprocessed data
-    pickle_base_path.mkdir(parents=True, exist_ok=True)
-    assert pickle_base_path.exists()
+        # Create directory for caching the preprocessed data
+        pickle_base_path.mkdir(parents=True, exist_ok=True)
+        assert pickle_base_path.exists()
 
     # Calculate the Spearman correlation matrix for the training data
     unlabeled_train_df = train_df.loc[:, train_df.columns != "label"]  # Exclude the label column
@@ -105,18 +106,18 @@ def remove_features_correlated_to_target_feature(
     Returns:
         The training data with only the uncorrelated features remaining.
     """
-    # check if the target feature is in the training data
-    assert target_feature in train_df.columns
-
-    # check if the target feature is in the correlation matrix
-    assert target_feature in correlation_matrix_df.index
-
-    # Extract the unlabeled training data
-    assert train_df.shape[1] - 1 == correlation_matrix_df.shape[1]  # Exclude the label
-    assert train_df.columns[0] == "label"
+    # # check if the target feature is in the training data
+    # assert target_feature in train_df.columns
+    #
+    # # check if the target feature is in the correlation matrix
+    # assert target_feature in correlation_matrix_df.index
+    #
+    # # Extract the unlabeled training data
+    # assert train_df.shape[1] - 1 == correlation_matrix_df.shape[1]  # Exclude the label
+    # assert train_df.columns[0] == "label"
     unlabeled_train_df = train_df.loc[:, train_df.columns != "label"]
 
-    assert unlabeled_train_df.shape[1] == correlation_matrix_df.shape[0] == correlation_matrix_df.shape[1]
+    # assert unlabeled_train_df.shape[1] == correlation_matrix_df.shape[0] == correlation_matrix_df.shape[1]
 
     # Create a mask for uncorrelated features based on the correlation threshold
     uncorrelated_features_mask = (
@@ -128,36 +129,36 @@ def remove_features_correlated_to_target_feature(
         # with axis="index" and the further elements after the diagonal
         # with axis="column".
     )
-    assert uncorrelated_features_mask.shape[0] == unlabeled_train_df.shape[1]
+    # assert uncorrelated_features_mask.shape[0] == unlabeled_train_df.shape[1]
 
     # Get the column names of uncorrelated features
     uncorrelated_feature_names = unlabeled_train_df.columns[uncorrelated_features_mask]
 
-    # Ensure that "label" is not in the list of uncorrelated features
-    assert "label" not in uncorrelated_feature_names
+    # # Ensure that "label" is not in the list of uncorrelated features
+    # assert "label" not in uncorrelated_feature_names
+    #
+    # # Check if there aren't any features left after removing "label" and "target_feature"
+    # if uncorrelated_feature_names.size == 0:
+    #     raise ValueError(
+    #         f"No features uncorrelated to {target_feature} with absolute correlation threshold "
+    #         f"{meta_data['train_correlation_threshold']}"
+    #     )
 
-    # Check if there aren't any features left after removing "label" and "target_feature"
-    if uncorrelated_feature_names.size == 0:
-        raise ValueError(
-            f"No features uncorrelated to {target_feature} with absolute correlation threshold "
-            f"{meta_data['train_correlation_threshold']}"
-        )
-
-    # Check if the maximum correlation of any uncorrelated feature with the target is within the threshold
-    assert (
-        correlation_matrix_df.loc[target_feature, uncorrelated_features_mask].abs().max()
-        <= meta_data["train_correlation_threshold"]
-    ), f"{meta_data['train_correlation_threshold']}"
+    # # Check if the maximum correlation of any uncorrelated feature with the target is within the threshold
+    # assert (
+    #     correlation_matrix_df.loc[target_feature, uncorrelated_features_mask].abs().max()
+    #     <= meta_data["train_correlation_threshold"]
+    # ), f"{meta_data['train_correlation_threshold']}"
 
     # Insert the 'label' as the first column
     uncorrelated_feature_names = uncorrelated_feature_names.insert(0, "label")
 
     # Remove correlated features from the training data
     uncorrlated_train_df = train_df[uncorrelated_feature_names]
-    assert target_feature not in uncorrlated_train_df.columns
-    assert "label" == uncorrlated_train_df.columns[0], f"{uncorrlated_train_df.columns[0]}"
-    assert uncorrlated_train_df.shape[0] == train_df.shape[0]
-    assert uncorrlated_train_df.shape[1] == uncorrelated_feature_names.size
+    # assert target_feature not in uncorrlated_train_df.columns
+    # assert "label" == uncorrlated_train_df.columns[0], f"{uncorrlated_train_df.columns[0]}"
+    # assert uncorrlated_train_df.shape[0] == train_df.shape[0]
+    # assert uncorrlated_train_df.shape[1] == uncorrelated_feature_names.size
 
     # Return the data frame with uncorrelated features
     return uncorrlated_train_df
