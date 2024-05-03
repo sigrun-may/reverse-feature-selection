@@ -116,7 +116,7 @@ def calculate_oob_errors_for_each_feature(
     #     scores_unlabeled_list.append(scores_unlabeled)
 
     # parallel version
-    out = Parallel(n_jobs=multiprocessing.cpu_count(), verbose=-1)(
+    out = Parallel(n_jobs=(multiprocessing.cpu_count()*2), verbose=-1)(
         delayed(calculate_oob_errors)(target_feature_name, train_df, corr_matrix_df, meta_data)
         for target_feature_name in data_df.columns[1:]
     )
