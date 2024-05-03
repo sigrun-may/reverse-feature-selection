@@ -51,6 +51,7 @@ def calculate_oob_errors(
             n_estimators=100,
             random_state=seed,
             min_samples_leaf=2,
+            n_jobs=1
         )
         # Create an exact clone of the RandomForestRegressor (clf1)
         # https://scikit-learn.org/stable/modules/generated/sklearn.base.clone.html
