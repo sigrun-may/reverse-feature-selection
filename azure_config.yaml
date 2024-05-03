@@ -16,7 +16,7 @@ outputs:
     type: uri_folder
     path: azureml://subscriptions/ebcfd0f7-1a0a-443d-b869-0c9c696bfb0b/resourcegroups/DefaultResourceGroup-westeurope/workspaces/default-west-europe-ws/datastores/workspaceblobstore/paths/experiments/
     mode: rw_mount
-experiment_name: test1
-display_name: test1
+experiment_name: colon1
+display_name: colon1
 
 # az ml job create --file azure_config.yaml --workspace-name default-west-europe-ws --resource-group DefaultResourceGroup-westeurope
