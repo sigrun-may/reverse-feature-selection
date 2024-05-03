@@ -1,8 +1,8 @@
-experiment_id = "test_delete_me"
-# description = "Colon cancer dataset with random RF, mannwhitneyu and welsh for reverse_fs"
+experiment_id = "colon01"
+description = "Colon cancer dataset"
 
-# method = "reverse_random_forest"
-method = "standard_random_forest"
+method = "reverse_random_forest"
+# method = "standard_random_forest"
 
 
 # standard parameters
@@ -21,6 +21,7 @@ loo = true
 pickle_preprocessed_data = true
 
 [data]
-name = "artificial_biomarker_data_2"
-path = "./data/artificial_biomarker_data_2.csv"
+name = "colon"
+# path = "./data/artificial_biomarker_data_2.csv"
+path = ""
 scale = false

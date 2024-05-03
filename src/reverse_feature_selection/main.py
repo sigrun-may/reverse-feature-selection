@@ -36,21 +36,19 @@ def main():
     else:
         result_dict = {}
 
-    # load artificial data
-    import pandas as pd
-
-    data_df = pd.read_csv(meta_data_dict["data"]["path"]).iloc[:, :221]
-    assert data_df.columns[0] == "label"
-
+    # # load artificial data
+    # import pandas as pd
+    # data_df = pd.read_csv(meta_data_dict["data"]["path"]).iloc[:, :221]
     # # shorten artificial data for faster testing
     # data_01 = data_df.iloc[:, 0:30]
     # data_02 = data_df.iloc[:, 200:220]
     # data_df = pd.concat([data_01, data_02], join="outer", axis=1)
 
-    # # data loaders
-    # from data_loader_tools import load_data_with_standardized_sample_size
-    # data_df = load_data_with_standardized_sample_size("colon")
+    # data loaders
+    from data_loader_tools import load_data_with_standardized_sample_size
+    data_df = load_data_with_standardized_sample_size("colon")
 
+    assert data_df.columns[0] == "label"
     print(data_df.shape)
     print("number of samples", data_df.shape[0], "number of features", data_df.shape[1] - 1)
 
