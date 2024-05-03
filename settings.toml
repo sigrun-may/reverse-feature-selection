@@ -1,4 +1,4 @@
-experiment_id = "colon01"
+experiment_id = "colon02"
 description = "Colon cancer dataset"
 
 method = "reverse_random_forest"
