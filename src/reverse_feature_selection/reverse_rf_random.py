@@ -4,18 +4,19 @@
 # This software is distributed under the terms of the MIT license
 # which is available at https://opensource.org/licenses/MIT
 
+"""Reverse feature selection with random forest regressors."""
+
+import logging
 import math
-from typing import Tuple, Optional
+from typing import Optional, Tuple
 
 import numpy as np
 import pandas as pd
+import preprocessing
 from joblib import Parallel, delayed
 from sklearn import clone
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error
-import logging
-
-import preprocessing
 
 logging.basicConfig(level=logging.INFO)
 
@@ -112,7 +113,6 @@ def calculate_oob_errors_for_each_feature(
     Returns:
         A DataFrame containing lists of OOB scores for repeated analyzes of labeled and unlabeled data.
     """
-
     # Preprocess the data and cache the results if not available yet
     corr_matrix_df, train_df = preprocessing.preprocess_data(
         train_indices,

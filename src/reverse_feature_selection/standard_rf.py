@@ -4,6 +4,8 @@
 # This software is distributed under the terms of the MIT license
 # which is available at https://opensource.org/licenses/MIT
 
+"""Standard embedded feature selection with sklearn random forest."""
+
 import math
 import warnings
 
@@ -18,6 +20,18 @@ warnings.filterwarnings("ignore")
 
 
 def optimize(train_indices, data_df, meta_data):
+    """
+    Optimize the hyperparameters of a random forest classifier using optuna.
+
+    Args:
+        train_indices: The indices of the training split.
+        data_df: The training data.
+        meta_data: The metadata related to the dataset and experiment.
+
+    Returns:
+        The feature importances, the summed shap values, and the out-of-bag (OOB) score.
+    """
+
     def optuna_objective(trial):
         rf_clf = RandomForestClassifier(
             oob_score=roc_auc_score,
@@ -67,7 +81,6 @@ def optimize(train_indices, data_df, meta_data):
     # calculate shap values
     explainer = shap.TreeExplainer(clf)
     shap_values = explainer.shap_values(data_df.iloc[train_indices, 1:])
-    # calculate mean shap values
     sum_shap_values = np.zeros(data_df.shape[1] - 1)
     for values_per_sample in shap_values:
         positive_shap_values = np.abs(values_per_sample[:, 0])

@@ -4,10 +4,10 @@
 # which is available at https://opensource.org/licenses/MIT
 
 """Data loader tools."""
-from typing import Literal, List, Tuple
+from typing import List, Literal, Tuple
 
-from mltb2.data import load_colon, load_prostate, load_leukemia_big
 import pandas as pd
+from mltb2.data import load_colon, load_leukemia_big, load_prostate
 
 
 def load_data_with_standardized_sample_size(
@@ -24,7 +24,6 @@ def load_data_with_standardized_sample_size(
     Returns:
         Dataframe containing labels and data.
     """
-
     # generate function from string
     load_data_function = globals()[f"load_{data}"]
 

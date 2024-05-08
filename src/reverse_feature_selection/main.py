@@ -4,19 +4,21 @@
 # This software is distributed under the terms of the MIT license
 # which is available at https://opensource.org/licenses/MIT
 
+"""Main script for cacluating the raw results of the feature selection."""
+
 import datetime
+import multiprocessing
 import pickle
 import sys
-import multiprocessing
 from pathlib import Path
 
-import toml
-import git
-
 import cross_validation
+import git
+import toml
 
 
 def main():
+    """Calculate the raw results of the feature selection."""
     # parse result path from input
     result_base_path = Path(sys.argv[1])
     print("data_path: ", result_base_path)

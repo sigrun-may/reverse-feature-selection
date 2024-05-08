@@ -4,15 +4,15 @@
 # This software is distributed under the terms of the MIT license
 # which is available at https://opensource.org/licenses/MIT
 
+"""Feature selection methods."""
+
 import pandas as pd
 import reverse_rf_random as reverse_rf
 import standard_rf
 
 
 class FeatureSelection:
-    """
-    This class is used to select feature subsets from a given dataset.
-    """
+    """This class is used to select feature subsets from a given dataset."""
 
     def __init__(self, data_df: pd.DataFrame, meta_data: dict):
         """
@@ -44,6 +44,13 @@ class FeatureSelection:
     def reverse_feature_selection(self, train_indices, fold_index):
         """
         Perform reverse feature selection on the dataset.
+
+        Args:
+            train_indices: The indices for the training split.
+            fold_index: The current loop iteration of the outer cross-validation.
+
+        Returns:
+            The raw training results for feature selection.
         """
         # Calculate raw metrics for feature subset calculation with reverse feature selection
         return reverse_rf.calculate_oob_errors_for_each_feature(
@@ -56,6 +63,12 @@ class FeatureSelection:
     def standard_random_forest(self, train_indices):
         """
         Perform standard random forest on the dataset.
+
+        Args:
+            train_indices: The indices for the training split.
+
+        Returns:
+            The feature importances, SHAP values and oob score.
         """
         # Calculate feature subset with standard random forest feature importance
         feature_importance, shap_values, training_oob_score = standard_rf.optimize(

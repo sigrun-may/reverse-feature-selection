@@ -4,13 +4,14 @@
 # This software is distributed under the terms of the MIT license
 # which is available at https://opensource.org/licenses/MIT
 
+"""Cross-validation tools."""
+
 import logging
 from typing import Tuple
 
 import pandas as pd
-from sklearn.model_selection import LeaveOneOut, StratifiedKFold
-
 from feature_selection import FeatureSelection
+from sklearn.model_selection import LeaveOneOut, StratifiedKFold
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)

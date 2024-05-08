@@ -4,40 +4,32 @@
 # This software is distributed under the terms of the MIT license
 # which is available at https://opensource.org/licenses/MIT
 
+"""Evaluation of feature selection results."""
+
 import math
 import os
 import pickle
-from typing import Any, Tuple, List
+from typing import Any, List, Tuple
 
 import numpy as np
-import optuna
 import pandas as pd
-import toml
-from sklearn.metrics import (
-    roc_curve,
-    auc,
-    precision_recall_curve,
-    average_precision_score,
-    accuracy_score,
-    precision_score,
-    f1_score,
-    recall_score,
-    log_loss,
-    brier_score_loss,
-)
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.preprocessing import RobustScaler
-from scipy.stats import mannwhitneyu, ttest_ind
 import plotly.express as px
 import plotly.io as pio
-
 import stability_estimator
+from scipy.stats import mannwhitneyu, ttest_ind
+from sklearn.metrics import (accuracy_score, auc, average_precision_score,
+                             brier_score_loss, f1_score, log_loss,
+                             precision_recall_curve, precision_score,
+                             recall_score, roc_curve)
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.preprocessing import RobustScaler
+
 from src.reverse_feature_selection.data_loader_tools import load_data_with_standardized_sample_size
 
 
 def evaluate(data_df: pd.DataFrame, pickled_result_path: str, plot=False) -> Tuple[dict, dict]:
     """
-    Evaluates the feature selection results.
+    Evaluate the feature selection results.
 
     This function loads the pickled results from the specified path, extracts the feature selection results,
     and evaluates them for each provided feature selection method.
@@ -78,7 +70,7 @@ def evaluate_performance(
     data_df: pd.DataFrame, cross_validation_indices_list: list, subset_evaluation_result_dict: dict, k: int
 ) -> dict:
     """
-    Evaluates the performance of the feature selection methods.
+    Evaluate the performance of the feature selection methods.
 
     This function calculates the performance of the feature selection methods based on the cross-validation indices
     and the subset evaluation results. It then updates the subset evaluation results with the performance results.
@@ -110,6 +102,16 @@ def evaluate_performance(
 
 
 def plot_performance(performance_evaluation_result_dict: dict, subset_evaluation_result_dict: dict):
+    """
+    Plot the performance metrics for each feature selection method.
+
+    This function plots the performance metrics for each feature selection method with plotly.
+
+    Args:
+        performance_evaluation_result_dict: A dictionary containing the performance metrics
+            for each feature selection method.
+        subset_evaluation_result_dict: A dictionary containing the evaluation results for each feature selection method.
+    """
     # plot performance metrics for each feature selection method with plotly
     # iterate over all performance metrics
     for performance_metric in performance_evaluation_result_dict["reverse_random_forest_ttest_ind"].keys():
@@ -173,7 +175,7 @@ def plot_performance(performance_evaluation_result_dict: dict, subset_evaluation
 
 def calculate_performance_metrics(y_true, y_predict, y_predict_proba):
     """
-    Calculates the performance metrics for the predicted labels.
+    Calculate the performance metrics for the predicted labels.
 
     Args:
         y_true: The true labels.
@@ -292,7 +294,7 @@ def evaluate_feature_subsets(
     raw_result_dict: dict,
 ) -> dict:
     """
-    Evaluates feature subsets for different feature selection methods.
+    Evaluate feature subsets for different feature selection methods.
 
     This function extracts for each provided feature selection method the raw feature selection results,
     and analyzes the feature importance matrix.If the feature selection method is "reverse", it applies a
@@ -345,7 +347,7 @@ def apply_p_value_as_feature_importance(
     p_value: str,
 ):
     """
-    Applies the negative log of the p-value as feature importance.
+    Apply the negative log of the p-value as feature importance.
 
     This function iterates over each cross-validation result, extracts the p-values, and calculates the negative log
     of the p-value. It then updates the feature selection result with the negative log of the p-value as feature
@@ -491,7 +493,7 @@ def apply_p_value_as_feature_importance(
 
 def update_result_dictionary(result_dict: dict, feature_selection_method: str, metric_name: str, metric_value: Any):
     """
-    Updates the result dictionary with a given metric_name-value pair.
+    Update the result dictionary with a given metric_name-value pair.
 
     Args:
         result_dict: The dictionary to update.
@@ -551,7 +553,16 @@ def analyze_feature_importance_matrix(
     update_result_dictionary(result_dict, feature_selection_method, "importance_ranking", feature_importance_matrix)
 
 
-def scale_feature_importance_matrix(feature_importance_matrix: np.ndarray):
+def scale_feature_importance_matrix(feature_importance_matrix: np.ndarray) -> np.ndarray:
+    """
+    Scale the feature importance matrix to have all columns sum up to one or zero.
+
+    Args:
+        feature_importance_matrix: The feature importance matrix to scale.
+
+    Returns:
+        The scaled feature importance matrix.
+    """
     # check if the sum of all columns is one or zero
     if np.all(
         np.isclose(np.sum(feature_importance_matrix, axis=1), 1)
@@ -578,7 +589,7 @@ def extract_feature_importance_matrix(
     method: str,
 ) -> np.ndarray:
     """
-    Extracts the feature importance matrix from the cross-validation results.
+    Extract the feature importance matrix from the cross-validation results.
 
     Args:
         feature_selection_result_cv_list: A list of cross-validation results.
@@ -610,6 +621,16 @@ def extract_feature_importance_matrix(
 
 
 def get_selected_feature_subset(cv_fold_result_df: pd.DataFrame, method: str) -> np.ndarray:
+    """
+    Extract the selected feature subset from the cross-validation fold result dataframe.
+
+    Args:
+        cv_fold_result_df: The cross-validation fold result dataframe.
+        method: The method used for feature selection.
+
+    Returns:
+        The selected feature subset.
+    """
     if method.startswith("standard"):
         feature_subset_series = cv_fold_result_df["standard_rf"].values
         # sum of all values in the feature subset series must be one
@@ -627,6 +648,16 @@ def get_selected_feature_subset(cv_fold_result_df: pd.DataFrame, method: str) ->
 
 
 def get_feature_subset_for_reverse_feature_selection(cv_fold_result_df: pd.DataFrame, method_name: str) -> np.ndarray:
+    """
+    Extract the feature subset for reverse feature selection.
+
+    Args:
+        cv_fold_result_df: The cross-validation fold result dataframe.
+        method_name: The method name used for feature selection.
+
+    Returns:
+        The selected feature subset for reverse feature selection.
+    """
     array_of_labeled_oob_error_lists = cv_fold_result_df["labeled"].values
     array_of_unlabeled_oob_error_lists = cv_fold_result_df["unlabeled"].values
 
@@ -728,12 +759,25 @@ def get_feature_subset_for_reverse_feature_selection(cv_fold_result_df: pd.DataF
 # print(performance_result_dict_final)
 
 
-def evaluate_reproducibility(input_data_df: pd.DataFrame, base_path: str, repeated_experiments: list[str]):
+def evaluate_reproducibility(data_df: pd.DataFrame, base_path: str, repeated_experiments: list[str]):
+    """
+    Evaluate the reproducibility of the feature selection results.
+
+    This function evaluates the reproducibility of the feature selection results for each provided feature selection method.
+
+    Args:
+        data_df: The underlying original data for the given experiments.
+        base_path: The base path to the pickled results files.
+        repeated_experiments: A list of the experiment ids of repeated experiments to evaluate.
+
+    Returns:
+        A dictionary containing the evaluation results for each feature selection method.
+    """
     results_dict = {}
 
     for experiment_id in repeated_experiments:
         subset_result_dict_final, performance_result_dict_final = evaluate(
-            input_data_df,
+            data_df,
             f"{base_path}/{experiment_id}_result_dict.pkl",
         )
         for selection_method in subset_result_dict_final["stability"].keys():

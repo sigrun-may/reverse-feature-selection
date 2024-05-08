@@ -4,10 +4,26 @@
 # This software is distributed under the terms of the MIT license
 # which is available at https://opensource.org/licenses/MIT
 
+"""Stability estimator for feature selection in high-dimensional data with small sample size.
+
+A generalized stability estimator based on inter-intrastability of subsets for high-dimensional feature selection.
+https://doi.org/10.1016/j.chemolab.2021.104457
+"""
 import numpy as np
 
 
-def get_stability(selected_features_matrix):
+def get_stability(selected_features_matrix) -> float:
+    """
+    Calculate the stability of selected features.
+
+    Args:
+        selected_features_matrix: Numpy array containing the selected features.
+            Rows represent the folds, columns represent the features.
+            The matrix should contain binary values (0 or 1).
+
+    Returns:
+        Stability of selected features.
+    """
     # preserve original matrix
     selected_features_matrix_cp = selected_features_matrix.copy()
 
@@ -59,28 +75,8 @@ def get_stability(selected_features_matrix):
     return stability
 
 
-def test_stability():
-    only_ones = np.ones((10, 20))
-    stability = get_stability(only_ones)
-    assert stability == 1, stability
-
-    perfect_stability = np.concatenate((np.ones((10, 8)), np.zeros((10, 120))), axis=1)
-    assert perfect_stability.shape == (10, 128)
-    perfect_stability_metric = get_stability(perfect_stability)
-    assert perfect_stability_metric == 1, perfect_stability_metric
-
-    perfect_stability2 = np.concatenate((np.ones((10, 1)), np.zeros((10, 120))), axis=1)
-    assert perfect_stability2.shape == (10, 121)
-    perfect_stability_metric2 = get_stability(perfect_stability2)
-    assert perfect_stability_metric2 == 1, perfect_stability_metric2
-
-    # print(get_stability(perfect_stability))
-    not_stable = get_stability(np.zeros((10, 20)))
-    assert not_stable == 0, not_stable
-
-
 def _subset_size_stability(subset_vector, number_of_features, k):
-    """
+    """Calculate the subset-size stability.
 
     Args:
         subset_vector: Numpy array containing the number of selected features
@@ -108,3 +104,24 @@ def _subset_size_stability(subset_vector, number_of_features, k):
         raise ValueError("Incorrect subset vector")
 
     return subset_size_stability
+
+
+def test_stability():
+    """Test the stability estimator."""
+    only_ones = np.ones((10, 20))
+    stability = get_stability(only_ones)
+    assert stability == 1, stability
+
+    perfect_stability = np.concatenate((np.ones((10, 8)), np.zeros((10, 120))), axis=1)
+    assert perfect_stability.shape == (10, 128)
+    perfect_stability_metric = get_stability(perfect_stability)
+    assert perfect_stability_metric == 1, perfect_stability_metric
+
+    perfect_stability2 = np.concatenate((np.ones((10, 1)), np.zeros((10, 120))), axis=1)
+    assert perfect_stability2.shape == (10, 121)
+    perfect_stability_metric2 = get_stability(perfect_stability2)
+    assert perfect_stability_metric2 == 1, perfect_stability_metric2
+
+    # print(get_stability(perfect_stability))
+    not_stable = get_stability(np.zeros((10, 20)))
+    assert not_stable == 0, not_stable
