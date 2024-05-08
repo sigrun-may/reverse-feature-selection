@@ -1,13 +1,4 @@
-black
-flake8
-isort
-mdformat
-pydocstyle
-pylint
-pylintfileheader
-mypy
 optuna
-tqdm
 numpy
 pandas
 scikit-learn
@@ -18,10 +9,6 @@ shap
 toml
 mltb2[data]
 GitPython
-
 requests
 bs4
 plotly
-pyyaml
-sqlitedict
-lightgbm
