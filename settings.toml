@@ -5,7 +5,7 @@
 # which is available at https://opensource.org/licenses/MIT
 
 
-experiment_id = "colon_s30"
+experiment_id = "colon_s40"
 description = "Colon cancer dataset"
 
 method = "reverse_random_forest"
