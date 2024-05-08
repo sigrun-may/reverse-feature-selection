@@ -19,8 +19,8 @@ def main():
     with open("./settings.toml", "r") as file:
         meta_data_dict = toml.load(file)
 
-    # shift seeds by 10
-    meta_data_dict["random_seeds"] = [seed + 10 for seed in meta_data_dict["random_seeds"]]
+    # shift seeds by 20
+    meta_data_dict["random_seeds"] = [seed + 20 for seed in meta_data_dict["random_seeds"]]
 
     # save git commit hash
     git_repository = git.Repo(search_parent_directories=True)
