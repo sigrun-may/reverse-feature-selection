@@ -1,5 +1,4 @@
 import math
-import multiprocessing
 from typing import Tuple, Optional
 
 import numpy as np
@@ -15,7 +14,7 @@ logging.basicConfig(level=logging.INFO)
 
 
 def calculate_oob_errors(
-    target_feature_name: str, train_df: pd.DataFrame, corr_matrix_df: pd.DataFrame, meta_data: dict
+    target_feature_name: str, train_df: pd.DataFrame, corr_matrix_df: pd.DataFrame, meta_data: dict,
 ) -> Tuple[Optional[list], Optional[list]]:
     """
     Calculate out-of-bag (OOB) error for labeled and unlabeled training data.
@@ -51,7 +50,6 @@ def calculate_oob_errors(
             n_estimators=100,
             random_state=seed,
             min_samples_leaf=2,
-            n_jobs=1
         )
         # Create an exact clone of the RandomForestRegressor (clf1)
         # https://scikit-learn.org/stable/modules/generated/sklearn.base.clone.html
@@ -112,12 +110,12 @@ def calculate_oob_errors_for_each_feature(
     # scores_labeled_list = []
     # scores_unlabeled_list = []
     # for target_feature_name in data_df.columns[1:]:
-    #     scores_labeled, scores_unlabeled = evaluate_oob_errors(target_feature_name, train_df, corr_matrix_df, meta_data)
+    #     scores_labeled, scores_unlabeled = calculate_oob_errors(target_feature_name, train_df, corr_matrix_df, meta_data)
     #     scores_labeled_list.append(scores_labeled)
     #     scores_unlabeled_list.append(scores_unlabeled)
 
     # parallel version
-    out = Parallel(n_jobs=(multiprocessing.cpu_count()+20), verbose=-1, backend="multiprocessing")(
+    out = Parallel(n_jobs=meta_data["n_cpus"], verbose=-1)(
         delayed(calculate_oob_errors)(target_feature_name, train_df, corr_matrix_df, meta_data)
         for target_feature_name in data_df.columns[1:]
     )
