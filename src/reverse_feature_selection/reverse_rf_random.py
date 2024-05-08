@@ -1,3 +1,9 @@
+# Copyright (c) 2024 Sigrun May,
+# Ostfalia Hochschule für angewandte Wissenschaften
+#
+# This software is distributed under the terms of the MIT license
+# which is available at https://opensource.org/licenses/MIT
+
 import math
 from typing import Tuple, Optional
 
@@ -8,13 +14,17 @@ from sklearn import clone
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error
 import logging
+
 import preprocessing
 
 logging.basicConfig(level=logging.INFO)
 
 
 def calculate_oob_errors(
-    target_feature_name: str, train_df: pd.DataFrame, corr_matrix_df: pd.DataFrame, meta_data: dict,
+    target_feature_name: str,
+    train_df: pd.DataFrame,
+    corr_matrix_df: pd.DataFrame,
+    meta_data: dict,
 ) -> Tuple[Optional[list], Optional[list]]:
     """
     Calculate out-of-bag (OOB) error for labeled and unlabeled training data.
@@ -28,6 +38,11 @@ def calculate_oob_errors(
     Returns:
         A tuple containing lists of OOB scores for labeled and unlabeled training data.
     """
+    # import omp_thread_count
+    #
+    # n_threads = omp_thread_count.get_thread_count()
+    # print(f"Number of threads: {n_threads}")
+
     # Prepare training data
     assert target_feature_name in train_df.columns
     y_train = train_df[target_feature_name].to_numpy()

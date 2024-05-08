@@ -1,3 +1,9 @@
+# Copyright (c) 2024 Sigrun May,
+# Ostfalia Hochschule für angewandte Wissenschaften
+#
+# This software is distributed under the terms of the MIT license
+# which is available at https://opensource.org/licenses/MIT
+
 import math
 import os
 import pickle
@@ -29,9 +35,7 @@ import stability_estimator
 from src.reverse_feature_selection.data_loader_tools import load_data_with_standardized_sample_size
 
 
-def evaluate(
-    data_df: pd.DataFrame, pickled_result_path: str, feature_selection_methods: list[str]
-) -> Tuple[dict, dict]:
+def evaluate(data_df: pd.DataFrame, pickled_result_path: str, plot=False) -> Tuple[dict, dict]:
     """
     Evaluates the feature selection results.
 
@@ -42,6 +46,8 @@ def evaluate(
         data_df: The data to evaluate.
         pickled_result_path: The path to the pickled results file.
         feature_selection_methods: A list of feature selection methods to evaluate.
+        plot: A boolean indicating whether to plot the results. Defaults to False.
+
 
     Returns:
         A dictionary containing the evaluation results for each feature selection method.
@@ -49,8 +55,6 @@ def evaluate(
     # validate input
     if not os.path.exists(pickled_result_path):
         raise ValueError(f"The file {pickled_result_path} does not exist.")
-    if not isinstance(feature_selection_methods, list):
-        raise TypeError("feature_selection_methods should be a list.")
 
     # unpickle the results
     with open(pickled_result_path, "rb") as file:
@@ -64,7 +68,8 @@ def evaluate(
     performance_evaluation_result_dict = evaluate_performance(
         data_df, raw_result_dict["indices"], subset_evaluation_result_dict, k=7
     )
-    plot_performance(performance_evaluation_result_dict, subset_evaluation_result_dict)
+    if plot:
+        plot_performance(performance_evaluation_result_dict, subset_evaluation_result_dict)
 
     return subset_evaluation_result_dict, performance_evaluation_result_dict
 
@@ -107,7 +112,7 @@ def evaluate_performance(
 def plot_performance(performance_evaluation_result_dict: dict, subset_evaluation_result_dict: dict):
     # plot performance metrics for each feature selection method with plotly
     # iterate over all performance metrics
-    for performance_metric in performance_evaluation_result_dict["standard_random_forest"].keys():
+    for performance_metric in performance_evaluation_result_dict["reverse_random_forest_ttest_ind"].keys():
         print(performance_metric)
         if performance_metric in ["fpr", "tpr", "thresholds", "recall", "precision", "auprc"]:
             continue
@@ -307,7 +312,8 @@ def evaluate_feature_subsets(
         if key.startswith("reverse"):
             # calculate significant difference of reverse feature selection results
             # based on statistical test
-            statistical_tests = ["ttest_ind", "mannwhitneyu", "welsh", "fraction"]
+            # statistical_tests = ["ttest_ind", "mannwhitneyu", "welsh", "fraction"]
+            statistical_tests = ["ttest_ind", "mannwhitneyu"]
             for test in statistical_tests:
                 method_name = f"{key}_{test}"
                 print(f"Calculating feature subsets for {method_name}")
@@ -605,11 +611,11 @@ def extract_feature_importance_matrix(
 
 def get_selected_feature_subset(cv_fold_result_df: pd.DataFrame, method: str) -> np.ndarray:
     if method.startswith("standard"):
-        feature_subset_series = cv_fold_result_df["standard"].values
+        feature_subset_series = cv_fold_result_df["standard_rf"].values
         # sum of all values in the feature subset series must be one
         assert np.isclose(feature_subset_series.sum(), 1.0), feature_subset_series.sum()
     elif method.startswith("standard_shap"):
-        feature_subset_series = cv_fold_result_df["shap_values"].values
+        feature_subset_series = cv_fold_result_df["shap_values_rf"].values
         # TODO: sum of all values in the feature subset series must be one?
     elif "reverse" in method:
         feature_subset_series = get_feature_subset_for_reverse_feature_selection(cv_fold_result_df, method)
@@ -637,6 +643,16 @@ def get_feature_subset_for_reverse_feature_selection(cv_fold_result_df: pd.DataF
         # calculate the p-value for the two distributions
         if "ttest_ind" in method_name:
             p_value = ttest_ind(labeled_error_distribution, unlabeled_error_distribution, alternative="less").pvalue
+            # p_value2 = ttest_ind(labeled_error_distribution, unlabeled_error_distribution, equal_var=False, alternative="less").pvalue
+            #
+            # if math.isclose(p_value, p_value2):
+            #     if p_value < p_value2:
+            #         print("tt", p_value2 - p_value)
+            #     else:
+            #         print("welsh", p_value - p_value2)
+            #
+            #     print(p_value, p_value2)
+
         elif "mannwhitneyu" in method_name:
             p_value = mannwhitneyu(labeled_error_distribution, unlabeled_error_distribution, alternative="less").pvalue
         elif "welsh" in method_name:
@@ -650,7 +666,7 @@ def get_feature_subset_for_reverse_feature_selection(cv_fold_result_df: pd.DataF
             raise ValueError(f"Unknown method_name: {method_name}")
 
         # apply p_value significance level of 0.05 to select feature subset for reverse feature selection
-        if p_value < 0.01 and np.mean(unlabeled_error_distribution) > np.mean(labeled_error_distribution):
+        if p_value < 0.05 and np.mean(unlabeled_error_distribution) > np.mean(labeled_error_distribution):
             # calculate the fraction difference of the two means of the distributions
             fraction = (np.mean(unlabeled_error_distribution) - np.mean(labeled_error_distribution)) / np.mean(
                 unlabeled_error_distribution
@@ -696,16 +712,70 @@ def get_feature_subset_for_reverse_feature_selection(cv_fold_result_df: pd.DataF
 
 
 # parse settings from toml
-with open("./settings.toml", "r") as file:
-    meta_data = toml.load(file)
-data_name = "test_delete_me"
-input_data_df = pd.read_csv(meta_data["data"]["path"]).iloc[:, :221]
-# data_name = "colon"
-# # data_name = "prostate"
-# input_data_df = load_data_with_standardized_sample_size(data_name)
-# TODO rest of the data as test data
-subset_result_dict_final, performance_result_dict_final = evaluate(
-    input_data_df,
-    f"/home/sigrun/PycharmProjects/reverse_feature_selection/results/{data_name}_result_dict.pkl",
-    feature_selection_methods=["standard", "standard_shap", "reverse"],
-)
+# with open("./settings.toml", "r") as file:
+#     meta_data = toml.load(file)
+# # data_name = "artificial221"
+# # input_data_df = pd.read_csv(meta_data["data"]["path"]).iloc[:, :221]
+# data_name = "colon00"
+# # # data_name = "prostate"
+# input_data_df = load_data_with_standardized_sample_size("colon")
+# # TODO rest of the data as test data
+# subset_result_dict_final, performance_result_dict_final = evaluate(
+#     input_data_df,
+#     f"/home/sigrun/PycharmProjects/reverse_feature_selection/results/{data_name}_result_dict.pkl",
+#     feature_selection_methods=["standard", "standard_shap", "reverse"],
+# )
+# print(performance_result_dict_final)
+
+
+def evaluate_reproducibility(input_data_df: pd.DataFrame, base_path: str, repeated_experiments: list[str]):
+    results_dict = {}
+
+    for experiment_id in repeated_experiments:
+        subset_result_dict_final, performance_result_dict_final = evaluate(
+            input_data_df,
+            f"{base_path}/{experiment_id}_result_dict.pkl",
+        )
+        for selection_method in subset_result_dict_final["stability"].keys():
+            if f"{selection_method}_stability" not in results_dict.keys():
+                results_dict[f"{selection_method}_stability"] = []
+            results_dict[f"{selection_method}_stability"].append(
+                subset_result_dict_final["stability"][selection_method]
+            )
+
+            if f"{selection_method}_mean_subset_size" not in results_dict.keys():
+                results_dict[f"{selection_method}_mean_subset_size"] = []
+            results_dict[f"{selection_method}_mean_subset_size"].append(
+                subset_result_dict_final["mean_subset_size"][selection_method]
+            )
+
+        for selection_method in performance_result_dict_final.keys():
+            if f"{selection_method}_auc" not in results_dict.keys():
+                results_dict[f"{selection_method}_auc"] = []
+            results_dict[f"{selection_method}_auc"].append(performance_result_dict_final[selection_method]["auc"])
+
+            if f"{selection_method}_f1" not in results_dict.keys():
+                results_dict[f"{selection_method}_f1"] = []
+            results_dict[f"{selection_method}_f1"].append(performance_result_dict_final[selection_method]["f1"])
+
+            if f"{selection_method}_log_loss" not in results_dict.keys():
+                results_dict[f"{selection_method}_log_loss"] = []
+            results_dict[f"{selection_method}_log_loss"].append(
+                performance_result_dict_final[selection_method]["log_loss"]
+            )
+
+            if f"{selection_method}_brier_score_loss" not in results_dict.keys():
+                results_dict[f"{selection_method}_brier_score_loss"] = []
+            results_dict[f"{selection_method}_brier_score_loss"].append(
+                performance_result_dict_final[selection_method]["brier_score_loss"]
+            )
+        # compare the results
+        print(subset_result_dict_final)
+
+
+list_of_experiments = ["colon00", "colon_s10"]
+pickle_base_path = f"results"
+data_name = "Colon Cancer"
+input_data_df = load_data_with_standardized_sample_size("colon")
+
+evaluate_reproducibility(input_data_df, pickle_base_path, list_of_experiments)
