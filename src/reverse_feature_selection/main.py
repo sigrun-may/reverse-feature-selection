@@ -1,6 +1,7 @@
 import datetime
 import pickle
 import sys
+import multiprocessing
 from pathlib import Path
 
 import toml
@@ -18,24 +19,26 @@ def main():
     with open("./settings.toml", "r") as file:
         meta_data_dict = toml.load(file)
 
+    # shift seeds by 10
+    meta_data_dict["random_seeds"] = [seed + 10 for seed in meta_data_dict["random_seeds"]]
+
     # save git commit hash
     git_repository = git.Repo(search_parent_directories=True)
     commit_sha = git_repository.head.object.hexsha
     meta_data_dict["git_commit_hash"] = commit_sha
 
-    # print number of available CPUs
-    import multiprocessing
-
+    # number of available CPUs
     print("Number of CPUs available: ", multiprocessing.cpu_count())
+    meta_data_dict["n_cpus"] = multiprocessing.cpu_count()
 
-    # # load previous cross-validation indices for the given experiment, if available
+    # load previous cross-validation indices for the given experiment, if available
     result_dict_path = Path(f"{result_base_path}/{meta_data_dict['experiment_id']}_result_dict.pkl")
-    # if result_dict_path.exists():
-    #     with open(result_dict_path, "rb") as file:
-    #         result_dict = pickle.load(file)
-    # else:
-    #     result_dict = {}
-    result_dict = {}
+    if result_dict_path.exists():
+        with open(result_dict_path, "rb") as file:
+            result_dict = pickle.load(file)
+    else:
+        result_dict = {}
+    # result_dict = {}
     # # load artificial data
     # import pandas as pd
     # data_df = pd.read_csv(meta_data_dict["data"]["path"]).iloc[:, :221]
@@ -46,7 +49,6 @@ def main():
 
     # data loaders
     from data_loader_tools import load_data_with_standardized_sample_size
-
     data_df = load_data_with_standardized_sample_size("colon")
 
     assert data_df.columns[0] == "label"
