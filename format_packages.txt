@@ -1,0 +1,8 @@
+black
+flake8
+isort
+mdformat
+pydocstyle
+pylint
+pylintfileheader
+mypy
