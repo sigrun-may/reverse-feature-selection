@@ -37,7 +37,7 @@ def optimize(train_indices, data_df, meta_data):
             oob_score=roc_auc_score,
             max_depth=trial.suggest_int("max_depth", 1, 15),
             n_estimators=300,
-            random_state=42,
+            random_state=meta_data.get("random_state", None),
             min_samples_leaf=trial.suggest_int("min_samples_leaf", 2, math.floor(len(train_indices) / 2)),
             min_impurity_decrease=trial.suggest_float("min_impurity_decrease", 0.0, 0.5),
             n_jobs=-1,
