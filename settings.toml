@@ -8,13 +8,14 @@
 experiment_id = "colon_s40"
 description = "Colon cancer dataset"
 
-method = "reverse_random_forest"
-# method = "standard_random_forest"
+# method = "reverse_random_forest"
+method = "standard_random_forest"
 
 
 # standard parameters
 verbose_optuna = true
 n_trials_optuna = 50
+# random_state = 42
 
 # reverse selection parameters
 random_seeds = [29, 10,  17, 42, 234, 34, 1, 5, 19, 3, 23, 9, 7, 123, 234, 345, 456, 567, 678, 789, 890, 15, 23, 34, 45, 56, 67, 78, 89, 90,]
