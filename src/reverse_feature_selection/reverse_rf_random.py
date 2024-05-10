@@ -56,6 +56,11 @@ def calculate_oob_errors(
     oob_errors_labeled = []
     oob_errors_unlabeled = []
 
+    # chose 1/10 of the available CPUs for nested parallel processing
+    n_jobs = int(meta_data["n_cpus"] / 10)
+    if n_jobs < 1:
+        n_jobs = 1
+
     # Perform validation using different random seeds
     for seed in meta_data["random_seeds"]:
         assert isinstance(seed, int)
@@ -66,7 +71,7 @@ def calculate_oob_errors(
             n_estimators=100,
             random_state=seed,
             min_samples_leaf=2,
-            n_jobs=30,
+            n_jobs=n_jobs,
         )
         # Create an exact clone of the RandomForestRegressor (clf1)
         # https://scikit-learn.org/stable/modules/generated/sklearn.base.clone.html
