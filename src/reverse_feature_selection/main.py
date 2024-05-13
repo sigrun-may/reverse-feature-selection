@@ -27,8 +27,8 @@ def main():
     with open("./settings.toml", "r") as file:
         meta_data_dict = toml.load(file)
 
-    # shift seeds by 40
-    meta_data_dict["random_seeds"] = [seed + 40 for seed in meta_data_dict["random_seeds"]]
+    # # shift seeds by 40
+    # meta_data_dict["random_seeds"] = [seed + 40 for seed in meta_data_dict["random_seeds"]]
 
     # save git commit hash
     git_repository = git.Repo(search_parent_directories=True)
@@ -58,7 +58,9 @@ def main():
     # data loaders
     from data_loader_tools import load_data_with_standardized_sample_size
 
-    data_df = load_data_with_standardized_sample_size("colon")
+    # data_df = load_data_with_standardized_sample_size("colon")
+    data_df = load_data_with_standardized_sample_size("prostate")
+    # data_df = load_data_with_standardized_sample_size("leukemia_big")
 
     assert data_df.columns[0] == "label"
     print(data_df.shape)

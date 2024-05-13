@@ -5,11 +5,11 @@
 # which is available at https://opensource.org/licenses/MIT
 
 
-experiment_id = "colon_s40"
-description = "Colon cancer dataset"
+experiment_id = "prostate_s00"
+description = "Prostate cancer dataset"
 
-# method = "reverse_random_forest"
-method = "standard_random_forest"
+method = "reverse_random_forest"
+# method = "standard_random_forest"
 
 
 # standard parameters
@@ -29,7 +29,7 @@ loo = true
 pickle_preprocessed_data = false
 
 [data]
-name = "colon"
+name = "prostate"
 # path = "./data/artificial_biomarker_data_2.csv"
 path = ""
 scale = false
