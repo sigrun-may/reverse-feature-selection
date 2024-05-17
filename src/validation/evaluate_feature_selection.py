@@ -9,6 +9,7 @@
 import math
 import os
 import pickle
+from collections import defaultdict
 from typing import Any, List, Tuple
 
 import numpy as np
@@ -16,6 +17,8 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import plotly.io as pio
+from sklearn.ensemble import RandomForestClassifier
+
 import stability_estimator
 from scipy.stats import mannwhitneyu
 from sklearn.metrics import (
@@ -33,12 +36,18 @@ from sklearn.metrics import (
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import RobustScaler
 
-from src.reverse_feature_selection.data_loader_tools import load_data_with_standardized_sample_size
+from src.reverse_feature_selection.data_loader_tools import (
+    load_data_with_standardized_sample_size,
+    load_train_test_data_for_standardized_sample_size,
+)
+from src.validation.weighted_manhattan_distance import WeightedManhattanDistance
 
 
 def evaluate(
-        data_df: pd.DataFrame, pickled_result_path: str, feature_selection_methods=None, plot=False
-) -> Tuple[dict, dict]:
+        data_df: pd.DataFrame,
+        data_df_test: pd.DataFrame,
+        raw_result_dict: dict,
+) -> Tuple[dict, dict, dict]:
     """
     Evaluate the feature selection results.
 
@@ -47,37 +56,43 @@ def evaluate(
 
     Args:
         data_df: The data to evaluate.
-        pickled_result_path: The path to the pickled results file.
-        feature_selection_methods: A list of feature selection methods to evaluate.
-        plot: A boolean indicating whether to plot the results. Defaults to False.
-
+        data_df_test: The test data to evaluate.
+        raw_result_dict: The raw results dictionary to evaluate.
 
     Returns:
         A dictionary containing the evaluation results for each feature selection method.
     """
-    # validate input
-    if not os.path.exists(pickled_result_path):
-        raise ValueError(f"The file {pickled_result_path} does not exist.")
-
-    # unpickle the results
-    with open(pickled_result_path, "rb") as file:
-        raw_result_dict = pickle.load(file)
-    assert isinstance(raw_result_dict, dict)
-
     # evaluate feature selection results
     subset_evaluation_result_dict = evaluate_feature_subsets(raw_result_dict)
 
     # evaluate performance
-    performance_evaluation_result_dict = evaluate_performance(
-        data_df, raw_result_dict["indices"], subset_evaluation_result_dict, k=7
+    performance_evaluation_result_dict = evaluate_cv_performance(
+        data_df, raw_result_dict["indices"], subset_evaluation_result_dict, k=5
     )
-    if plot:
-        plot_performance(performance_evaluation_result_dict, subset_evaluation_result_dict, feature_selection_methods)
-    return subset_evaluation_result_dict, performance_evaluation_result_dict
+
+    # evaluate test performance
+    test_performance_evaluation_result_dict = evaluate_test_performance(
+        data_df, data_df_test, subset_evaluation_result_dict, k=5
+    )
+    return subset_evaluation_result_dict, performance_evaluation_result_dict, test_performance_evaluation_result_dict
 
 
-def evaluate_performance(
-        data_df: pd.DataFrame, cross_validation_indices_list: list, subset_evaluation_result_dict: dict, k: int
+def evaluate_test_performance(train_data, test_data, subset_evaluation_result_dict, k):
+    performance_result_dict = {}
+    # calculate performance metrics
+    for feature_selection_method in subset_evaluation_result_dict["importance_ranking"].keys():
+        feature_importances = subset_evaluation_result_dict["importance_ranking"][feature_selection_method]
+        # sum up all feature importances
+        feature_importance = np.sum(feature_importances, axis=0)
+        y_predict, y_predict_proba, y_true = train_model_and_predict_y(train_data, test_data, feature_importance, k)
+        performance_result_dict[feature_selection_method] = calculate_performance_metrics(
+            y_true, y_predict, y_predict_proba
+        )
+    return performance_result_dict
+
+
+def evaluate_cv_performance(
+        data_df: pd.DataFrame, cross_validation_indices_list: list, feature_importances, k: int
 ) -> dict:
     """
     Evaluate the performance of the feature selection methods.
@@ -96,19 +111,9 @@ def evaluate_performance(
     """
     # check the correct type of the cross-validation indices list
     assert isinstance(cross_validation_indices_list, list), type(cross_validation_indices_list)
-
-    prediction_result_dict = train_model_and_predict_y(
-        cross_validation_indices_list, data_df, subset_evaluation_result_dict, k
-    )
-    performance_evaluation_result_dict = {}
     # calculate performance metrics
-    for feature_selection_method in subset_evaluation_result_dict["importance_ranking"].keys():
-        performance_evaluation_result_dict[feature_selection_method] = calculate_performance_metrics(
-            prediction_result_dict[f"{feature_selection_method}_true"],
-            prediction_result_dict[f"{feature_selection_method}_predict"],
-            prediction_result_dict[f"{feature_selection_method}_predict_proba"],
-        )
-    return performance_evaluation_result_dict
+    y_predict, y_predict_proba, y_true = validate_cv(cross_validation_indices_list, data_df, feature_importances, k)
+    return calculate_performance_metrics(y_true, y_predict, y_predict_proba)
 
 
 def plot_performance(
@@ -223,7 +228,79 @@ def calculate_performance_metrics(y_true, y_predict, y_predict_proba):
     return performance_dict
 
 
-def train_model_and_predict_y(cross_validation_indices_list, data_df, subset_evaluation_result_dict, k):
+def validate_cv(cross_validation_indices_list: list, data_df: pd.DataFrame, feature_importances, k: int):
+    y_predict = []
+    y_predict_proba = []
+    y_true = []
+    # iterate over cross-validation indices
+    for cv_iteration, (train_indices, test_indices) in enumerate(cross_validation_indices_list):
+        feature_importance = feature_importances[cv_iteration]
+        # extract training and test data samples
+        train_data = data_df.iloc[train_indices, :]
+        test_data = data_df.iloc[test_indices, :]
+        y_pred, y_pred_proba, true_y = train_model_and_predict_y(train_data, test_data, feature_importance, k)
+        y_predict.append(y_pred[0])
+        y_predict_proba.append(y_pred_proba[0])
+        y_true.append(true_y[0])
+    return y_predict, y_predict_proba, y_true
+
+
+def train_model_and_predict_y(train_data, test_data, feature_importance, k):
+    """
+    Trains a model and predicts the labels for the test data.
+
+    Args:
+        train_data: The training data.
+        test_data: The test data.
+        feature_importance: The feature importance.
+        k: The number of neighbors to use. Defaults to 5.
+
+    Returns:
+        A dictionary containing the prediction results for each feature selection method.
+    """
+    # extract x and y values
+    x_train = train_data.iloc[:, 1:].values
+    y_train = train_data.iloc[:, 0].values
+    x_test = test_data.iloc[:, 1:].values
+    y_test = test_data.iloc[:, 0].values
+
+    feature_subset_weights = feature_importance
+    assert feature_subset_weights.size == train_data.shape[1] - 1, feature_subset_weights.size  # -1 for label column
+    assert np.count_nonzero(feature_subset_weights) > 0, np.count_nonzero(feature_subset_weights)
+
+    # select relevant feature subset
+    # extract indices of selected features where feature_subset_weights is nonzero
+    relevant_feature_subset_indices = np.flatnonzero(feature_subset_weights)
+    feature_subset_x_train = x_train[:, relevant_feature_subset_indices]
+    assert feature_subset_x_train.shape == (
+        train_data.shape[0],
+        np.count_nonzero(feature_subset_weights),
+    ), feature_subset_x_train.shape
+    feature_subset_x_test = x_test[:, relevant_feature_subset_indices]
+    assert feature_subset_x_test.shape == (
+        test_data.shape[0],
+        np.count_nonzero(feature_subset_weights),
+    ), feature_subset_x_test.shape
+
+    # scale data: choose robust scaler due to the presence of outliers
+    robust_scaler = RobustScaler()
+    preprocessed_x_train = robust_scaler.fit_transform(feature_subset_x_train)
+    preprocessed_x_test = robust_scaler.transform(feature_subset_x_test)
+
+    # train and evaluate the model
+    knn = KNeighborsClassifier(n_neighbors=k, n_jobs=-1)
+    # knn = RandomForestClassifier()
+    # knn = KNeighborsClassifier(
+    #     n_neighbors=k, metric=WeightedManhattanDistance(feature_subset_weights[relevant_feature_subset_indices]),
+    #     n_jobs=1
+    # )
+    knn.fit(preprocessed_x_train, y_train)
+    predicted_proba_y = knn.predict_proba(preprocessed_x_test)
+    predicted_y = knn.predict(preprocessed_x_test)
+    return predicted_y, predicted_proba_y, y_test
+
+
+def train_model_and_predict_y2(cross_validation_indices_list, data_df, subset_evaluation_result_dict, k):
     """
     Trains a model and predicts the labels for the test data.
 
@@ -280,10 +357,12 @@ def train_model_and_predict_y(cross_validation_indices_list, data_df, subset_eva
             preprocessed_x_test = robust_scaler.transform(feature_subset_x_test)
 
             # train and evaluate the model
-            knn = KNeighborsClassifier(n_neighbors=k, n_jobs=-1)
-            # knn = KNeighborsClassifier(
-            #     n_neighbors=k, metric=WeightedManhattanDistance(feature_subset_weights), n_jobs=-1
-            # )
+            # knn = KNeighborsClassifier(n_neighbors=k, n_jobs=-1)
+            knn = KNeighborsClassifier(
+                n_neighbors=k,
+                metric=WeightedManhattanDistance(feature_subset_weights[relevant_feature_subset_indices]),
+                n_jobs=1,
+            )
             knn.fit(preprocessed_x_train, y_train)
             predicted_proba_y = knn.predict_proba(preprocessed_x_test)[0]
             predicted_y = knn.predict(preprocessed_x_test)[0]
@@ -311,7 +390,7 @@ def evaluate_feature_subsets(raw_result_dict: dict) -> dict:
     This function extracts for each provided feature selection method the raw feature selection results,
     and analyzes the feature importance matrix.If the feature selection method is "reverse", it applies a
     p-metric_value to select feature subsets for reverse feature selection. It calculates the significant difference
-    of reverse feature selection results with p-values based on t-test and Mann-Whitney-U test. It then analyzes the
+    of reverse feature selection results with p-values based on Mann-Whitney-U test. It then analyzes the
     feature importance matrix.
 
     Args:
@@ -324,20 +403,7 @@ def evaluate_feature_subsets(raw_result_dict: dict) -> dict:
     for key in raw_result_dict.keys():
         # select feature subsets for reverse feature selection
         if key.startswith("reverse"):
-            # calculate significant difference of reverse feature selection results
-            # based on statistical test
-            # statistical_tests = ["ttest_ind", "mannwhitneyu", "welsh", "fraction"]
-            # statistical_tests = ["ttest_ind", "mannwhitneyu"]
-            # for test in statistical_tests:
-            #     method_name = f"{key}_{test}"
-            #     print(f"Calculating feature subsets for {method_name}")
-            #     feature_importance_matrix = extract_feature_importance_matrix(raw_result_dict[key], method_name)
-            #     analyze_feature_importance_matrix(
-            #         methods_result_dict,
-            #         method_name,
-            #         feature_importance_matrix,
-            #     )
-            print(f"Calculating feature subsets for {key}")
+            # calculate significant difference of reverse feature selection results based on Mann-Whitney-U test
             feature_importance_matrix = extract_feature_importance_matrix(raw_result_dict[key], key)
             analyze_feature_importance_matrix(
                 methods_result_dict,
@@ -528,48 +594,34 @@ def update_result_dictionary(result_dict: dict, feature_selection_method: str, m
     result_dict[metric_name][feature_selection_method] = metric_value
 
 
-def analyze_feature_importance_matrix(
-        result_dict: dict, feature_selection_method: str, feature_importance_matrix: np.ndarray
-) -> None:
+def analyze_feature_importance_matrix(feature_importance_matrix: np.ndarray) -> dict:
     """
     Analyzes a feature importance matrix and updates a result dictionary with various metrics.
 
     This function calculates the stability, robustness, subset size, mean subset size, importance ranking,
-    and feature weights based on the feature importance matrix. It then updates the result dictionary
+    and feature weights based on the feature importance matrix. It then returns the result dictionary
     with these metrics.
 
     Args:
-        result_dict: The result dictionary to update.
-        feature_selection_method: The feature selection method used.
         feature_importance_matrix: The feature importance matrix to analyze.
+
+    Returns:
+        Analysis results for the feature importance matrix.
     """
-    # calculate stability of feature selection
-    update_result_dictionary(
-        result_dict, feature_selection_method, "stability", stability_estimator.get_stability(feature_importance_matrix)
-    )
-    # count number of nonzero values per column to determine the robustness
-    update_result_dictionary(
-        result_dict,
-        feature_selection_method,
-        "robustness_array",
-        np.sum(np.where(feature_importance_matrix > 0, 1, 0), axis=0),
-    )
-    # count number of nonzero values per row to determine the subset size
-    update_result_dictionary(
-        result_dict,
-        feature_selection_method,
-        "subset_size_array",
-        np.sum(np.where(feature_importance_matrix > 0, 1, 0), axis=1),
-    )
-    # calculate mean subset size
-    update_result_dictionary(
-        result_dict,
-        feature_selection_method,
-        "mean_subset_size",
-        np.mean(result_dict["subset_size_array"][feature_selection_method], axis=0),
-    )
-    # calculate importance ranking
-    update_result_dictionary(result_dict, feature_selection_method, "importance_ranking", feature_importance_matrix)
+    result_dict = {
+        # calculate stability of feature selection
+        "stability": stability_estimator.get_stability(feature_importance_matrix),
+        # calculate robustness of feature selection
+        "robustness_array": np.sum(np.where(feature_importance_matrix > 0, 1, 0), axis=0),
+        # calculate subset size of feature selection
+        "subset_size_array": np.sum(np.where(feature_importance_matrix > 0, 1, 0), axis=1),
+        # calculate mean subset size
+        "mean_subset_size": np.mean(np.sum(np.where(feature_importance_matrix > 0, 1, 0), axis=1), axis=0),
+        # calculate importance ranking
+        "importance_ranking": feature_importance_matrix,
+    }
+
+    return result_dict
 
 
 def scale_feature_importance_matrix(feature_importance_matrix: np.ndarray) -> np.ndarray:
@@ -617,18 +669,17 @@ def extract_feature_importance_matrix(
     Returns:
         A tuple containing the feature importance matrix and the method name.
     """
-    # extract feature selection matrix
+    # initialize feature importance matrix with zeros
     feature_importance_matrix = np.zeros(
-        (len(feature_selection_result_cv_list), feature_selection_result_cv_list[0].shape[0])
+        (len(feature_selection_result_cv_list), len(feature_selection_result_cv_list[0]))
     )
-    # iterate over cross-validation results
+    # iterate over cross-validation results and populate the matrix with feature importances
     for i, cv_iteration_result_df in enumerate(feature_selection_result_cv_list):
         feature_importance_matrix[i, :] = get_selected_feature_subset(cv_iteration_result_df, method)
 
     # check of each row contains at least one nonzero metric_value
-    assert np.all(
-        np.sum(feature_importance_matrix, axis=1) > 0
-    ), f"{np.sum(feature_importance_matrix, axis=1)} {method}"
+    if not np.any(np.sum(feature_importance_matrix, axis=1) > 0):
+        raise ValueError("Each fold must have at least one feature with nonzero importance.")
 
     # check the shape of the feature importance matrix
     assert feature_importance_matrix.shape == (
@@ -787,245 +838,416 @@ def get_feature_subset_for_reverse_feature_selection(cv_fold_result_df: pd.DataF
 # print(performance_result_dict_final)
 
 
-def evaluate_reproducibility(data_df: pd.DataFrame, base_path: str, repeated_experiments: list[str]):
+def append_to_results_dict(results_dict, method_key, metric, value):
     """
-    Evaluate the reproducibility of the feature selection results.
+    Appends the value to the list of metrics for the given method in the results dictionary.
+    If the method or metric does not exist, it initializes them.
+    """
+    if method_key not in results_dict:
+        results_dict[method_key] = defaultdict(list)
+    results_dict[method_key][metric].append(value)
 
-    This function evaluates the reproducibility of the feature selection results for each provided feature selection method.
+
+def evaluate_reproducibility(
+        data_df: pd.DataFrame, test_data: pd.DataFrame, base_path: str, repeated_experiments: list[str], k: int
+) -> dict:
+    """
+    Evaluate the feature selection results and their reproducibility for each provided feature selection method.
 
     Args:
         data_df: The underlying original data for the given experiments.
+        test_data: The test data to evaluate.
         base_path: The base path to the pickled results files.
         repeated_experiments: A list of the experiment ids of repeated experiments to evaluate.
+        k: The number of neighbors to use. Defaults to 5.
 
     Returns:
-        A dictionary containing the evaluation results for each feature selection method.
+        Evaluation results for each feature selection method.
     """
     results_dict = {}
-
+    # iterate over all repeated experiments
     for experiment_id in repeated_experiments:
         print(f"Evaluating experiment {experiment_id}")
-        subset_result_dict_final, performance_result_dict_final = evaluate(
-            data_df,
-            f"{base_path}/{experiment_id}_result_dict.pkl",
-        )
-        for selection_method in subset_result_dict_final["stability"].keys():
-            if f"{selection_method}" not in results_dict.keys():
-                results_dict[f"{selection_method}"] = {}
-            if "stability" not in results_dict[f"{selection_method}"].keys():
-                results_dict[f"{selection_method}"]["stability"] = []
-            results_dict[f"{selection_method}"]["stability"].append(
-                subset_result_dict_final["stability"][selection_method]
-            )
-            if "mean_subset_size" not in results_dict[f"{selection_method}"].keys():
-                results_dict[f"{selection_method}"]["mean_subset_size"] = []
-            results_dict[f"{selection_method}"]["mean_subset_size"].append(
-                subset_result_dict_final["mean_subset_size"][selection_method]
-            )
-            if "AUC" not in results_dict[f"{selection_method}"].keys():
-                results_dict[f"{selection_method}"]["AUC"] = []
-            results_dict[f"{selection_method}"]["AUC"].append(performance_result_dict_final[selection_method]["AUC"])
-            if "Accuracy" not in results_dict[f"{selection_method}"].keys():
-                results_dict[f"{selection_method}"]["Accuracy"] = []
-            results_dict[f"{selection_method}"]["Accuracy"].append(
-                performance_result_dict_final[selection_method]["Accuracy"]
-            )
-            if "F1" not in results_dict[f"{selection_method}"].keys():
-                results_dict[f"{selection_method}"]["F1"] = []
-            results_dict[f"{selection_method}"]["F1"].append(performance_result_dict_final[selection_method]["F1"])
-            # if "log_loss" not in results_dict[f"{selection_method}"].keys():
-            #     results_dict[f"{selection_method}"]["log_loss"] = []
-            # results_dict[f"{selection_method}"]["log_loss"].append(
-            #     performance_result_dict_final[selection_method]["log_loss"]
-            # )
-            if "Brier Score" not in results_dict[f"{selection_method}"].keys():
-                results_dict[f"{selection_method}"]["Brier Score"] = []
-            results_dict[f"{selection_method}"]["Brier Score"].append(
-                performance_result_dict_final[selection_method]["Brier Score"]
-            )
+        file_path = os.path.join(base_path, f"{experiment_id}_result_dict.pkl")
+
+        try:
+            with (open(file_path, "rb") as file):
+                raw_result_dict = pickle.load(file)
+
+                # iterate over all feature selection methods
+                for key in raw_result_dict.keys():
+                    if "reverse" in key or "standard" in key:
+                        # select feature subsets
+                        feature_importance_matrix = extract_feature_importance_matrix(raw_result_dict[key], key)
+                        append_to_results_dict(results_dict, key, "stability", stability_estimator.get_stability(feature_importance_matrix))
+                        append_to_results_dict(results_dict, key, "robustness_array", np.sum(np.where(feature_importance_matrix > 0, 1, 0), axis=0))
+                        append_to_results_dict(results_dict, key, "subset_size_array", np.sum(np.where(feature_importance_matrix > 0, 1, 0), axis=1))
+                        append_to_results_dict(results_dict, key, "mean_subset_size", np.mean(np.sum(np.where(feature_importance_matrix > 0, 1, 0), axis=1), axis=0))
+                        append_to_results_dict(results_dict, key, "importance_ranking", feature_importance_matrix)
+
+                        # evaluate loo cv performance
+                        y_predict, y_predict_proba, y_true = validate_cv(
+                            raw_result_dict["indices"], data_df, feature_importance_matrix, k
+                        )
+                        append_performance_metrics(key, "cv_performance", results_dict, y_predict, y_predict_proba, y_true)
+
+                        # evaluate test performance
+                        # aggregate feature importance matrix
+                        # TODO train complete train data without loo cv?
+                        y_predict1, y_predict_proba1, y_true1 = train_model_and_predict_y(data_df, test_data,
+                                                                                       feature_importance=np.sum(feature_importance_matrix, axis=0), k=k)
+                        append_performance_metrics(key, "test_performance", results_dict, y_predict1, y_predict_proba1, y_true1)
+
+            #     # evaluate performance
+            #     cv_performance_result_dict = evaluate_cv_performance(
+            #         data_df, raw_result_dict["indices"], subset_evaluation_result_dict, k=5
+            #     )
+            #     # evaluate test performance
+            #     test_performance_evaluation_result_dict = evaluate_test_performance(
+            #         data_df, test_data, subset_evaluation_result_dict, k=5
+            #     )
+            # for selection_method in subset_evaluation_result_dict["stability"].keys():
+            #     # save cv evaluation results
+            #     results_dict_cv[selection_method]["stability"].append(
+            #         subset_evaluation_result_dict["stability"][selection_method]
+            #     )
+            #     results_dict_cv[selection_method]["mean_subset_size"].append(
+            #         subset_evaluation_result_dict["mean_subset_size"][selection_method]
+            #     )
+            #     results_dict_cv[selection_method]["AUC"].append(cv_performance_result_dict[selection_method]["AUC"])
+            #     results_dict_cv[selection_method]["Accuracy"].append(
+            #         cv_performance_result_dict[selection_method]["Accuracy"]
+            #     )
+            #     results_dict_cv[selection_method]["F1"].append(cv_performance_result_dict[selection_method]["F1"])
+            #     results_dict_cv[selection_method]["Brier Score"].append(
+            #         cv_performance_result_dict[selection_method]["Brier Score"]
+            #     )
+            #
+            #     # save test evaluation results
+            #     results_dict_test[selection_method]["stability"].append(
+            #         subset_evaluation_result_dict["stability"][selection_method]
+            #     )
+            #     results_dict_test[selection_method]["mean_subset_size"].append(
+            #         subset_evaluation_result_dict["mean_subset_size"][selection_method]
+            #     )
+            #     results_dict_test[selection_method]["AUC"].append(
+            #         test_performance_evaluation_result_dict[selection_method]["AUC"]
+            #     )
+            #     results_dict_test[selection_method]["Accuracy"].append(
+            #         test_performance_evaluation_result_dict[selection_method]["Accuracy"]
+            #     )
+            #     results_dict_test[selection_method]["F1"].append(
+            #         test_performance_evaluation_result_dict[selection_method]["F1"]
+            #     )
+            #     results_dict_test[selection_method]["Brier Score"].append(
+            #         test_performance_evaluation_result_dict[selection_method]["Brier Score"]
+            #     )
+        except FileNotFoundError:
+            print(f"File {file_path} not found.")
     return results_dict
 
 
-def calculate_average_results(results_dict: dict):
-    """
-    Calculate the average results for the given results dictionary.
-
-    Args:
-        results_dict: The dictionary containing the results to average.
-
-    Returns:
-        A dictionary containing the averaged results.
-    """
-    average_results_dict = {}
-    for selection_method in results_dict.keys():
-        if selection_method not in average_results_dict.keys():
-            average_results_dict[selection_method] = {}
-        for metric in results_dict[selection_method].keys():
-            average_results_dict[selection_method][metric] = np.mean(results_dict[selection_method][metric])
-    return average_results_dict
+def append_performance_metrics(feature_selection_method, performance_evaluation_method, results_dict, y_predict, y_predict_proba, y_true):
+    for metric, value in calculate_performance_metrics(y_true, y_predict, y_predict_proba).items():
+        # check if cv_performance is already a key in the dictionary
+        if performance_evaluation_method not in results_dict[feature_selection_method]:
+            results_dict[feature_selection_method][performance_evaluation_method] = {}
+        # check if the metric is already a key in the dictionary
+        if metric not in results_dict[feature_selection_method][performance_evaluation_method]:
+            results_dict[feature_selection_method][performance_evaluation_method][metric] = [value]
+        else:
+            results_dict[feature_selection_method][performance_evaluation_method][metric].append(value)
 
 
 def plot_average_results(evaluated_results_dict: dict):
     """
-    Plot the average results for the given results dictionary.
+    Plot the average results and the standard deviation for the given results dictionary.
 
     Args:
         evaluated_results_dict: The dictionary containing the evaluated results to plot.
     """
-    # iterate over all performance metrics
-    for performance_metric in evaluated_results_dict["reverse_random_forest"].keys():
-        if performance_metric in ["stability", "mean_subset_size"]:
-            continue
+    for performance_evaluation_method in ["cv_performance", "test_performance"]:
+        for performance_metric in ["AUC", "Accuracy", "F1", "Brier Score"]:
+            # Create a DataFrame
+            df = pd.DataFrame(
+                columns=[
+                    "method",
+                    "performance",
+                    "stability",
+                    "num_features",
+                    "e_performance",
+                    "e_stability",
+                    "e_num_features",
+                ]
+            )
+            for feature_selection_method in evaluated_results_dict.keys():
+                df.loc[len(df)] = [feature_selection_method,
+                                   np.mean(evaluated_results_dict[feature_selection_method][performance_evaluation_method][
+                                               performance_metric]),
+                                   np.mean(evaluated_results_dict[feature_selection_method]["stability"]),
+                                   np.mean(evaluated_results_dict[feature_selection_method]["mean_subset_size"]),
+                                   np.std(evaluated_results_dict[feature_selection_method][performance_evaluation_method][
+                                             performance_metric]),
+                                   np.std(evaluated_results_dict[feature_selection_method]["stability"]),
+                                   np.std(evaluated_results_dict[feature_selection_method]["mean_subset_size"]),
+                                   ]
+            fig = px.scatter(
+                df,
+                x="stability",
+                y="performance",
+                error_y="e_performance",
+                error_x="e_stability",
+                size="num_features",
+                color="num_features",
+                hover_data=["method"],
+                text="method",  # Add method name to each data point
+                template="plotly_white",
+            )
+            fig.update_traces(textposition="top left")
+            fig.update_xaxes(range=[0, 1.0])
+            fig.update_layout(
+                title=f"{data_name}: {performance_metric} vs Stability (colored and shaped by number of selected "
+                      f"features)",
+                xaxis_title="Stability of Feature Selection",
+                yaxis_title=f"{performance_metric} - {performance_evaluation_method}",
+                legend_title="Average Number of Selected Features",
+                legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+            )
+            #     fig.update_layout(
+            #         title=f"{data_name}: {performance_metric} vs Stability (colored and shaped by number of selected features)",
+            #         xaxis_title="Stability of Feature Selection",
+            #         yaxis_title=performance_metric,
+            #         legend_title="Number of Selected Features",
+            #         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+            #     )
+            fig.show()
 
-        # Create a DataFrame
-        df = pd.DataFrame(
-            columns=[
-                "method",
-                "performance",
-                "stability",
-                "num_features",
-                "e_performance",
-                "e_stability",
-                "e_num_features",
-            ]
-        )
+    #     # plot mean results with plotly
+    #     fig = px.scatter(
+    #         df,
+    #         x="stability",
+    #         y="performance",
+    #         error_y="e_performance",
+    #         error_x="e_stability",
+    #         size="num_features",
+    #         color="num_features",
+    #         hover_data=["method"],
+    #         text="method",  # Add method name to each data point
+    #         template="plotly_white",
+    #         # color_continuous_scale=px.colors.qualitative.Pastel2,
+    #         # color_continuous_scale=px.colors.qualitative.Set2,
+    #         # color_continuous_scale='Viridis'
+    #         # color_continuous_scale='Greys'  # Use a grey color scale
+    #         # color_continuous_scale="smoker",
+    #         # color_
+    #     )
+    #     fig.update_traces(textposition="top left")
+    #     fig.update_xaxes(range=[0, 1.0])
+    #     fig.update_layout(
+    #         title=f"{data_name}: {performance_metric} vs Stability (colored and shaped by number of selected features)",
+    #         xaxis_title="Stability of Feature Selection",
+    #         yaxis_title=performance_metric,
+    #         legend_title="Number of Selected Features",
+    #         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+    #     )
+    #
+    #
+    #
+    # data_for_df = [
+    #     {
+    #         "method": method,
+    #         "performance": np.mean(evaluated_results_dict[method][performance_metric]),
+    #         "stability": np.mean(evaluated_results_dict[method]["stability"]),
+    #         "num_features": np.mean(evaluated_results_dict[method]["mean_subset_size"]),
+    #         "e_performance": np.std(evaluated_results_dict[method][performance_metric]),
+    #         "e_stability": np.std(evaluated_results_dict[method]["stability"]),
+    #         "e_num_features": np.std(evaluated_results_dict[method]["mean_subset_size"]),
+    #     }
+    #     for performance_metric in evaluated_results_dict[method].keys()
+    #     for method in evaluated_results_dict.keys()
+    # ]
+    #
+    # df = pd.DataFrame(data_for_df)
+    #
+    # fig = px.scatter(
+    #     df,
+    #     x="stability",
+    #     y="performance",
+    #     error_y="e_performance",
+    #     error_x="e_stability",
+    #     size="num_features",
+    #     color="method",
+    #     hover_data=["method"],
+    #     template="plotly_white",
+    # )
+    #
+    # fig.update_traces(textposition="top left")
+    # fig.update_xaxes(range=[0, 1.0])
+    # fig.update_layout(
+    #     title=f"Performance vs Stability (colored by method, sized by number of selected features)",
+    #     xaxis_title="Stability of Feature Selection",
+    #     yaxis_title="Performance",
+    #     legend_title="Method",
+    #     legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+    # )
+    #
+    #
+    #
+    # # iterate over all performance metrics
+    # for performance_metric in evaluated_results_dict["reverse_random_forest"].keys():
+    #     if performance_metric in ["stability", "mean_subset_size"]:
+    #         continue
+    #
+    #     # Create a DataFrame
+    #     df = pd.DataFrame(
+    #         columns=[
+    #             "method",
+    #             "performance",
+    #             "stability",
+    #             "num_features",
+    #             "e_performance",
+    #             "e_stability",
+    #             "e_num_features",
+    #         ]
+    #     )
+    #
+    #     # Extract the performance metric, stability, and number of selected features
+    #     for method in evaluated_results_dict.keys():
+    #         df.loc[len(df)] = [
+    #             method,
+    #             np.mean(evaluated_results_dict[method][performance_metric]),
+    #             np.mean(evaluated_results_dict[method]["stability"]),
+    #             np.mean(evaluated_results_dict[method]["mean_subset_size"]),
+    #             # # calculate the standard error of the mean (sem) of performance, stability, and num_features
+    #             # # doi: 10.1097/jp9.0000000000000024
+    #             # sem(evaluated_results_dict[method][performance_metric]),
+    #             # sem(evaluated_results_dict[method]["stability"]),
+    #             # sem(evaluated_results_dict[method]["mean_subset_size"]),
+    #             # calculate the standard deviation of performance, stability, and num_features
+    #             np.std(evaluated_results_dict[method][performance_metric]),
+    #             np.std(evaluated_results_dict[method]["stability"]),
+    #             np.std(evaluated_results_dict[method]["mean_subset_size"]),
+    #             # # calculate the maximum of performance, stability, and num_features
+    #             # np.max(evaluated_results_dict[method][performance_metric]),
+    #             # np.max(evaluated_results_dict[method]["stability"]),
+    #             # np.max(evaluated_results_dict[method]["mean_subset_size"]),
+    #             # # calculate the minimum of performance, stability, and num_features
+    #             # np.min(evaluated_results_dict[method][performance_metric]),
+    #             # np.min(evaluated_results_dict[method]["stability"]),
+    #             # np.min(evaluated_results_dict[method]["mean_subset_size"]),
+    #         ]
+    #
+    #     # plot mean results with plotly
+    #     fig = px.scatter(
+    #         df,
+    #         x="stability",
+    #         y="performance",
+    #         error_y="e_performance",
+    #         error_x="e_stability",
+    #         size="num_features",
+    #         color="num_features",
+    #         hover_data=["method"],
+    #         text="method",  # Add method name to each data point
+    #         template="plotly_white",
+    #         # color_continuous_scale=px.colors.qualitative.Pastel2,
+    #         # color_continuous_scale=px.colors.qualitative.Set2,
+    #         # color_continuous_scale='Viridis'
+    #         # color_continuous_scale='Greys'  # Use a grey color scale
+    #         # color_continuous_scale="smoker",
+    #         # color_
+    #     )
+    #     fig.update_traces(textposition="top left")
+    #     fig.update_xaxes(range=[0, 1.0])
+    #     fig.update_layout(
+    #         title=f"{data_name}: {performance_metric} vs Stability (colored and shaped by number of selected features)",
+    #         xaxis_title="Stability of Feature Selection",
+    #         yaxis_title=performance_metric,
+    #         legend_title="Number of Selected Features",
+    #         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+    #     )
+    #     # TODO Save results to pdf
+    #     # if performance_metric == "auc":
+    #     #     # save figure as pdf
+    #     #     pio.write_image(fig, f"{performance_metric}_performance.pdf")
+    #     fig.show()
+    #
+    #     # # check if the list of values for the performance metric contains more than one value
+    #     # if len(evaluated_results_dict["standard_random_forest"][performance_metric]) > 1:
+    #     #     # plot results of performance as plotly bar chart and add error bars
+    #     #     # for standard error of the mean (sem) of performance
+    #     #     fig = go.Figure()
+    #     #     fig.add_trace(
+    #     #         go.Bar(
+    #     #             x=df["method"],
+    #     #             y=df["performance"],
+    #     #             name="Performance",
+    #     #             error_y=dict(type="data", array=df["e_performance"]),
+    #     #         )
+    #     #     )
+    #     #     fig.update_layout(
+    #     #         title=f"{data_name}: {performance_metric}",
+    #     #         xaxis_title="Feature Selection Method",
+    #     #         yaxis_title=performance_metric,
+    #     #     )
+    #     #     fig.show()
+    #     #
+    #     #     # plot results of stability as plotly bar chart and add error bars
+    #     #     # for standard error of the mean (sem) of stability
+    #     #     fig = go.Figure()
+    #     #     fig.add_trace(
+    #     #         go.Bar(
+    #     #             x=df["method"],
+    #     #             y=df["stability"],
+    #     #             name="Stability",
+    #     #             error_y=dict(type="data", array=df["e_stability"]),
+    #     #         )
+    #     #     )
+    #     #     fig.update_layout(
+    #     #         title=f"{data_name}: Stability",
+    #     #         xaxis_title="Feature Selection Method",
+    #     #         yaxis_title="Stability",
+    #     #     )
+    #     #     fig.show()
+    #     #
+    #     #     # plot results of num_features as plotly bar chart and add error bars
+    #     #     # for standard error of the mean (sem) of num_features
+    #     #     fig = go.Figure()
+    #     #     fig.add_trace(
+    #     #         go.Bar(
+    #     #             x=df["method"],
+    #     #             y=df["num_features"],
+    #     #             name="Number of Selected Features",
+    #     #             error_y=dict(type="data", array=df["e_num_features"]),
+    #     #         )
+    #     #     )
+    #     #     fig.update_layout(
+    #     #         title=f"{data_name}: Number of Selected Features",
+    #     #         xaxis_title="Feature Selection Method",
+    #     #         yaxis_title="Number of Selected Features",
+    #     #     )
+    #     #     fig.show()
 
-        # Extract the performance metric, stability, and number of selected features
-        for method in evaluated_results_dict.keys():
-            df.loc[len(df)] = [
-                method,
-                np.mean(evaluated_results_dict[method][performance_metric]),
-                np.mean(evaluated_results_dict[method]["stability"]),
-                np.mean(evaluated_results_dict[method]["mean_subset_size"]),
-                # # calculate the standard error of the mean (sem) of performance, stability, and num_features
-                # # doi: 10.1097/jp9.0000000000000024
-                # sem(evaluated_results_dict[method][performance_metric]),
-                # sem(evaluated_results_dict[method]["stability"]),
-                # sem(evaluated_results_dict[method]["mean_subset_size"]),
-                # calculate the standard deviation of performance, stability, and num_features
-                np.std(evaluated_results_dict[method][performance_metric]),
-                np.std(evaluated_results_dict[method]["stability"]),
-                np.std(evaluated_results_dict[method]["mean_subset_size"]),
-                # # calculate the maximum of performance, stability, and num_features
-                # np.max(evaluated_results_dict[method][performance_metric]),
-                # np.max(evaluated_results_dict[method]["stability"]),
-                # np.max(evaluated_results_dict[method]["mean_subset_size"]),
-                # # calculate the minimum of performance, stability, and num_features
-                # np.min(evaluated_results_dict[method][performance_metric]),
-                # np.min(evaluated_results_dict[method]["stability"]),
-                # np.min(evaluated_results_dict[method]["mean_subset_size"]),
-            ]
-
-        # plot mean results with plotly
-        fig = px.scatter(
-            df,
-            x="stability",
-            y="performance",
-            error_y="e_performance",
-            error_x="e_stability",
-            size="num_features",
-            color="num_features",
-            hover_data=["method"],
-            text="method",  # Add method name to each data point
-            template="plotly_white",
-            # color_continuous_scale=px.colors.qualitative.Pastel2,
-            # color_continuous_scale=px.colors.qualitative.Set2,
-            # color_continuous_scale='Viridis'
-            # color_continuous_scale='Greys'  # Use a grey color scale
-            # color_continuous_scale="smoker",
-            # color_
-        )
-        fig.update_traces(textposition='top left')
-        fig.update_xaxes(range=[0, 1.0])
-        fig.update_layout(
-            title=f"{data_name}: {performance_metric} vs Stability (colored and shaped by number of selected features)",
-            xaxis_title="Stability of Feature Selection",
-            yaxis_title=performance_metric,
-            legend_title="Number of Selected Features",
-            legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
-        )
-        # TODO Save results to pdf
-        # if performance_metric == "auc":
-        #     # save figure as pdf
-        #     pio.write_image(fig, f"{performance_metric}_performance.pdf")
-        fig.show()
-
-        # # check if the list of values for the performance metric contains more than one value
-        # if len(evaluated_results_dict["standard_random_forest"][performance_metric]) > 1:
-        #     # plot results of performance as plotly bar chart and add error bars
-        #     # for standard error of the mean (sem) of performance
-        #     fig = go.Figure()
-        #     fig.add_trace(
-        #         go.Bar(
-        #             x=df["method"],
-        #             y=df["performance"],
-        #             name="Performance",
-        #             error_y=dict(type="data", array=df["e_performance"]),
-        #         )
-        #     )
-        #     fig.update_layout(
-        #         title=f"{data_name}: {performance_metric}",
-        #         xaxis_title="Feature Selection Method",
-        #         yaxis_title=performance_metric,
-        #     )
-        #     fig.show()
-        #
-        #     # plot results of stability as plotly bar chart and add error bars
-        #     # for standard error of the mean (sem) of stability
-        #     fig = go.Figure()
-        #     fig.add_trace(
-        #         go.Bar(
-        #             x=df["method"],
-        #             y=df["stability"],
-        #             name="Stability",
-        #             error_y=dict(type="data", array=df["e_stability"]),
-        #         )
-        #     )
-        #     fig.update_layout(
-        #         title=f"{data_name}: Stability",
-        #         xaxis_title="Feature Selection Method",
-        #         yaxis_title="Stability",
-        #     )
-        #     fig.show()
-        #
-        #     # plot results of num_features as plotly bar chart and add error bars
-        #     # for standard error of the mean (sem) of num_features
-        #     fig = go.Figure()
-        #     fig.add_trace(
-        #         go.Bar(
-        #             x=df["method"],
-        #             y=df["num_features"],
-        #             name="Number of Selected Features",
-        #             error_y=dict(type="data", array=df["e_num_features"]),
-        #         )
-        #     )
-        #     fig.update_layout(
-        #         title=f"{data_name}: Number of Selected Features",
-        #         xaxis_title="Feature Selection Method",
-        #         yaxis_title="Number of Selected Features",
-        #     )
-        #     fig.show()
-
-
-# list_of_experiments = [
-#     "colon00",
-#     # "colon_s10",
-#     "colon_s20",
-#     "colon_s30",
-#     "colon_s40",
-# ]
-# # list_of_experiments = ["colon00"]
-# pickle_base_path = f"results"
-# data_name = "Colon Cancer"
-# input_data_df = load_data_with_standardized_sample_size("colon")
 
 list_of_experiments = [
-    "prostate_s00",
+    "colon00",
+    "colon_s10",
+    # "colon_s20",
+    # "colon_s30",
+    # "colon_s40",
 ]
+# list_of_experiments = ["colon00"]
 pickle_base_path = f"results"
-data_name = "Prostate Cancer"
-input_data_df = load_data_with_standardized_sample_size("prostate")
+data_name = "Colon Cancer"
+test_data_df, input_data_df = load_train_test_data_for_standardized_sample_size("colon")
 
-result_dict = evaluate_reproducibility(input_data_df, pickle_base_path, list_of_experiments)
-average_results = calculate_average_results(result_dict)
-plot_average_results(result_dict)
+# list_of_experiments = [
+#     "prostate_s00",
+# ]
+# pickle_base_path = f"results"
+# data_name = "Prostate Cancer"
+# input_data_df = load_data_with_standardized_sample_size("prostate")
+
+result_dict_cv = evaluate_reproducibility(
+    input_data_df, test_data_df, pickle_base_path, list_of_experiments, 5
+)
+plot_average_results(result_dict_cv)
