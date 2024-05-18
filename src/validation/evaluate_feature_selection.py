@@ -9,13 +9,13 @@
 import os
 import pickle
 from collections import defaultdict
-from typing import List
+from typing import Dict, List
 
 import numpy as np
 import pandas as pd
 import plotly.express as px
-import plotly.io as pio
 import plotly.graph_objects as go
+import plotly.io as pio
 import stability_estimator
 from scipy.stats import mannwhitneyu
 from sklearn.ensemble import RandomForestClassifier
@@ -24,13 +24,14 @@ from sklearn.metrics import (accuracy_score, auc, average_precision_score,
                              precision_recall_curve, precision_score,
                              recall_score, roc_curve)
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.preprocessing import RobustScaler, PowerTransformer, QuantileTransformer
+from sklearn.preprocessing import (PowerTransformer, QuantileTransformer,
+                                   RobustScaler)
 
 from src.reverse_feature_selection.data_loader_tools import \
     load_train_test_data_for_standardized_sample_size
 
 
-def calculate_performance_metrics(y_true, y_predict, y_predict_proba):
+def calculate_performance_metrics(y_predict, y_predict_proba, y_true) -> Dict[str, float]:
     """
     Calculate the performance metrics for the predicted labels.
 
@@ -42,28 +43,21 @@ def calculate_performance_metrics(y_true, y_predict, y_predict_proba):
     Returns:
         A dictionary containing the performance metrics.
     """
-    # calculate performance metrics
-    fpr, tpr, thresholds = roc_curve(y_true, y_predict)
-    precision, recall, thresholds = precision_recall_curve(y_true, y_predict)
-
-    # brier score loss
-    # extract the probability for the positive class
+    # extract the probability for the positive class for briar score calculation
     probability_positive_class = np.array([proba[1] for proba in y_predict_proba])
 
-    performance_dict = {
-        "Accuracy": accuracy_score(y_true, y_predict),
-        "precision": precision_score(y_true, y_predict),
-        "recall": recall_score(y_true, y_predict),
-        "F1": f1_score(y_true, y_predict),
-        "AUC": auc(fpr, tpr),
-        "log loss": log_loss(y_true, y_predict_proba),
-        "Brier Score": brier_score_loss(y_true, probability_positive_class),
-        "auprc": average_precision_score(y_true, y_predict),
-        "fpr": fpr,
-        "tpr": tpr,
-        "thresholds": thresholds,
-    }
-    return performance_dict
+    performance_metrics_dict = {}
+    fpr, tpr, _ = roc_curve(y_true, y_predict)
+    precision, recall, _ = precision_recall_curve(y_true, y_predict)
+    performance_metrics_dict["Accuracy"] = accuracy_score(y_true, y_predict)
+    performance_metrics_dict["Precision"] = precision_score(y_true, y_predict)
+    performance_metrics_dict["Recall"] = recall_score(y_true, y_predict)
+    performance_metrics_dict["F1"] = f1_score(y_true, y_predict)
+    performance_metrics_dict["AUC"] = auc(fpr, tpr)
+    performance_metrics_dict["Log Loss"] = log_loss(y_true, y_predict_proba)
+    performance_metrics_dict["Brier Score"] = brier_score_loss(y_true, probability_positive_class)
+    performance_metrics_dict["AUPRC"] = average_precision_score(y_true, y_predict)
+    return performance_metrics_dict
 
 
 def validate_cv(cross_validation_indices_list: list, data_df: pd.DataFrame, feature_importances, k: int):
@@ -76,14 +70,16 @@ def validate_cv(cross_validation_indices_list: list, data_df: pd.DataFrame, feat
         # extract training and test data samples
         train_data = data_df.iloc[train_indices, :]
         test_data = data_df.iloc[test_indices, :]
-        y_pred, y_pred_proba, true_y = train_model_and_predict_y(train_data, test_data, feature_importance, k)
+        y_pred, y_pred_proba, true_y = train_and_predict(train_data, test_data, feature_importance, k)
         y_predict.append(y_pred[0])
         y_predict_proba.append(y_pred_proba[0])
         y_true.append(true_y[0])
     return y_predict, y_predict_proba, y_true
 
 
-def train_model_and_predict_y(train_data, test_data, feature_importance, k):
+def train_and_predict(
+    train_data: pd.DataFrame, test_data: pd.DataFrame, feature_importance: np.ndarray, k: int
+) -> tuple:
     """
     Trains a model and predicts the labels for the test data.
 
@@ -91,10 +87,10 @@ def train_model_and_predict_y(train_data, test_data, feature_importance, k):
         train_data: The training data.
         test_data: The test data.
         feature_importance: The feature importance.
-        k: The number of neighbors to use. Defaults to 5.
+        k: The number of neighbors to use.
 
     Returns:
-        A dictionary containing the prediction results for each feature selection method.
+        Prediction results: predicted labels, predicted probabilities, true labels.
     """
     # extract x and y values
     x_train = train_data.iloc[:, 1:].values
@@ -286,59 +282,78 @@ def evaluate(
                 raw_result_dict = pickle.load(file)
 
                 # iterate over all feature selection methods
-                for key in raw_result_dict.keys():
-                    if "reverse" in key or "standard" in key:
+                for feature_selection_method in raw_result_dict.keys():
+                    if "reverse" in feature_selection_method or "standard" in feature_selection_method:
                         # select feature subsets
-                        feature_importance_matrix = extract_feature_importance_matrix(raw_result_dict[key], key)
-                        append_to_results_dict(
-                            results_dict, key, "stability", stability_estimator.get_stability(feature_importance_matrix)
+                        feature_importance_matrix = extract_feature_importance_matrix(
+                            raw_result_dict[feature_selection_method], feature_selection_method
                         )
-                        append_to_results_dict(
-                            results_dict,
-                            key,
-                            "robustness_array",
-                            np.sum(np.where(feature_importance_matrix > 0, 1, 0), axis=0),
-                        )
-                        append_to_results_dict(
-                            results_dict,
-                            key,
-                            "subset_size_array",
-                            np.sum(np.where(feature_importance_matrix > 0, 1, 0), axis=1),
-                        )
-                        append_to_results_dict(
-                            results_dict,
-                            key,
-                            "mean_subset_size",
-                            np.mean(np.sum(np.where(feature_importance_matrix > 0, 1, 0), axis=1), axis=0),
-                        )
-                        append_to_results_dict(results_dict, key, "importance_ranking", feature_importance_matrix)
+                        analyze_importance_matrix(feature_importance_matrix, feature_selection_method, results_dict)
 
                         # evaluate loo cv performance
                         y_predict, y_predict_proba, y_true = validate_cv(
                             raw_result_dict["indices"], data_df, feature_importance_matrix, k
                         )
                         append_performance_metrics(
-                            key, "cv_performance", results_dict, y_predict, y_predict_proba, y_true
+                            feature_selection_method, "cv_performance", results_dict, y_predict, y_predict_proba, y_true
                         )
-
                         # evaluate test performance
-                        # aggregate feature importance matrix
-                        # TODO train complete train data without loo cv?
-                        y_predict1, y_predict_proba1, y_true1 = train_model_and_predict_y(
+                        y_predict1, y_predict_proba1, y_true1 = train_and_predict(
                             data_df, test_data, feature_importance=np.sum(feature_importance_matrix, axis=0), k=k
                         )
                         append_performance_metrics(
-                            key, "test_performance", results_dict, y_predict1, y_predict_proba1, y_true1
+                            feature_selection_method,
+                            "test_performance",
+                            results_dict,
+                            y_predict1,
+                            y_predict_proba1,
+                            y_true1,
                         )
         except FileNotFoundError:
             print(f"File {file_path} not found.")
     return results_dict
 
 
+def analyze_importance_matrix(feature_importance_matrix, feature_selection_method, results_dict):
+    """
+    Analyze the feature importance matrix and append the results to the results dictionary.
+
+    Args:
+        feature_importance_matrix: The feature importance matrix.
+        feature_selection_method: The feature selection method.
+        results_dict: The dictionary to store the results.
+    """
+    append_to_results_dict(
+        results_dict,
+        feature_selection_method,
+        "stability",
+        stability_estimator.get_stability(feature_importance_matrix),
+    )
+    append_to_results_dict(
+        results_dict,
+        feature_selection_method,
+        "robustness_array",
+        np.sum(np.where(feature_importance_matrix > 0, 1, 0), axis=0),
+    )
+    append_to_results_dict(
+        results_dict,
+        feature_selection_method,
+        "subset_size_array",
+        np.sum(np.where(feature_importance_matrix > 0, 1, 0), axis=1),
+    )
+    append_to_results_dict(
+        results_dict,
+        feature_selection_method,
+        "mean_subset_size",
+        np.mean(np.sum(np.where(feature_importance_matrix > 0, 1, 0), axis=1), axis=0),
+    )
+    append_to_results_dict(results_dict, feature_selection_method, "importance_ranking", feature_importance_matrix)
+
+
 def append_performance_metrics(
     feature_selection_method, performance_evaluation_method, results_dict, y_predict, y_predict_proba, y_true
 ):
-    for metric, value in calculate_performance_metrics(y_true, y_predict, y_predict_proba).items():
+    for metric, value in calculate_performance_metrics(y_predict, y_predict_proba, y_true).items():
         # check if cv_performance is already a key in the dictionary
         if performance_evaluation_method not in results_dict[feature_selection_method]:
             results_dict[feature_selection_method][performance_evaluation_method] = {}
