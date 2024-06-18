@@ -12,9 +12,10 @@ code: ./
 command: |
   python3 -m venv virtual-env
   source virtual-env/bin/activate
-  pip install -r requirements.txt
+  # pip install -r requirements.txt
+  pip install -e .
   pip list
-  python3 src/reverse_feature_selection/main.py ${{outputs.outdir}}
+  python3 feature_selection_benchmark/feature_selection_experiment.py ${{outputs.outdir}}
 compute: 'cpu-120-cores'
 resources:
   instance_count: 1
@@ -23,7 +24,7 @@ outputs:
     type: uri_folder
     path: azureml://subscriptions/ebcfd0f7-1a0a-443d-b869-0c9c696bfb0b/resourcegroups/DefaultResourceGroup-westeurope/workspaces/default-west-europe-ws/datastores/workspaceblobstore/paths/experiments/
     mode: rw_mount
-experiment_name: prostate_s00
-display_name: prostate_s00
+experiment_name: colon_shift00
+display_name: colon_shift00
 
 # az ml job create --file azure_config.yaml --workspace-name west-europe-ws --resource-group DefaultResourceGroup-westeurope
