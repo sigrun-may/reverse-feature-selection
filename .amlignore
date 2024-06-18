@@ -2,4 +2,7 @@ results
 .idea
 data
 archive
-preprocessed_data
+.git
+.mypy_cache
+.pytest_cache
+test
