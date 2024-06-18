@@ -160,7 +160,6 @@ def select_feature_subset(data_df: pd.DataFrame, train_indices: np.ndarray, meta
             np.median(unlabeled_error_distribution) - np.median(labeled_error_distribution)
         ) / np.median(unlabeled_error_distribution)
         fraction_list_median.append(fraction_median_based)
-        print(fraction_median_based)
 
     assert (
         len(labeled_errors_list)
