@@ -2,7 +2,6 @@ results
 .idea
 data
 archive
-.git
 .mypy_cache
 .pytest_cache
 test
