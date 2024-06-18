@@ -41,8 +41,8 @@ def remove_features_correlated_to_target_feature(
     # Remove correlated features from the training data
     uncorrlated_train_df = train_df[train_df.columns[uncorrelated_features_mask]]
 
+    # insert the 'label' as the first column if it is not already there
     if "label" != uncorrlated_train_df.columns[0]:
-        # insert the 'label' as the first column
         uncorrlated_train_df.insert(0, "label", train_df["label"])
 
     if len(uncorrlated_train_df.columns) == 1:
