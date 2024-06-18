@@ -1,3 +1,103 @@
+# Copyright (c) 2024 Sigrun May,
+# Ostfalia Hochschule für angewandte Wissenschaften
+#
+# This software is distributed under the terms of the MIT license
+# which is available at https://opensource.org/licenses/MIT
+
+[tool.poetry]
+name = "reverse_feature_selection"
+version = "0.0.1rc1"
+description = ""
+authors = ["Sigrun May <s.may@ostfalia.de>"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/sigrun-may/reverse_feature_selection"
+include = ["LICENSE", "Makefile"]
+keywords = [
+    "feature selection", "reverse feature selection", "feature importance", "high-dimensional data",
+    "machine learning", "tiny sample size"
+]
+# all classifiers see https://pypi.org/classifiers/
+classifiers = [
+    # "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
+    # "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Education",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Operating System :: OS Independent",
+]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.urls]
+"Bug Tracker" = "https://github.com/sigrun-may/reverse_feature_selection/issues"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+pyyaml = "*"
+numpy = "*"
+pandas = "*"
+seaborn = "*"
+matplotlib = "*"
+statsmodels = "*"
+
+[tool.poetry.group.lint.dependencies]
+black = "*"
+flake8 = "*"
+isort = "*"
+mdformat = "*"
+pydocstyle = "*"
+mypy = "*"
+pylint = "*"
+pylintfileheader = "*"
+
+[tool.poetry.group.test.dependencies]
+pytest = "*"
+
+[tool.poetry.group.doc.dependencies]
+sphinx = "*"
+sphinx_rtd_theme = "*"
+myst_parser = "*"
+sphinx_copybutton = "*"
+
 [tool.black]
 line-length = 120
 target-version = ["py311"]
+
+[tool.isort]
+profile = "black"
+lines_after_imports = 2
+line_length = 120
+
+#[tool.pylint."MASTER"]
+#load-plugins = "pylintfileheader"
+#file-header = "(# Copyright \\(c\\) \\d{4} .*\\n)*# This software is distributed under the terms of the MIT license\\n# which is available at https://opensource.org/licenses/MIT\\n\\n"
+
+[tool.pylint."MESSAGES CONTROL"]
+disable = [
+    "too-many-arguments",
+    "too-many-lines",
+    "line-too-long",  # checked by flake8
+    "fixme",
+    "bare-except",  # checked by flake8
+    "too-many-locals",
+    "too-many-branches",
+]
