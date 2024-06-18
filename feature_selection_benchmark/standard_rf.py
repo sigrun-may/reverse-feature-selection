@@ -6,7 +6,6 @@
 
 """Standard embedded feature selection with sklearn random forest."""
 
-import datetime
 import math
 import warnings
 
@@ -17,7 +16,6 @@ import rpy2.robjects as ro
 import shap
 from optuna.samplers import TPESampler
 from rpy2.robjects import pandas2ri
-from rpy2.robjects.packages import importr
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import roc_auc_score
 
@@ -125,8 +123,7 @@ def ranger_permutation_importance(
     # calculate permutation importance with R
     # activate the pandas2ri conversion
     pandas2ri.activate()
-    # import ranger package
-    ranger = importr("ranger")
+
     # R script to train a ranger model and compute permutation importance
     r_script = """
     library(ranger)
