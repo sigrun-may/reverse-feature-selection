@@ -1,14 +1,16 @@
-optuna
 numpy
 pandas
 scikit-learn
 joblib
 scipy
 statistics
-shap
-toml
 mltb2[data]
 GitPython
 requests
 bs4
-plotly
+
+# necessary for feature selection methods comparison
+# plotly
+# optuna
+# shap
+# rpy2
