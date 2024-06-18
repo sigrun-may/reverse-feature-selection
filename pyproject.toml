@@ -27,8 +27,8 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.6",
-    "Programming Language :: Python :: 3.7",
+#    "Programming Language :: Python :: 3.6",
+#    "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
@@ -51,23 +51,32 @@ build-backend = "poetry.core.masonry.api"
 "Bug Tracker" = "https://github.com/sigrun-may/reverse_feature_selection/issues"
 
 [tool.poetry.dependencies]
-python = "^3.8"
-pyyaml = "*"
-numpy = "*"
+python = "^3.10"
+numpy = "^1"
 pandas = "*"
-seaborn = "*"
-matplotlib = "*"
-statsmodels = "*"
+scikit-learn = "*"
+joblib = "*"
+scipy = "*"
+statistics = "*"
+mltb2 = {extras = ["data"], version = "*"}
+GitPython = "*"
+requests = "*"
+bs4 = "*"
+optuna = {version = "*", optional = true}
+plotly = {version = "*", optional = true}
+shap = {version = "*", optional = true}
+rpy2 = {version = "*", optional = true}
+
+[tool.poetry.extras]
+benchmark = ["optuna", "plotly", "shap", "rpy2"]
 
 [tool.poetry.group.lint.dependencies]
 black = "*"
-flake8 = "*"
-isort = "*"
-mdformat = "*"
-pydocstyle = "*"
+ruff = "*"
 mypy = "*"
-pylint = "*"
-pylintfileheader = "*"
+mdformat-gfm = "*"
+mdformat-frontmatter = "*"
+mdformat-footnote = "*"
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"
@@ -80,24 +89,63 @@ sphinx_copybutton = "*"
 
 [tool.black]
 line-length = 120
-target-version = ["py311"]
+target-version = ["py310", "py311"]
 
-[tool.isort]
-profile = "black"
-lines_after_imports = 2
-line_length = 120
+[tool.ruff]
+line-length = 119
+target-version = "py310"
 
-#[tool.pylint."MASTER"]
-#load-plugins = "pylintfileheader"
-#file-header = "(# Copyright \\(c\\) \\d{4} .*\\n)*# This software is distributed under the terms of the MIT license\\n# which is available at https://opensource.org/licenses/MIT\\n\\n"
-
-[tool.pylint."MESSAGES CONTROL"]
-disable = [
-    "too-many-arguments",
-    "too-many-lines",
-    "line-too-long",  # checked by flake8
-    "fixme",
-    "bare-except",  # checked by flake8
-    "too-many-locals",
-    "too-many-branches",
+[tool.ruff.lint]
+select = ["ALL"]
+fixable = ["I"]
+ignore = [
+  "DJ",  # flake8-django - https://docs.astral.sh/ruff/rules/#flake8-django-dj
+  "ERA",  # eradicate - https://docs.astral.sh/ruff/rules/#eradicate-era
+  "ANN",  # flake8-annotations - https://docs.astral.sh/ruff/rules/#flake8-annotations-ann
+  "FA",  # flake8-future-annotations - https://docs.astral.sh/ruff/rules/#flake8-future-annotations-fa
+  "EM",  # flake8-errmsg - https://docs.astral.sh/ruff/rules/#flake8-errmsg-em
+  "PTH",  # flake8-use-pathlib - https://docs.astral.sh/ruff/rules/#flake8-use-pathlib-pth
+  "FBT",  # flake8-boolean-trap - https://docs.astral.sh/ruff/rules/#flake8-boolean-trap-fbt
+  "TD", # flake8-todos - https://docs.astral.sh/ruff/rules/#flake8-todos-td
+  "SLF",  # flake8-self - https://docs.astral.sh/ruff/rules/#flake8-self-slf
+  "D107",  # Missing docstring in __init__
+  "D410",  # Missing blank line after section ("{name}")
+  "D411",  # Missing blank line before section ("{name}")
+  "PLR0913",  # Too many arguments to function call ({c_args} > {max_args})
+  "S106",  # Possible hardcoded password assigned to argument: "{}"
+  "COM812",  # Trailing comma missing
+  "S101",  # Use of `assert` detected
+  "PLR2004",  # Magic value used in comparison
+  "B011",  # Do not `assert False`
+  "RET505",  # Unnecessary `else` after `return` statement
+  "TRY003",  # Avoid specifying long messages outside the exception class
+  "RET504",  # Unnecessary assignment before `return` statement
+  "T201",  # `print` found
+  "RET507",  # Unnecessary `else` after `continue` statement
+  "PT015",  # Assertion always fails, replace with `pytest.fail()`
+  "UP015",  # Unnecessary open mode parameters
+  "FIX002",  # Line contains TO-DO, consider resolving the issue
+  "PT011",  # `pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception
+  "PT001",  # Use `@pytest.fixture()` over `@pytest.fixture`
+  "RUF015",  # Prefer `next(iter(sentences))` over single element slice
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"test/**/test_*.py" = [
+  "D100",  # Missing docstring in public module
+  "D103",  # Missing docstring in public function
+  "PLR2004",  # Magic value used in comparison, consider replacing {value} with a constant variable
+  "S101",  # Use of assert detected
+  "N802",  # Function name should be lowercase
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.flake8-copyright]
+notice-rgx = "(# Copyright \\(c\\) \\d{4}.*\\n)+# This software is distributed under the terms of the MIT license\\n# which is available at https://opensource.org/licenses/MIT\\n\\n"
+
+[tool.mypy]
+ignore_missing_imports = true
+warn_unused_ignores = true
+enable_error_code=["ignore-without-code"]
