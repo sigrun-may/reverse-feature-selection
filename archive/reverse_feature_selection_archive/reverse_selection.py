@@ -30,7 +30,7 @@ def select_features(
         (
             performance_evaluation_metric_unlabeled_train_data,
             performance_evaluation_metric_labeled_train_data,
-        ) = reverse_selection_algorithm.optimize(
+        ) = reverse_selection_algorithm.select_feature_subset(
             preprocessed_data,
             target_feature_name,
             deselected_features_list,

@@ -1,4 +1,4 @@
-from typing import Dict, Literal
+from typing import Dict
 
 import joblib
 import numpy as np
@@ -17,7 +17,7 @@ from sklearn.metrics import (
 )
 from sklearn.neighbors import KNeighborsClassifier
 
-from src.validation.stability_estimator import get_stability
+from feature_selection_benchmark.validation.stability_estimator import get_stability
 from weighted_manhattan_distance import WeightedManhattanDistance
 
 # data_name = "overlapping_500_3"

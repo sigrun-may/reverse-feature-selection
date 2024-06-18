@@ -226,7 +226,7 @@ def optimize(
     )
     if meta_data["parallel"]["cluster"]:  # deactivate logging on cluster
         optuna.logging.set_verbosity(optuna.logging.ERROR)
-    study.optimize(
+    study.select_feature_subset(
         optuna_objective,
         # n_trials = 40,
         n_trials=meta_data["selection_method"]["reverse_lasso"]["trials"],
