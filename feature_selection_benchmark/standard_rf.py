@@ -23,7 +23,7 @@ from sklearn.metrics import roc_auc_score
 warnings.filterwarnings("ignore")
 
 
-def optimize(data_df: pd.DataFrame, train_indices: np.ndarray, meta_data: dict) -> dict:
+def calculate_feature_importance(data_df: pd.DataFrame, train_indices: np.ndarray, meta_data: dict) -> dict:
     """Optimize the hyperparameters of a random forest classifier using optuna.
 
     Args:
