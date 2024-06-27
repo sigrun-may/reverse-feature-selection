@@ -40,7 +40,7 @@ def calculate_feature_importance(data_df: pd.DataFrame, train_indices: np.ndarra
         rf_clf = RandomForestClassifier(
             oob_score=roc_auc_score,
             max_depth=trial.suggest_int("max_depth", 1, 15),
-            n_estimators=trial.suggest_int("n_estimators", 50, 200),
+            n_estimators=trial.suggest_int("n_estimators", 20, 200),
             max_features=trial.suggest_int("max_features", 1, data_df.shape[1] - 1),
             min_samples_leaf=trial.suggest_int("min_samples_leaf", 2, math.floor(len(train_indices) / 2)),
             min_samples_split=trial.suggest_int("min_samples_split", 2, 5),
