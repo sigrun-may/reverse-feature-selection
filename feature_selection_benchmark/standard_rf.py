@@ -46,6 +46,7 @@ def calculate_feature_importance(data_df: pd.DataFrame, train_indices: np.ndarra
             min_samples_split=trial.suggest_int("min_samples_split", 2, 5),
             min_impurity_decrease=trial.suggest_float("min_impurity_decrease", 0.0, 0.5),
             random_state=meta_data["random_state"],
+            class_weight='balanced_subsample',
             n_jobs=-1,
         )
         rf_clf.fit(data_df.iloc[train_indices, 1:], data_df.loc[train_indices, "label"])
@@ -72,7 +73,8 @@ def calculate_feature_importance(data_df: pd.DataFrame, train_indices: np.ndarra
         # timeout=120,
     )
     # train random forest with default parameters
-    clf = RandomForestClassifier(oob_score=roc_auc_score, n_jobs=-1, random_state=meta_data["random_state"])
+    clf = RandomForestClassifier(oob_score=roc_auc_score, n_jobs=-1, random_state=meta_data["random_state"],
+                                 class_weight='balanced_subsample')
     clf.fit(data_df.iloc[train_indices, 1:], data_df.loc[train_indices, "label"])
     gini_feature_importances = clf.feature_importances_
     print("number of selected features (gini): ", np.sum(gini_feature_importances > 0))
