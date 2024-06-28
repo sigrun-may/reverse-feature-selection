@@ -34,13 +34,13 @@ def main():
 
     # define meta data for the experiment
     meta_data_dict = {
-        "experiment_id": "leukemia_shift_02",
-        # valid data names for the data loader are "colon", "prostate" or "leukemia_big"
-        "data_name": "leukemia_big",
-        "description": "Leukemia dataset",
-        # "experiment_id": "random_noise_normal_scale_2_30_2000",
-        # "data_name": "random_noise_normal_scale_2_30_2000",
-        # "description": "Random noise dataset for testing purposes with 30 samples and 2000 features.",
+        # "experiment_id": "leukemia_shift_02",
+        # # valid data names for the data loader are "colon", "prostate" or "leukemia_big"
+        # "data_name": "leukemia_big",
+        # "description": "Leukemia dataset",
+        "experiment_id": "random_noise_lognormal_30_7000_01",
+        "data_name": "random_noise_lognormal_30_7000_01",
+        "description": "Random noise dataset for testing purposes with 30 samples and 2000 features.",
         "git_commit_hash": commit_sha,
         "n_cpus": multiprocessing.cpu_count(),  # number of available CPUs
         "train_correlation_threshold": 0.2,
@@ -97,8 +97,8 @@ def main():
     else:
         result_dict = {}
 
-    # load data
-    data_df = load_data_with_standardized_sample_size(meta_data_dict["data_name"])
+    # # load data
+    # data_df = load_data_with_standardized_sample_size(meta_data_dict["data_name"])
 
     # generate random noise data for benchmarking
     # import numpy as np
@@ -113,29 +113,27 @@ def main():
     # data_df.to_csv(data_df_path, index=False)
 
     # # load artificial data for testing from csv file
-    # import pandas as pd
-    # data_df = pd.read_csv(
-    #     "/home/sigrun/PycharmProjects/reverse_feature_selection/data/artificial_biomarker_data_2.csv"
-    # ).iloc[:, :70]
+    import pandas as pd
+    data_df = pd.read_csv(f"../data/{meta_data_dict['experiment_id']}_data_df.csv")
     # del result_dict["standard_random_forest"]
     # assert "standard_random_forest" not in result_dict, "Standard random forest results are still present."
 
     print("number of samples", data_df.shape[0], "number of features", data_df.shape[1] - 1)
 
-    # calculate raw feature subset data for reverse random forest
-    from reverse_feature_selection.reverse_rf_random import select_feature_subset
-
-    result_dict["reverse_random_forest"] = cross_validation.cross_validate(
-        data_df, meta_data_dict, select_feature_subset
-    )
-    result_dict["reverse_random_forest_meta_data"] = meta_data_dict
-
-    # # calculate raw feature subset data for standard random forest
-    # from standard_rf import calculate_feature_importance
-    # result_dict["standard_random_forest"] = cross_validation.cross_validate(
-    #     data_df, meta_data_dict, calculate_feature_importance
+    # # calculate raw feature subset data for reverse random forest
+    # from reverse_feature_selection.reverse_rf_random import select_feature_subset
+    #
+    # result_dict["reverse_random_forest"] = cross_validation.cross_validate(
+    #     data_df, meta_data_dict, select_feature_subset
     # )
-    # result_dict["standard_random_forest_meta_data"] = meta_data_dict
+    # result_dict["reverse_random_forest_meta_data"] = meta_data_dict
+
+    # calculate raw feature subset data for standard random forest
+    from standard_rf import calculate_feature_importance
+    result_dict["standard_random_forest"] = cross_validation.cross_validate(
+        data_df, meta_data_dict, calculate_feature_importance
+    )
+    result_dict["standard_random_forest_meta_data"] = meta_data_dict
 
     # save results
     result_dict_path = Path(f"{result_base_path}/{meta_data_dict['experiment_id']}_result_dict.pkl")
