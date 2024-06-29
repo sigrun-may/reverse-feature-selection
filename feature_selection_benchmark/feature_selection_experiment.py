@@ -32,15 +32,40 @@ def main():
     git_repository = git.Repo(search_parent_directories=True)
     commit_sha = git_repository.head.object.hexsha
 
+    # iterate over all files in the directory
+    for file in result_base_path.iterdir():
+        # extract the experiment id from the file name
+        experiment_id = file.stem.split("_result_dict")[0]
+        print("id", experiment_id)
+        # check if the experiment id is a string
+        assert isinstance(experiment_id, str), "Experiment id is not a string."
+
+        # extract the data name from the experiment id
+        if "colon" in experiment_id:
+            data_name = "colon"
+        elif "prostate" in experiment_id:
+            data_name = "prostate"
+        elif "leukemia" in experiment_id:
+            data_name = "leukemia_big"
+        else:
+            data_name = "random_noise"
+        print(data_name)
+
     # define meta data for the experiment
     meta_data_dict = {
+        "experiment_id": experiment_id,
+        "data_name": data_name,
+        "description": f"{data_name} dataset",
         # "experiment_id": "leukemia_shift_02",
         # # valid data names for the data loader are "colon", "prostate" or "leukemia_big"
         # "data_name": "leukemia_big",
         # "description": "Leukemia dataset",
-        "experiment_id": "random_noise_lognormal_30_7000_01",
-        "data_name": "random_noise_lognormal_30_7000_01",
-        "description": "Random noise dataset for testing purposes with 30 samples and 2000 features.",
+        # "experiment_id": "colon_shift02_30trials",
+        # "data_name": "colon",
+        # "description": "Colon cancer dataset",
+        # "experiment_id": "random_noise_lognormal_30_7000_01",
+        # "data_name": "random_noise_lognormal_30_7000_01",
+        # "description": "Random noise dataset for testing purposes with 30 samples and 2000 features.",
         "git_commit_hash": commit_sha,
         "n_cpus": multiprocessing.cpu_count(),  # number of available CPUs
         "train_correlation_threshold": 0.2,
@@ -80,7 +105,7 @@ def main():
         # generate random seed for reproducibility of random forest
         "random_state": random.randint(1, 2**8),
         "verbose_optuna": True,
-        "n_trials_optuna": 50,
+        "n_trials_optuna": 100,
     }
 
     # # shift seeds by 10
@@ -97,8 +122,15 @@ def main():
     else:
         result_dict = {}
 
-    # # load data
-    # data_df = load_data_with_standardized_sample_size(meta_data_dict["data_name"])
+    if "random" in meta_data_dict["data_name"]:
+        # load artificial data
+        import pandas as pd
+
+        data_df = pd.read_csv(f"../data/{meta_data_dict['experiment_id']}_data_df.csv")
+    else:
+        # load data
+        assert meta_data_dict["data_name"] in ["colon", "prostate", "leukemia_big"], "Invalid data name."
+        data_df = load_data_with_standardized_sample_size(meta_data_dict["data_name"])
 
     # generate random noise data for benchmarking
     # import numpy as np
@@ -112,9 +144,6 @@ def main():
     # data_df_path = Path(f"{result_base_path}/{meta_data_dict['experiment_id']}_data_df.csv")
     # data_df.to_csv(data_df_path, index=False)
 
-    # # load artificial data for testing from csv file
-    import pandas as pd
-    data_df = pd.read_csv(f"../data/{meta_data_dict['experiment_id']}_data_df.csv")
     # del result_dict["standard_random_forest"]
     # assert "standard_random_forest" not in result_dict, "Standard random forest results are still present."
 
@@ -130,6 +159,7 @@ def main():
 
     # calculate raw feature subset data for standard random forest
     from standard_rf import calculate_feature_importance
+
     result_dict["standard_random_forest"] = cross_validation.cross_validate(
         data_df, meta_data_dict, calculate_feature_importance
     )
