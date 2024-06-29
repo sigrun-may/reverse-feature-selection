@@ -44,9 +44,9 @@ def calculate_feature_importance(data_df: pd.DataFrame, train_indices: np.ndarra
             max_features=trial.suggest_int("max_features", 1, data_df.shape[1] - 1),
             min_samples_leaf=trial.suggest_int("min_samples_leaf", 2, math.floor(len(train_indices) / 2)),
             min_samples_split=trial.suggest_int("min_samples_split", 2, 5),
-            min_impurity_decrease=trial.suggest_float("min_impurity_decrease", 0.0, 0.5),
+            min_impurity_decrease=trial.suggest_float("min_impurity_decrease", 0.0, 0.5, log=True),
             random_state=meta_data["random_state"],
-            class_weight='balanced_subsample',
+            class_weight="balanced_subsample",
             n_jobs=-1,
         )
         rf_clf.fit(data_df.iloc[train_indices, 1:], data_df.loc[train_indices, "label"])
@@ -73,8 +73,9 @@ def calculate_feature_importance(data_df: pd.DataFrame, train_indices: np.ndarra
         # timeout=120,
     )
     # train random forest with default parameters
-    clf = RandomForestClassifier(oob_score=roc_auc_score, n_jobs=-1, random_state=meta_data["random_state"],
-                                 class_weight='balanced_subsample')
+    clf = RandomForestClassifier(
+        oob_score=roc_auc_score, n_jobs=-1, random_state=meta_data["random_state"], class_weight="balanced_subsample"
+    )
     clf.fit(data_df.iloc[train_indices, 1:], data_df.loc[train_indices, "label"])
     gini_feature_importances = clf.feature_importances_
     print("number of selected features (gini): ", np.sum(gini_feature_importances > 0))
@@ -99,8 +100,8 @@ def calculate_feature_importance(data_df: pd.DataFrame, train_indices: np.ndarra
         data_df, train_indices, study.best_params, meta_data["random_state"]
     )
     return {
-        "gini_importance": gini_feature_importances_optimized,
-        "gini_rf_unoptimized_importance": gini_feature_importances,
+        "gini_impurity": gini_feature_importances_optimized,
+        "gini_impurity_default_parameters": gini_feature_importances,
         "summed_shap_values": sum_shap_values,
         "permutation_importance": permutation_importances,
         "train_oob_score": clf.oob_score_,
