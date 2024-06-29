@@ -44,7 +44,7 @@ def calculate_feature_importance(data_df: pd.DataFrame, train_indices: np.ndarra
             max_features=trial.suggest_int("max_features", 1, data_df.shape[1] - 1),
             min_samples_leaf=trial.suggest_int("min_samples_leaf", 2, math.floor(len(train_indices) / 2)),
             min_samples_split=trial.suggest_int("min_samples_split", 2, 5),
-            min_impurity_decrease=trial.suggest_float("min_impurity_decrease", 0.0, 0.5, log=True),
+            min_impurity_decrease=trial.suggest_float("min_impurity_decrease", 0.1, 0.5),
             random_state=meta_data["random_state"],
             class_weight="balanced_subsample",
             n_jobs=-1,
