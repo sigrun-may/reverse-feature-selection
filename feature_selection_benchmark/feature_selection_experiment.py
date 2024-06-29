@@ -105,7 +105,7 @@ def main():
         # generate random seed for reproducibility of random forest
         "random_state": random.randint(1, 2**8),
         "verbose_optuna": True,
-        "n_trials_optuna": 100,
+        "n_trials_optuna": 50,
     }
 
     # # shift seeds by 10
