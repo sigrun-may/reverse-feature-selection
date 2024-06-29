@@ -5,10 +5,11 @@
 # which is available at https://opensource.org/licenses/MIT
 
 """This module evaluates the feature selection results of different feature selection methods."""
+import logging
 import os
 import pickle
 from pathlib import Path
-from typing import Tuple, Dict, List, Any
+from typing import Dict, Any
 
 import numpy as np
 import pandas as pd
@@ -28,18 +29,14 @@ from sklearn.metrics import (
     brier_score_loss,
     average_precision_score,
 )
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.preprocessing import QuantileTransformer
-
 from feature_selection_benchmark.data_loader_tools import load_train_test_data_for_standardized_sample_size
 from feature_selection_benchmark.feature_selection_evaluation import stability_estimator
-from feature_selection_benchmark.feature_selection_evaluation.weighted_manhattan_distance import (
-    WeightedManhattanDistance,
-)
+
+logging.basicConfig(level=logging.INFO)
 
 
 def train_and_predict(
-        train_data: pd.DataFrame, test_data: pd.DataFrame, feature_selection_result: np.ndarray, k: int
+        train_data: pd.DataFrame, test_data: pd.DataFrame, feature_selection_result: np.ndarray,
 ) -> tuple:
     """Trains a model and predicts the labels for the test data.
 
@@ -47,8 +44,6 @@ def train_and_predict(
         train_data: The training data.
         test_data: The test data.
         feature_selection_result: The feature importance.
-        k: If None, a random forest classifier with standard hyperparameters is used.
-            Else, the number of neighbors to use for KNN.
 
     Returns:
         Prediction results: predicted labels, predicted probabilities, true labels.
@@ -80,35 +75,25 @@ def train_and_predict(
     ), f"{feature_subset_x_test.shape}, {test_data.shape[0]}, {np.count_nonzero(feature_selection_result)}"
 
     # train and evaluate the model
-    if k is None:
-        # print("train random forest classifier")
-        clf = RandomForestClassifier()
-    else:
-        # scale data: choose quantile scaler due to the presence of outliers
-        robust_scaler = QuantileTransformer(n_quantiles=feature_subset_x_train.shape[0], output_distribution="normal")
-
-        x_train = robust_scaler.fit_transform(feature_subset_x_train)
-        x_test = robust_scaler.transform(feature_subset_x_test)
-        feature_subset_weights = feature_selection_result[relevant_feature_subset_indices]
-        assert feature_subset_weights.size == np.count_nonzero(feature_selection_result), feature_subset_weights.size
-        # print("use weighted KNeighborsClassifier")
-        clf = KNeighborsClassifier(
-            n_neighbors=k,
-            metric=WeightedManhattanDistance(feature_subset_weights),
-        )
-        # # print("use KNeighborsClassifier")
-        # clf = KNeighborsClassifier(n_neighbors=k, n_jobs=-1)
-
+    clf = RandomForestClassifier(
+        n_estimators=20,  # Fewer trees to avoid overfitting
+        max_features=None,  # Consider all selected features at each split
+        max_depth=4,  # Limit the depth of the trees
+        min_samples_leaf=2,  # More samples needed at each leaf node
+        bootstrap=False,  # Use the whole dataset for each tree
+        class_weight="balanced",  # Adjust weights for class imbalance if any
+    )
     clf.fit(x_train, y_train)
     predicted_proba_y = clf.predict_proba(x_test)
     predicted_y = clf.predict(x_test)
     return predicted_y, predicted_proba_y, y_test
 
 
-def calculate_performance_metrics(feature_importance_matrix: np.ndarray,
-                                  experiment_data_df: pd.DataFrame,
-                                  hold_out_data_df: pd.DataFrame = None,
-                                  k: int = None) -> Dict[str, float]:
+def calculate_performance_metrics(
+        feature_importance_matrix: np.ndarray,
+        experiment_data_df: pd.DataFrame,
+        hold_out_data_df: pd.DataFrame = None,
+) -> Dict[str, float]:
     """Calculate the performance metrics for the predicted labels.
 
     Args:
@@ -117,18 +102,17 @@ def calculate_performance_metrics(feature_importance_matrix: np.ndarray,
         experiment_data_df: The experiment data containing the features and labels.
         hold_out_data_df: The hold-out data for validation. If None, the test sample of the
             leave-one-out cross-validation is used.
-        k: The number of neighbors to use for KNN. If None, a random forest classifier with standard hyperparameters
-            is used.
 
     Returns:
         A dictionary containing the performance metrics.
     """
+    assert feature_importance_matrix.shape[0] == experiment_data_df.shape[0], feature_importance_matrix.shape[0]
     # predict y values
     y_predict = []
     y_predict_proba = []
     y_true = []
     # iterate over cross-validation indices of leave-one-out cross-validation
-    for cv_iteration in range(experiment_data_df.shape[0]):
+    for cv_iteration in range(feature_importance_matrix.shape[0]):
         feature_importances = feature_importance_matrix[cv_iteration, :]
         if np.count_nonzero(feature_importances) == 0:
             print("no features selected in iteration", cv_iteration)
@@ -141,7 +125,7 @@ def calculate_performance_metrics(feature_importance_matrix: np.ndarray,
         else:
             # use hold-out data for validation
             test_data = hold_out_data_df
-        y_pred, y_pred_proba, true_y = train_and_predict(train_data, test_data, feature_importances, k)
+        y_pred, y_pred_proba, true_y = train_and_predict(train_data, test_data, feature_importances)
         y_predict.extend(y_pred)
         y_predict_proba.extend(y_pred_proba)
         y_true.extend(true_y)
@@ -192,35 +176,37 @@ def evaluate_importance_matrix(input_feature_importance_matrix: np.ndarray) -> D
     return evaluation_results_dict
 
 
-def evaluate_feature_selection_results(
-        experiment_data_df, feature_importance_matrix, importance_calculation_method, evaluation_result_dict, k,
-        test_data_df
+def evaluate_feature_selection_performance(
+        evaluation_result_dict,
+        importance_calculation_method,
+        feature_importance_matrix,
+        experiment_data_df,
+        test_data_df,
 ):
     """Evaluate the feature selection results for the given feature importance matrix.
 
     Args:
-        experiment_data_df: The experiment data containing the features and labels.
-        feature_importance_matrix: The feature importance matrix where each row corresponds to the feature importance of a
-            cross-validation iteration.
-        importance_calculation_method: The method used for the feature selection.
         evaluation_result_dict: The dictionary to save the evaluation results.
-        k: The number of neighbors to use for KNN. If None, a random forest classifier with standard hyperparameters
-            is used.
+        importance_calculation_method: The method used for the feature selection.
+        feature_importance_matrix: The feature importance matrix where each row corresponds to the feature importance
+            of a cross-validation iteration.
+        experiment_data_df: The experiment data containing the features and labels.
         test_data_df: The test data to evaluate if a hold-out data set is available.
     """
-    # evaluate the feature subset selection results
-    evaluation_result_dict[importance_calculation_method] = evaluate_importance_matrix(feature_importance_matrix)
+
     # evaluate performance of the leave-one-out cross-validation
     evaluation_result_dict[importance_calculation_method]["performance_loo"] = calculate_performance_metrics(
-        feature_importance_matrix, experiment_data_df, k=k
+        feature_importance_matrix, experiment_data_df, hold_out_data_df=None,
     )
-    # evaluate performance of the hold-out data
-    evaluation_result_dict[importance_calculation_method]["performance_hold_out"] = calculate_performance_metrics(
-        feature_importance_matrix, experiment_data_df, hold_out_data_df=test_data_df, k=k)
+    if test_data_df is not None:
+        # evaluate performance of the hold-out data
+        evaluation_result_dict[importance_calculation_method]["performance_hold_out"] = calculate_performance_metrics(
+            feature_importance_matrix, experiment_data_df, hold_out_data_df=test_data_df,
+        )
 
 
 def evaluate_experiment(
-        input_result_dict: dict, experiment_data_df: pd.DataFrame, test_data_df: pd.DataFrame = None, k: int = None
+        input_result_dict: dict, experiment_data_df: pd.DataFrame, test_data_df: pd.DataFrame = None,
 ):
     """Evaluate the feature selection results of the given experiment.
 
@@ -228,13 +214,7 @@ def evaluate_experiment(
         input_result_dict: The result dictionary containing the feature selection results.
         experiment_data_df: The experiment data containing the features and labels.
         test_data_df: The test data to evaluate if a hold-out data set is available.
-        k: The number of neighbors to use for KNN. If None, a random forest classifier with standard hyperparameters
-            is used.
     """
-    if k is None:
-        print("Evaluate feature selection results without KNN classifier - RF")
-    else:
-        print(f"Evaluate feature selection results with KNN classifier with k={k}")
     # initialize evaluation dictionary
     input_result_dict["evaluation"] = {}
 
@@ -259,13 +239,16 @@ def evaluate_experiment(
             for i, cv_iteration_result in enumerate(loo_cv_iteration_list):
                 feature_importance_matrix[i, :] = cv_iteration_result[importance_calculation_method]
 
-            evaluate_feature_selection_results(
-                experiment_data_df,
-                feature_importance_matrix,
-                f"standard_random_forest_{importance_calculation_method}",
-                input_result_dict["evaluation"],
-                k,
-                test_data_df,
+            # evaluate the feature subset selection results
+            input_result_dict["evaluation"][importance_calculation_method] = evaluate_importance_matrix(
+                feature_importance_matrix)
+
+            evaluate_feature_selection_performance(
+                evaluation_result_dict=input_result_dict["evaluation"],
+                importance_calculation_method=importance_calculation_method,
+                feature_importance_matrix=feature_importance_matrix,
+                experiment_data_df=experiment_data_df,
+                test_data_df=test_data_df,
             )
 
     # evaluate the feature selection results for the reverse random forest
@@ -286,16 +269,66 @@ def evaluate_experiment(
                     feature_subset_selection_array[j] = cv_iteration_result.loc[f"f_{j}", "fraction_mean"]
             feature_importance_matrix[i, :] = feature_subset_selection_array
 
-        evaluate_feature_selection_results(experiment_data_df, feature_importance_matrix, "reverse_random_forest",
-                                           input_result_dict["evaluation"], k, test_data_df)
+        # evaluate the feature subset selection results
+        input_result_dict["evaluation"]["reverse_random_forest"] = evaluate_importance_matrix(
+            feature_importance_matrix)
+
+        evaluate_feature_selection_performance(
+            evaluation_result_dict=input_result_dict["evaluation"],
+            importance_calculation_method="reverse_random_forest",
+            feature_importance_matrix=feature_importance_matrix,
+            experiment_data_df=experiment_data_df,
+            test_data_df=test_data_df,
+        )
+
+
+def initialize_results_dict(feature_selection_methods, metrics):
+    """Initialize a dictionary to store the performance metrics for different feature selection methods."""
+    results_dict = {}
+    for method in feature_selection_methods:
+        if not isinstance(method, str):
+            raise ValueError(f"Invalid feature selection method: {method}")
+        results_dict[method] = {}
+        for metric in metrics:
+            if not isinstance(metric, str):
+                raise ValueError(f"Invalid metric: {metric}")
+            if metric.startswith("performance"):
+                # insert the dictionary for the performance metrics
+                results_dict[method][metric] = {"AUC": [], "Accuracy": [], "F1": [], "Brier Score": []}
+            else:
+                # initialize the lists for the stability and mean subset size
+                results_dict[method][metric] = []
+    return results_dict
+
+
+def load_experiment_results(result_dict_path: str, experiment_id: str) -> Dict:
+    """Load the raw experiment results from a pickle file.
+
+    Args:
+        result_dict_path: The path to dictionary of the pickled results files.
+        experiment_id: The id of the experiment.
+
+    Returns:
+        The loaded experiment results.
+
+    Raises:
+        FileNotFoundError: If the file does not exist.
+    """
+    file_path = os.path.join(result_dict_path, f"{experiment_id}_result_dict.pkl")
+    if not Path(file_path).exists():
+        raise FileNotFoundError(f"File {file_path} not found.")
+
+    with open(file_path, "rb") as file:
+        result_dict = pickle.load(file)
+
+    return result_dict
 
 
 def evaluate_repeated_experiments(
         data_df: pd.DataFrame,
-        test_data_df: pd.DataFrame,
-        result_dict_path: Path,
+        test_data_df: pd.DataFrame | None,
+        result_dict_path: str,
         repeated_experiments: list[str],
-        k: int | None,
 ):
     """Evaluate the feature selection results and their reproducibility for each provided feature selection method.
 
@@ -304,86 +337,55 @@ def evaluate_repeated_experiments(
         test_data_df: The test data to evaluate.
         result_dict_path: The base path to the pickled results files.
         repeated_experiments: A list of the experiment ids of repeated experiments to evaluate.
-        k: The number of neighbors to use for KNN. If None, a random forest classifier
-            with standard hyperparameters is used.
 
     Returns:
         Evaluation results for each feature selection method.
     """
-    summarised_results_dict = {}
-    list_of_methods = ['standard_random_forest_gini_importance', 'standard_random_forest_gini_rf_unoptimized_importance', 'standard_random_forest_permutation_importance', 'standard_random_forest_summed_shap_values', 'reverse_random_forest']
-    for fs_method in list_of_methods:
-        summarised_results_dict[fs_method] = {
-            "performance_loo": {
-                "AUC": [],
-                "Accuracy": [],
-                "F1": [],
-                "Brier Score": [],
-            },
-            "performance_hold_out": {
-                "AUC": [],
-                "Accuracy": [],
-                "F1": [],
-                "Brier Score": [],
-            },
-            "stability": [],
-            "mean_subset_size": [],
-        }
+    # define the feature selection methods and metrics
+    feature_selection_methods = [
+        "gini_rf_unoptimized_importance",
+        "gini_importance",
+        "summed_shap_values",
+        "permutation_importance",
+        "reverse_random_forest",
+    ]
+    metrics = ["performance_loo", "performance_hold_out", "stability", "mean_subset_size"]
+    if test_data_df is None:
+        metrics.remove("performance_hold_out")
+
+    # initialize the results dictionary for the summarised results
+    summarised_results_dict = initialize_results_dict(feature_selection_methods, metrics)
+
     # iterate over all repeated experiments
     for experiment_id in repeated_experiments:
-        print(f"Evaluating experiment {experiment_id}")
-        file_path = os.path.join(result_dict_path, f"{experiment_id}_result_dict.pkl")
-
-        # analyze experiment results
-        try:
-            # load the raw experiment results
-            with open(file_path, "rb") as file:
-                result_dict = pickle.load(file)
-        except FileNotFoundError:
-            print(f"File {file_path} not found.")
+        logging.info(f"Evaluating experiment {experiment_id}")
+        result_dict = load_experiment_results(result_dict_path, experiment_id)
 
         # check if the result dictionary already contains the evaluation results
         if "evaluation" in result_dict.keys():
-            print(f"Evaluation results for {experiment_id} already present.")
-            # continue
+            logging.info(f"Evaluation results for {experiment_id} already present.")
             # delete the evaluation results to reevaluate the experiment
             del result_dict["evaluation"]
-            evaluate_experiment(result_dict, data_df, test_data_df, k=k)
-        else:
-            # evaluate the experiment
-            evaluate_experiment(result_dict, data_df, test_data_df, k=k)
 
-        # extract the evaluation results and store them in the summarised results dictionary
-        for method in result_dict["evaluation"].keys():
-            summarised_results_dict[method]["performance_loo"]["AUC"].append(
-                result_dict["evaluation"][method]["performance_loo"]["AUC"]
-            )
-            summarised_results_dict[method]["performance_loo"]["Accuracy"].append(
-                result_dict["evaluation"][method]["performance_loo"]["Accuracy"]
-            )
-            summarised_results_dict[method]["performance_loo"]["F1"].append(
-                result_dict["evaluation"][method]["performance_loo"]["F1"]
-            )
-            summarised_results_dict[method]["performance_loo"]["Brier Score"].append(
-                result_dict["evaluation"][method]["performance_loo"]["Brier Score"]
-            )
-            summarised_results_dict[method]["stability"].append(result_dict["evaluation"][method]["stability"])
-            summarised_results_dict[method]["mean_subset_size"].append(result_dict["evaluation"][method]["mean_subset_size"])
+        # evaluate the experiment
+        evaluate_experiment(result_dict, data_df, test_data_df)
 
-            # check if the performance of an independent test set is available
-            if "performance_hold_out" in result_dict["evaluation"][method].keys():
-                summarised_results_dict[method]["performance_hold_out"]["AUC"].append(
-                    result_dict["evaluation"][method]["performance_hold_out"]["AUC"]
-                )
-                summarised_results_dict[method]["performance_hold_out"]["Accuracy"].append(
-                    result_dict["evaluation"][method]["performance_hold_out"]["Accuracy"]
-                )
-                summarised_results_dict[method]["performance_hold_out"]["F1"].append(
-                    result_dict["evaluation"][method]["performance_hold_out"]["F1"]
-                )
-                summarised_results_dict[method]["performance_hold_out"]["Brier Score"].append(
-                    result_dict["evaluation"][method]["performance_hold_out"]["Brier Score"]
-                )
+        # extract the evaluation results and summarise them
+        for feature_selection_method in result_dict["evaluation"].keys():
+            # iterate over the evaluation metrics
+            for metric in result_dict["evaluation"][feature_selection_method].keys():
+                if metric.startswith("performance"):
+                    # iterate over the performance metrics
+                    for performance_metric in summarised_results_dict[feature_selection_method][metric].keys():
+                        summarised_results_dict[feature_selection_method][metric][performance_metric].append(
+                            result_dict["evaluation"][feature_selection_method][metric][performance_metric]
+                        )
+                elif metric == "stability" or metric == "mean_subset_size":
+                    # append stability and mean subset size
+                    summarised_results_dict[feature_selection_method][metric].append(
+                        result_dict["evaluation"][feature_selection_method][metric]
+                    )
+
     # print the average results
     for method in summarised_results_dict.keys():
         print("\n")
@@ -392,7 +394,6 @@ def evaluate_repeated_experiments(
             if element == "importance_matrix" or element == "robustness_array" or element == "cumulated_importance":
                 continue
             print(element, ": ", value)
-
 
     # for method in result_dict["evaluation"].keys():
     #     if "shap" in method:
@@ -406,16 +407,28 @@ def evaluate_repeated_experiments(
     return summarised_results_dict
 
 
-def plot_average_results(evaluated_results_dict: dict, save: bool = False, data_name: str = "Data"):
+def plot_average_results(
+        evaluated_results_dict: dict, save: bool = False, data_display_name: str = "Data", hold_out: bool = False,
+        loo: bool = True
+):
     """Plot the average results and the standard deviation for the given result dictionary.
 
     Args:
         evaluated_results_dict: The dictionary containing the evaluated results to plot.
         save: A boolean indicating whether to save the plot as a pdf. Defaults to False.
-        data_name: The name of the data to plot. Defaults to "Data".
+        data_display_name: The name of the data to plot. Defaults to "Data".
+        hold_out: A boolean indicating whether to plot the hold-out data. Defaults to False.
+        loo: A boolean indicating whether to plot the leave-one-out cross-validation data. Defaults to True.
     """
     barchart_counter = 0
-    for performance_evaluation_method in ["performance_loo", "performance_hold_out"]:
+    performance_evaluation_methods = []
+    if loo:
+        performance_evaluation_methods.append("performance_loo")
+    if hold_out:
+        performance_evaluation_methods.append("performance_hold_out")
+    assert len(performance_evaluation_methods) > 0, "No performance evaluation method selected."
+    for performance_evaluation_method in performance_evaluation_methods:
+        print("plot", performance_evaluation_method)
         for performance_metric in ["AUC", "Accuracy", "F1", "Brier Score"]:
             # Create a DataFrame
             df = pd.DataFrame(
@@ -430,6 +443,7 @@ def plot_average_results(evaluated_results_dict: dict, save: bool = False, data_
                 ]
             )
             for feature_selection_method in evaluated_results_dict.keys():
+                # print("feature_selection_method", feature_selection_method)
                 df.loc[len(df)] = [
                     feature_selection_method,
                     np.mean(
@@ -456,15 +470,16 @@ def plot_average_results(evaluated_results_dict: dict, save: bool = False, data_
                 size="num_features",
                 color="num_features",
                 hover_data=["method"],
-                text="method",  # Add method name to each data point
+                text=["without HPO", "gini", "shap", "permutation", "reverse"],# "method",  # Add method name to each data point
                 template="plotly_white",
             )
-            fig.update_traces(textposition="top left")
-            fig.update_xaxes(range=[0, 1.0])
-            fig.update_yaxes(range=[0, 1.0])
+            # unoptimized, gini, shap, permutation, reverse
+            fig.update_traces(textposition=["top right", "top left", "bottom left", "top left", "bottom right"])
+            fig.update_xaxes(range=[0, 1.1])
+            fig.update_yaxes(range=[0, 1.1])
             fig.update_layout(
-                title=f"{data_name}: {performance_metric} vs Stability (colored and shaped by number of selected "
-                f"features)",
+                title=f"{data_display_name}: {performance_metric} vs Stability (colored and shaped by number of selected "
+                      f"features)",
                 xaxis_title="Stability of Feature Selection",
                 yaxis_title=f"{performance_metric} - {performance_evaluation_method}",
                 legend_title="Average Number of Selected Features",
@@ -487,8 +502,9 @@ def plot_average_results(evaluated_results_dict: dict, save: bool = False, data_
                         error_y=dict(type="data", array=df["e_num_features"]),
                     )
                 )
+                print(data_display_name)
                 fig.update_layout(
-                    title=f"{data_name}: Number of Selected Features",
+                    title=f"{data_display_name}: Number of Selected Features",
                     xaxis_title="Feature Selection Method",
                     yaxis_title="Number of Selected Features",
                 )
@@ -496,47 +512,45 @@ def plot_average_results(evaluated_results_dict: dict, save: bool = False, data_
                 barchart_counter += 1
 
 
-base_path = Path("../../results")
-# result_dict_path = Path("../../results/colon_shift_00_result_dict.pkl")
-# hold_out_df, input_df = load_train_test_data_for_standardized_sample_size("colon")
-
+base_path = "../../results"
 list_of_experiments = [
-    "prostate_shift_00", "prostate_shift_01", "prostate_shift_02",
+    # "colon00",
+    # "colon_s10",
+    # "colon_s20",
+    # "colon_s30",
+    # "colon_s40",
+    "colon_shift_00",
 ]
-hold_out_df, input_df = load_train_test_data_for_standardized_sample_size("prostate")
-
+data_name = "colon"
+# list_of_experiments = [
+#     "prostate_shift_00",
+#     "prostate_shift_01",
+#     "prostate_shift_02",
+# ]
+# data_name = "prostate"
 # list_of_experiments = [
 #     "leukemia_shift_00",
 # ]
-# hold_out_df, input_df = load_train_test_data_for_standardized_sample_size("leukemia_big")
+# data_name = "leukemia_big"
 
 # result_dict_path = Path("../../results/random_noise_lognormal_30_7000_01_result_dict.pkl")
-# data_df = pd.read_csv("../../results/random_noise_lognormal_30_7000_01_data_df.csv")
-# hold_out_test_data_df = None
-# assert input_data_df.columns[0] == "label", input_data_df.columns[0]
+# list_of_experiments = ["random_noise_lognormal_30_7000_01"]
+# input_df = pd.read_csv("../../data/random_noise_lognormal_30_7000_01_data_df.csv")
+# hold_out_df = None
+# assert input_df.columns[0] == "label", input_df.columns[0]
 
 # data_df.drop(columns=[data_df.columns[0]], inplace=True)
 # input_data_df.to_csv("../../results/random_noise_lognormal_30_7000_01_data_df.csv", index=False)
+
 # load the raw experiment results
 # with open(Path("../../results/colon_shift_00_result_dict.pkl"), "rb") as file:
 #     result_dict = pickle.load(file)
-# evaluate_experiment(result_dict, input_df, hold_out_df, k=None)
-# print(result_dict["evaluation"].keys())
-# evaluate_repeated_experiments(input_df, hold_out_df, base_path, list_of_experiments, k=None)
-plot_average_results(evaluate_repeated_experiments(input_df, hold_out_df, base_path, list_of_experiments, k=None), save=False, data_name="Prostate")
 
-# if result_dict_path.exists():
-#     with open(result_dict_path, "rb") as file:
-#         result_dict = pickle.load(file)
-#
-# evaluate_selected_feature_subsets(result_dict, k=None, test_data_df=hold_out_test_data_df)
+hold_out_df, input_df = load_train_test_data_for_standardized_sample_size(data_name)
+plot_average_results(
+    evaluate_repeated_experiments(input_df, hold_out_df, base_path, list_of_experiments),
+    save=False,
+    data_display_name=data_name.capitalize(),
+    hold_out=True,
+)
 
-# for method in result_dict["evaluation"].keys():
-#     if "shap" in method:
-#         continue
-#     print("\n")
-#     print(method)
-#     for element, value in result_dict["evaluation"][method].items():
-#         if element == "importance_matrix" or element == "robustness_array" or element == "cumulated_importance":
-#             continue
-#         print(element, ": ", value)
