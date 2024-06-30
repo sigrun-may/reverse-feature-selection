@@ -32,40 +32,37 @@ def main():
     git_repository = git.Repo(search_parent_directories=True)
     commit_sha = git_repository.head.object.hexsha
 
-    # iterate over all files in the directory
-    for file in result_base_path.iterdir():
-        # extract the experiment id from the file name
-        experiment_id = file.stem.split("_result_dict")[0]
-        print("id", experiment_id)
-        # check if the experiment id is a string
-        assert isinstance(experiment_id, str), "Experiment id is not a string."
+    # # iterate over all files in the directory
+    # for file in result_base_path.iterdir():
+    #     # extract the experiment id from the file name
+    #     experiment_id = file.stem.split("_result_dict")[0]
+    #     print("id", experiment_id)
+    #     # check if the experiment id is a string
+    #     assert isinstance(experiment_id, str), "Experiment id is not a string."
+    #
+    #     # extract the data name from the experiment id
+    #     if "colon" in experiment_id:
+    #         data_name = "colon"
+    #     elif "prostate" in experiment_id:
+    #         data_name = "prostate"
+    #     elif "leukemia" in experiment_id:
+    #         data_name = "leukemia_big"
+    #     else:
+    #         data_name = "random_noise"
+    #     print(data_name)
 
-        # extract the data name from the experiment id
-        if "colon" in experiment_id:
-            data_name = "colon"
-        elif "prostate" in experiment_id:
-            data_name = "prostate"
-        elif "leukemia" in experiment_id:
-            data_name = "leukemia_big"
-        else:
-            data_name = "random_noise"
-        print(data_name)
+    # valid data names for the data loader are "colon", "prostate" or "leukemia_big"
+    data_name = "leukemia_big"
+    shift = 10
+    experiment_id = f"{data_name}_shift{shift}"
+    description = f"{data_name} dataset with a shift of {shift} for the random seeds."
+    # "description": "Random noise dataset for testing purposes with 30 samples and 2000 features.",
 
     # define meta data for the experiment
     meta_data_dict = {
         "experiment_id": experiment_id,
         "data_name": data_name,
-        "description": f"{data_name} dataset",
-        # "experiment_id": "leukemia_shift_02",
-        # # valid data names for the data loader are "colon", "prostate" or "leukemia_big"
-        # "data_name": "leukemia_big",
-        # "description": "Leukemia dataset",
-        # "experiment_id": "colon_shift02_30trials",
-        # "data_name": "colon",
-        # "description": "Colon cancer dataset",
-        # "experiment_id": "random_noise_lognormal_30_7000_01",
-        # "data_name": "random_noise_lognormal_30_7000_01",
-        # "description": "Random noise dataset for testing purposes with 30 samples and 2000 features.",
+        "description": description,
         "git_commit_hash": commit_sha,
         "n_cpus": multiprocessing.cpu_count(),  # number of available CPUs
         "train_correlation_threshold": 0.2,
@@ -108,11 +105,8 @@ def main():
         "n_trials_optuna": 50,
     }
 
-    # # shift seeds by 10
-    # meta_data_dict["random_seeds"] = [seed + 10 for seed in meta_data_dict["random_seeds"]]
-
-    # shift seeds by 20
-    meta_data_dict["random_seeds"] = [seed + 20 for seed in meta_data_dict["random_seeds"]]
+    # shift seeds
+    meta_data_dict["random_seeds"] = [seed + shift for seed in meta_data_dict["random_seeds"]]
 
     # load previous result for the given experiment, if available
     result_dict_path = Path(f"{result_base_path}/{meta_data_dict['experiment_id']}_result_dict.pkl")
@@ -125,31 +119,27 @@ def main():
     if "random" in meta_data_dict["data_name"]:
         # load artificial data
         import pandas as pd
-
         data_df = pd.read_csv(f"../data/{meta_data_dict['experiment_id']}_data_df.csv")
+
+        # generate random noise data for benchmarking
+        # import numpy as np
+        # import pandas as pd
+        # rnd = np.random.default_rng(seed=42)
+        # data_df = pd.DataFrame(rnd.normal(scale=2, size=(30, 2000)), columns=[f"f_{i}" for i in range(2000)])
+        # # generate array as binary balanced target with two classes for 30 samples
+        # label_array = np.concatenate([np.zeros(15), np.ones(15)])
+        # data_df.insert(0, "label", label_array)
+        # # save data_df as csv
+        # data_df_path = Path(f"{result_base_path}/{meta_data_dict['experiment_id']}_data_df.csv")
+        # data_df.to_csv(data_df_path, index=False)
     else:
         # load data
         assert meta_data_dict["data_name"] in ["colon", "prostate", "leukemia_big"], "Invalid data name."
         data_df = load_data_with_standardized_sample_size(meta_data_dict["data_name"])
-
-    # generate random noise data for benchmarking
-    # import numpy as np
-    # import pandas as pd
-    # rnd = np.random.default_rng(seed=42)
-    # data_df = pd.DataFrame(rnd.normal(scale=2, size=(30, 2000)), columns=[f"f_{i}" for i in range(2000)])
-    # # generate array as binary balanced target with two classes for 30 samples
-    # label_array = np.concatenate([np.zeros(15), np.ones(15)])
-    # data_df.insert(0, "label", label_array)
-    # # save data_df as csv
-    # data_df_path = Path(f"{result_base_path}/{meta_data_dict['experiment_id']}_data_df.csv")
-    # data_df.to_csv(data_df_path, index=False)
-
-    # del result_dict["standard_random_forest"]
-    # assert "standard_random_forest" not in result_dict, "Standard random forest results are still present."
-
     print("number of samples", data_df.shape[0], "number of features", data_df.shape[1] - 1)
 
     # # calculate raw feature subset data for reverse random forest
+    # assert "reverse_random_forest" not in result_dict, "Reverse random forest results are already present."
     # from reverse_feature_selection.reverse_rf_random import select_feature_subset
     #
     # result_dict["reverse_random_forest"] = cross_validation.cross_validate(
@@ -158,6 +148,8 @@ def main():
     # result_dict["reverse_random_forest_meta_data"] = meta_data_dict
 
     # calculate raw feature subset data for standard random forest
+    # del result_dict["standard_random_forest"]
+    assert "standard_random_forest" not in result_dict, "Standard random forest results are already present."
     from standard_rf import calculate_feature_importance
 
     result_dict["standard_random_forest"] = cross_validation.cross_validate(
