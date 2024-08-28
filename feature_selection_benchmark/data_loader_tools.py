@@ -106,9 +106,8 @@ def load_train_test_data_for_standardized_sample_size(
     assert train_data_df.shape[1] == test_data_df.shape[1]
     assert train_data_df.shape[0] + test_data_df.shape[0] == data.shape[0]
 
-    # return test_data_df, train_data_df
-    metadata_dict = {"data_name": data_name}
-    return get_data_df(metadata_dict), get_data_df(metadata_dict)
+    return test_data_df, train_data_df
+
 
 
 def standardize_sample_size(data, label) -> Tuple[pd.DataFrame, pd.Series]:
