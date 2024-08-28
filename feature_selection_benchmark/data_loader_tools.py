@@ -152,7 +152,7 @@ def get_data_df(meta_data_dict: dict, generate_random_noise: bool = False, path_
 
     if "random" in meta_data_dict["data_name"]:
         # load artificial data
-        data_df = pd.read_csv(f"../data/{meta_dataL_dict['experiment_id']}_data_df.csv")
+        data_df = pd.read_csv(f"../data/{meta_data_dict['experiment_id']}_data_df.csv")
     elif generate_random_noise:
         # generate random noise data for benchmarking
         import numpy as np
