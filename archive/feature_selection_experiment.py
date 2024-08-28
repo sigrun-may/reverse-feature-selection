@@ -41,8 +41,6 @@ def load_data(meta_data_dict):
     return data_df
 
 
-
-
 def run_experiment(meta_data_dict, result_dict):
     """Calculate the raw results of the feature selection."""
 
