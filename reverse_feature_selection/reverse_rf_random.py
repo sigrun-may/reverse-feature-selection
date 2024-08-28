@@ -8,7 +8,6 @@
 
 import logging
 import math
-from typing import Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -20,7 +19,6 @@ from sklearn.metrics import mean_squared_error
 
 from reverse_feature_selection import preprocessing
 
-
 logging.basicConfig(level=logging.INFO)
 
 
@@ -29,7 +27,7 @@ def calculate_oob_errors(
     train_df: pd.DataFrame,
     corr_matrix_df: pd.DataFrame,
     meta_data: dict,
-) -> Tuple[Optional[list], Optional[list]]:
+) -> tuple[list | None, list | None]:
     """Calculate out-of-bag (OOB) error for labeled and unlabeled training data.
 
     Args:
@@ -61,6 +59,7 @@ def calculate_oob_errors(
         # Create a RandomForestRegressor model with specified parameters
         clf1 = RandomForestRegressor(
             oob_score=mean_squared_error,  # Use out-of-bag error for evaluation
+            max_features=None,  # Consider all features at each split, to ensure that the label is considered
             # criterion="absolute_error",
             n_estimators=100,
             random_state=seed,
@@ -130,9 +129,9 @@ def select_feature_subset(data_df: pd.DataFrame, train_indices: np.ndarray, meta
     )
     labeled_errors_list = []
     unlabeled_errors_list = []
-    p_value_list = []
-    fraction_list_mean = []
-    fraction_list_median = []
+    p_value_list: list[float | None] = []
+    fraction_list_mean: list[float | None] = []
+    fraction_list_median: list[float | None] = []
     for labeled_error_distribution, unlabeled_error_distribution in out:
         labeled_errors_list.append(labeled_error_distribution)
         unlabeled_errors_list.append(unlabeled_error_distribution)

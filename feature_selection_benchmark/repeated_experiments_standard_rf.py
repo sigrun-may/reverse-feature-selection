@@ -13,13 +13,14 @@ import sys
 from pathlib import Path
 
 import git
+from standard_rf import calculate_feature_importance
 
 from feature_selection_benchmark import cross_validation
 from feature_selection_benchmark.data_loader_tools import get_data_df
-from standard_rf import calculate_feature_importance
 
 
 def main():
+    """Main function for calculating baseline feature selection experiments for standard random forest."""
     # parse result path from input
     result_base_path = Path(sys.argv[1])
     print("result data_path: ", result_base_path)
@@ -85,7 +86,6 @@ def main():
         result_dict_path = Path(f"{result_base_path}/{meta_data_dict['experiment_id']}_result_dict.pkl")
         with open(result_dict_path, "wb") as result_file:
             pickle.dump(result_dict, result_file, protocol=pickle.HIGHEST_PROTOCOL)
-
 
 
 if __name__ == "__main__":

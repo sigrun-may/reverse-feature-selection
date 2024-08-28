@@ -10,6 +10,7 @@ import multiprocessing
 import pickle
 import sys
 from pathlib import Path
+
 import git
 
 from feature_selection_benchmark import cross_validation
@@ -17,7 +18,7 @@ from feature_selection_benchmark.data_loader_tools import get_data_df
 from reverse_feature_selection.reverse_rf_random import select_feature_subset
 
 
-def define_random_seeds()->list:
+def define_random_seeds() -> list:
     """Define random seeds for reproducibility of the experiments.
 
     Returns:
@@ -26,7 +27,6 @@ def define_random_seeds()->list:
     Raises:
         ValueError: If the random seeds are not unique.
     """
-
     # define a set of 30 different random seeds for reproducibility of the experiments
     random_seeds_0 = [
         29,
@@ -59,8 +59,9 @@ def define_random_seeds()->list:
         78,
         89,
         90,
-            ]
-    # generate a set of 30 different random seeds for reproducibility of reverse random forest distinct to the seeds in random_seeds_0
+    ]
+    # generate a set of 30 different random seeds for reproducibility of reverse random forest
+    # distinct to the seeds in random_seeds_0
     random_seeds_1 = [seed + 97 for seed in random_seeds_0]
     random_seeds_2 = [seed + 1948 for seed in random_seeds_0]
 
@@ -69,7 +70,7 @@ def define_random_seeds()->list:
     # flatten list of seeds to check if the random seeds are equal
     flattened_lists_of_seeds = sum(list_of_seeds, [])
     assert len(flattened_lists_of_seeds) == 90, "Number of random seeds is not equal to 90."
-    if not len(set(flattened_lists_of_seeds)) == 90:
+    if len(set(flattened_lists_of_seeds)) != 90:
         # find equal elements within the list
         equal_elements = [
             element for element in flattened_lists_of_seeds if flattened_lists_of_seeds.count(element) > 1
@@ -81,6 +82,7 @@ def define_random_seeds()->list:
 
 
 def main():
+    """Main function for calculating a grid of repeated feature selection experiments for reverse feature selection."""
     # parse result path from input
     result_base_path = Path(sys.argv[1])
     print("result data_path: ", result_base_path)
@@ -90,7 +92,7 @@ def main():
     data_names = ["colon", "prostate", "leukemia_big"]
     for data_name in data_names:
         if "random" in data_name:
-            description = f"Random noise dataset for testing purposes with 30 samples and 2000 features."
+            description = "Random noise dataset for testing purposes with 30 samples and 2000 features."
         else:
             description = f"{data_name} dataset."
 
@@ -114,9 +116,12 @@ def main():
             print("number of samples", data_df.shape[0], "number of features", data_df.shape[1] - 1)
 
             # calculate raw feature subset data for reverse random forest
-            result_dict = {"reverse_random_forest": cross_validation.cross_validate(
-                data_df, meta_data_dict, select_feature_subset
-            ), "reverse_random_forest_meta_data": meta_data_dict}
+            result_dict = {
+                "reverse_random_forest": cross_validation.cross_validate(
+                    data_df, meta_data_dict, select_feature_subset
+                ),
+                "reverse_random_forest_meta_data": meta_data_dict,
+            }
 
             # save results
             result_dict_path = Path(f"{result_base_path}/{meta_data_dict['experiment_id']}_result_dict.pkl")

@@ -5,8 +5,8 @@
 # which is available at https://opensource.org/licenses/MIT
 
 """Cross-validation tools."""
-import logging
 import datetime
+import logging
 
 import pandas as pd
 from sklearn.model_selection import LeaveOneOut
@@ -29,7 +29,7 @@ def cross_validate(data_df: pd.DataFrame, meta_data: dict, feature_selection_fun
     start_time = datetime.datetime.now(tz=datetime.timezone.utc)
     cv_result_list = []
     loo = LeaveOneOut()
-    for fold_index, (train_indices, test_index) in enumerate(loo.split(data_df.iloc[:, 1:])):
+    for fold_index, (train_indices, _) in enumerate(loo.split(data_df.iloc[:, 1:])):
         logging.info(f"fold_index {fold_index + 1} of {data_df.shape[0]}")
         # Calculate raw values for calculating feature subsets
         selected_feature_subset = feature_selection_function(data_df, train_indices, meta_data)

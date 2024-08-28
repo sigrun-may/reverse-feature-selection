@@ -1,5 +1,6 @@
-import pytest
 import pandas as pd
+import pytest
+
 from reverse_feature_selection.preprocessing import remove_features_correlated_to_target_feature
 
 
@@ -17,7 +18,7 @@ def test_removal_of_correlated_features():
     uncorrelated_train_df = remove_features_correlated_to_target_feature(
         train_df, correlation_matrix_df, target_feature, meta_data
     )
-    assert "label" == uncorrelated_train_df.columns[0]
+    assert uncorrelated_train_df.columns[0] == "label"
     assert target_feature not in uncorrelated_train_df.columns
     uncorrelated_features = uncorrelated_train_df.columns[1:]
 

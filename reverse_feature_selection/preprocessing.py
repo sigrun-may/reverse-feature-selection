@@ -16,8 +16,8 @@ def remove_features_correlated_to_target_feature(
 ) -> pd.DataFrame:
     """Remove features from the training data that are correlated to the target feature.
 
-    This function creates a mask for uncorrelated features based on the correlation threshold specified in the metadata.
-    It then uses this mask to select the uncorrelated features from the training data.
+    This function creates a mask for uncorrelated features based on the correlation threshold
+    specified in the metadata. It then uses this mask to select the uncorrelated features from the training data.
 
     Args:
         train_df: The training data.
@@ -44,7 +44,7 @@ def remove_features_correlated_to_target_feature(
     assert len(uncorrlated_train_df.columns) > 1, "No features uncorrelated to the target feature found."
 
     # insert the 'label' as the first column if it is not already there
-    if "label" != uncorrlated_train_df.columns[0]:
+    if uncorrlated_train_df.columns[0] != "label":
         uncorrlated_train_df.insert(0, "label", train_df["label"])
 
     # Return the data frame with uncorrelated features

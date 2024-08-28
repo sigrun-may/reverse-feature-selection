@@ -88,6 +88,7 @@ def _subset_size_stability(subset_vector, number_of_features, k):
         subset_vector: Numpy array containing the number of selected features
             per fold. The length of the array equals the number of all folds.
         number_of_features: Number of all features in the input data.
+        k: Subset size.
 
     Returns:
         Subset-size stability

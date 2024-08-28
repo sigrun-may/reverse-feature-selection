@@ -1,6 +1,6 @@
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
 from mltb2.data import load_colon
 
 from reverse_feature_selection.reverse_rf_random import calculate_oob_errors, select_feature_subset
