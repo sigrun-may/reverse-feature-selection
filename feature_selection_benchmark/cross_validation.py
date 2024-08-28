@@ -5,13 +5,11 @@
 # which is available at https://opensource.org/licenses/MIT
 
 """Cross-validation tools."""
-
 import logging
-from datetime import datetime
+import datetime
 
 import pandas as pd
 from sklearn.model_selection import LeaveOneOut
-
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -28,7 +26,7 @@ def cross_validate(data_df: pd.DataFrame, meta_data: dict, feature_selection_fun
     Returns:
         Results of the cross-validation.
     """
-    start_time = datetime.utcnow()
+    start_time = datetime.datetime.now(tz=datetime.timezone.utc)
     cv_result_list = []
     loo = LeaveOneOut()
     for fold_index, (train_indices, test_index) in enumerate(loo.split(data_df.iloc[:, 1:])):
@@ -36,6 +34,6 @@ def cross_validate(data_df: pd.DataFrame, meta_data: dict, feature_selection_fun
         # Calculate raw values for calculating feature subsets
         selected_feature_subset = feature_selection_function(data_df, train_indices, meta_data)
         cv_result_list.append(selected_feature_subset)
-    end_time = datetime.utcnow()
+    end_time = datetime.datetime.now(tz=datetime.timezone.utc)
     print("Duration of the cross-validation: ", end_time - start_time)
     return cv_result_list
