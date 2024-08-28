@@ -1,11 +1,10 @@
-# -*- coding: utf-8 -*-
 # Copyright (c) 2023 Sigrun May, Ostfalia Hochschule für angewandte Wissenschaften
 # This software is distributed under the terms of the MIT license
 # which is available at https://opensource.org/licenses/MIT
 
 """Data loader tools."""
 from pathlib import Path
-from typing import List, Literal, Tuple
+from typing import Literal
 
 import pandas as pd
 from mltb2.data import load_colon, load_leukemia_big, load_prostate
@@ -57,7 +56,7 @@ def convert_to_single_df(x, y):
 
 def load_train_test_data_for_standardized_sample_size(
     data_name: Literal["colon", "prostate", "leukemia_big"] = "colon"
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Load remaining test data from standardized train sample size.
 
     The data is loaded and parsed from the internet (see mltb2.data). The function selects all samples but the first 15
@@ -76,9 +75,10 @@ def load_train_test_data_for_standardized_sample_size(
     label, data = load_data_function()
 
     # find remaining samples for each class
-    indices: List[int] = []
+    indices: list[int] = []
     counter_0 = 0
     counter_1 = 0
+
     for i in range(label.shape[0]):
         # select samples with label 0
         if label.iloc[i] == 0:
@@ -109,15 +109,14 @@ def load_train_test_data_for_standardized_sample_size(
     return test_data_df, train_data_df
 
 
-
-def standardize_sample_size(data, label) -> Tuple[pd.DataFrame, pd.Series]:
+def standardize_sample_size(data, label) -> tuple[pd.DataFrame, pd.Series]:
     """Reduce samples to 15 for each class.
 
     Returns:
         Tuple containing balanced data and corresponding labels.
     """
     # reduce samples to 15 for each class
-    indices: List[int] = []
+    indices: list[int] = []
     for i in range(label.shape[0]):
         if label.iloc[i] == 0:
             indices.append(i)
@@ -137,7 +136,9 @@ def standardize_sample_size(data, label) -> Tuple[pd.DataFrame, pd.Series]:
     return data, label
 
 
-def get_data_df(meta_data_dict: dict, generate_random_noise: bool = False, path_for_random_noise: str = "") -> pd.DataFrame:
+def get_data_df(
+    meta_data_dict: dict, generate_random_noise: bool = False, path_for_random_noise: str = ""
+) -> pd.DataFrame:
     """Load data for the experiment.
 
     Args:
@@ -148,13 +149,13 @@ def get_data_df(meta_data_dict: dict, generate_random_noise: bool = False, path_
     Returns:
         The data as a pandas DataFrame with the label in the first column.
     """
-
     if "random" in meta_data_dict["data_name"]:
         # load artificial data
         data_df = pd.read_csv(f"../data/{meta_data_dict['experiment_id']}_data_df.csv")
     elif generate_random_noise:
         # generate random noise data for benchmarking
         import numpy as np
+
         rnd = np.random.default_rng(seed=42)
         data_df = pd.DataFrame(rnd.normal(scale=2, size=(30, 2000)), columns=[f"f_{i}" for i in range(2000)])
         # generate array as binary balanced target with two classes for 30 samples
