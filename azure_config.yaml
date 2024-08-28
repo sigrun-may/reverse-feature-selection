@@ -15,7 +15,7 @@ command: |
   # pip install -r requirements.txt
   pip install -e .
   pip list
-  python3 feature_selection_benchmark/feature_selection_experiment.py ${{outputs.outdir}}
+  python3 feature_selection_benchmark/repeated_experiments_reverse_rf.py ${{outputs.outdir}}
 compute: 'cpu-120-cores'
 resources:
   instance_count: 1
@@ -24,7 +24,9 @@ outputs:
     type: uri_folder
     path: azureml://subscriptions/ebcfd0f7-1a0a-443d-b869-0c9c696bfb0b/resourcegroups/DefaultResourceGroup-westeurope/workspaces/default-west-europe-ws/datastores/workspaceblobstore/paths/experiments/
     mode: rw_mount
-experiment_name: colon_shift00
-display_name: colon_shift00
+#experiment_name: "random_noise_normal_scale_2_30_2000"
+#display_name: "random_noise_normal_scale_2_30_2000"
+experiment_name: experiment_grid_01
+display_name: experiment_grid_01
 
 # az ml job create --file azure_config.yaml --workspace-name west-europe-ws --resource-group DefaultResourceGroup-westeurope
