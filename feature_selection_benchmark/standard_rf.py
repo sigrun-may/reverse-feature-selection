@@ -143,7 +143,7 @@ def ranger_permutation_importance(
                                  mtry = mtry,
                                  max.depth = max_depth,
                                  num.trees = num_trees,
-                                 seed_random_forest = seed_random_forest,
+                                 seed = seed_random_forest,
                                  oob.error = TRUE,
                                 )
       # Retrieve the OOB error for debugging
