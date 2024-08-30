@@ -59,9 +59,6 @@ def calculate_oob_errors(
         # Create a RandomForestRegressor model with specified parameters
         clf1 = RandomForestRegressor(
             oob_score=mean_squared_error,  # Use out-of-bag error for evaluation
-            max_features=None,  # Consider all features at each split, to ensure that the label is considered
-            # criterion="absolute_error",
-            n_estimators=100,
             random_state=seed,
             min_samples_leaf=2,
             n_jobs=n_jobs,
@@ -107,10 +104,14 @@ def select_feature_subset(data_df: pd.DataFrame, train_indices: np.ndarray, meta
         data_df: The training data.
         train_indices: Indices for the training split.
         meta_data: The metadata related to the dataset and experiment.
+            The required keys are: "n_cpus" and "random_seeds". Number of available CPUs as integer and a list of
+            random seeds for reproducibility of the repeated reverse random forest.
 
     Returns:
-        A DataFrame containing lists of OOB scores for repeated analyzes of labeled and unlabeled data, p_values
-        and fraction differences based on means and medians of the distributions.
+        A DataFrame containing raw data with lists of OOB scores for repeated analyzes of labeled and unlabeled data,
+        p_values and fraction differences based on means and medians of the distributions. The feature_subset_selection
+        column contains the fraction difference based on the mean of the distributions, where the p_value is smaller or
+        equal to 0.05. Those features are selected for the feature subset.
     """
     # check if feature importance calculation is possible
     if data_df.shape[1] < 2:
@@ -160,15 +161,25 @@ def select_feature_subset(data_df: pd.DataFrame, train_indices: np.ndarray, meta
         ) / np.median(unlabeled_error_distribution)
         fraction_list_median.append(fraction_median_based)
 
+    feature_subset_selection_list = []
+    # extract feature selection array
+    for p_value, fraction_mean in zip(p_value_list, fraction_list_mean, strict=True):
+        # check if the value of the "p_value" column is smaller or equal than 0.05
+        if p_value is not None and p_value <= 0.05:
+            feature_subset_selection_list.append(fraction_mean)
+
     assert (
         len(labeled_errors_list)
         == len(unlabeled_errors_list)
         == len(p_value_list)
         == len(fraction_list_mean)
         == len(fraction_list_median)
+        == len(feature_subset_selection_list)
         == data_df.shape[1] - 1  # exclude label column
     )
+
     result_df = pd.DataFrame(index=data_df.columns[1:])
+    result_df["feature_subset_selection"] = feature_subset_selection_list
     result_df["unlabeled_errors"] = unlabeled_errors_list
     result_df["labeled_errors"] = labeled_errors_list
     result_df["p_value"] = p_value_list
