@@ -131,7 +131,7 @@ def ranger_permutation_importance(
     library(ranger)
 
     # train a ranger model with optimized hyperparameters
-    train_ranger <- function(data, label, max_depth, num_trees, mtry, min_node_size, seed){
+    train_ranger <- function(data, label, max_depth, num_trees, mtry, min_node_size, seed_random_forest){
       # ensure label is a factor
       data[[label]] <- as.factor(data[[label]])
 
@@ -143,7 +143,7 @@ def ranger_permutation_importance(
                                  mtry = mtry,
                                  max.depth = max_depth,
                                  num.trees = num_trees,
-                                 seed = seed,
+                                 seed_random_forest = seed_random_forest,
                                  oob.error = TRUE,
                                 )
       # Retrieve the OOB error for debugging
@@ -170,7 +170,7 @@ def ranger_permutation_importance(
     seed = random_state
 
     # call the R function from Python
-    # function(data, label, max_depth, num_trees, mtry, min_node_size, seed)
+    # function(data, label, max_depth, num_trees, mtry, min_node_size, seed_random_forest)
     permutation_importances = train_ranger(
         pandas2ri.py2rpy(data), "label", max_depth, num_trees, mtry, min_node_size, seed
     )
