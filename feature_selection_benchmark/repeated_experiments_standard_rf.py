@@ -65,8 +65,10 @@ def main():
             "experiment_id": experiment_id,
             "data_name": data_name,
             "description": result_dict["reverse_random_forest_meta_data"]["description"],
+            # seed to shuffle the indices of the samples of the data set:
+            "shuffle_seed": result_dict["reverse_random_forest_meta_data"]["shuffle_seed"],
             "n_cpus": multiprocessing.cpu_count(),  # number of available CPUs
-            # random seed for reproducibility of random forest
+            # random seed for reproducibility of random forest:
             "random_state": result_dict["reverse_random_forest_meta_data"]["random_seeds"][0],
             "verbose_optuna": True,
             "n_trials_optuna": 50,
