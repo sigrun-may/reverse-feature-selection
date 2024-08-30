@@ -1,3 +1,11 @@
+# Copyright (c) 2024 Sigrun May,
+# Ostfalia Hochschule für angewandte Wissenschaften
+#
+# This software is distributed under the terms of the MIT license
+# which is available at https://opensource.org/licenses/MIT
+
+"""Preprocessing test script."""
+
 import pandas as pd
 import pytest
 
@@ -5,6 +13,7 @@ from reverse_feature_selection.preprocessing import remove_features_correlated_t
 
 
 def test_removal_of_correlated_features():
+    """Test removal of correlated features."""
     from mltb2.data import load_colon
 
     y, x = load_colon()
@@ -39,10 +48,11 @@ def test_removal_of_correlated_features():
 
 
 def test_removal_of_correlated_features_no_features_uncorrelated_to_target_feature():
+    """Test removal of correlated features when no features are uncorrelated to the target feature."""
     train_df = pd.DataFrame({"label": [1, 0, 1], "feature1": [10, 20, 30], "feature2": [100, 200, 300]})
     correlation_matrix_df = train_df.corr(method="spearman")
     target_feature = "feature1"
     meta_data = {"train_correlation_threshold": 0.6}
 
-    with pytest.raises(ValueError):
+    with pytest.raises(AssertionError):
         remove_features_correlated_to_target_feature(train_df, correlation_matrix_df, target_feature, meta_data)
