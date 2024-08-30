@@ -113,6 +113,14 @@ def select_feature_subset(data_df: pd.DataFrame, train_indices: np.ndarray, meta
         column contains the fraction difference based on the mean of the distributions, where the p_value is smaller or
         equal to 0.05. Those features are selected for the feature subset.
     """
+    # assert "n_cpus" in meta_data, "Number of available CPUs not found in meta_data."
+    # assert "random_seeds" in meta_data, "Random seeds not found in meta_data."
+    # assert isinstance(meta_data["n_cpus"], int), "Number of available CPUs is not an integer."
+    # assert isinstance(meta_data["random_seeds"], list), "Random seeds are not a list."
+    # assert all(
+    #     isinstance(seed_random_forest, int) for seed_random_forest in meta_data["random_seeds"]
+    # ), "Random seeds are not integers."
+
     # check if feature importance calculation is possible
     if data_df.shape[1] < 2:
         raise ValueError("No features found in the training data.")
@@ -167,6 +175,8 @@ def select_feature_subset(data_df: pd.DataFrame, train_indices: np.ndarray, meta
         # check if the value of the "p_value" column is smaller or equal than 0.05
         if p_value is not None and p_value <= 0.05:
             feature_subset_selection_list.append(fraction_mean)
+        else:
+            feature_subset_selection_list.append(0.0)
 
     assert (
         len(labeled_errors_list)
