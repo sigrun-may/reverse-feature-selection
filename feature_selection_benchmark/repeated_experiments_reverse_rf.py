@@ -88,6 +88,9 @@ def main():
     print("result data_path: ", result_base_path)
     result_base_path.mkdir(parents=True, exist_ok=True)
 
+    # seed to shuffle the indices of the samples of the data set
+    shuffle_seed = None
+
     # valid data names for the data loader are "colon", "prostate" or "leukemia_big"
     data_names = ["colon", "prostate", "leukemia_big"]
     for data_name in data_names:
@@ -97,8 +100,8 @@ def main():
             description = f"{data_name} dataset."
 
         # repeat the experiment three times with different random seeds
-        for i, random_seeds in enumerate(define_random_seeds()):
-            experiment_id = f"{data_name}_{i}"
+        for i, list_of_random_seeds in enumerate(define_random_seeds()):
+            experiment_id = f"{data_name}_{i}_shuffle_seed_{shuffle_seed}"
 
             # define meta data for the experiment
             meta_data_dict = {
@@ -109,7 +112,8 @@ def main():
                 "n_cpus": multiprocessing.cpu_count(),  # number of available CPUs
                 "train_correlation_threshold": 0.2,
                 # random seeds for reproducibility of reverse random forest
-                "random_seeds": random_seeds,
+                "random_seeds": list_of_random_seeds,
+                "shuffle_seed": shuffle_seed,
             }
             # load data
             data_df = get_data_df(meta_data_dict)
