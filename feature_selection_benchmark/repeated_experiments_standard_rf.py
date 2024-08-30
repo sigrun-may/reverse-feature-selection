@@ -16,7 +16,7 @@ import git
 from standard_rf import calculate_feature_importance
 
 from feature_selection_benchmark import cross_validation
-from feature_selection_benchmark.data_loader_tools import get_data_df
+from feature_selection_benchmark.data_loader_tools import load_data_df
 
 
 def main():
@@ -73,7 +73,7 @@ def main():
         }
 
         # load data
-        data_df = get_data_df(meta_data_dict)
+        data_df = load_data_df(meta_data_dict)
         print("number of samples", data_df.shape[0], "number of features", data_df.shape[1] - 1)
 
         # calculate raw feature subset data for standard random forest
