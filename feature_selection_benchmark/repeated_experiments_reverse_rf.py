@@ -14,7 +14,7 @@ from pathlib import Path
 import git
 
 from feature_selection_benchmark import cross_validation
-from feature_selection_benchmark.data_loader_tools import get_data_df
+from feature_selection_benchmark.data_loader_tools import load_data_df
 from reverse_feature_selection.reverse_rf_random import select_feature_subset
 
 
@@ -116,7 +116,7 @@ def main():
                 "shuffle_seed": shuffle_seed,
             }
             # load data
-            data_df = get_data_df(meta_data_dict)
+            data_df = load_data_df(meta_data_dict)
             print("number of samples", data_df.shape[0], "number of features", data_df.shape[1] - 1)
 
             # calculate raw feature subset data for reverse random forest
