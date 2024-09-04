@@ -20,6 +20,7 @@ from feature_selection_benchmark.data_loader_tools import (
     load_train_test_data_for_standardized_sample_size,
     shuffle,
     standardize_sample_size_of_hold_out_data,
+    standardize_sample_size_of_hold_out_data_single_df,
 )
 
 
@@ -31,13 +32,44 @@ class TestDataLoaderTools(unittest.TestCase):
         if os.path.exists("./test_experiment_id_data_df.csv"):
             os.remove("./test_experiment_id_data_df.csv")
 
-    def test_standardize_sample_size_of_hold_out_data(self):
+        if os.path.exists("./random_lognormal_test_(30, 2000)_df.csv"):
+            os.remove("./random_lognormal_test_(30, 2000)_df.csv")
+
+        if os.path.exists("./random_test_(30, 2000)_df.csv"):
+            os.remove("./random_test_(30, 2000)_df.csv")
+
+    def test_standardize_sample_size_of_hold_out_data_single_df(self):
         """Test standardizing the sample size of the hold out data."""
         data = pd.DataFrame(np.random.randn(20, 2000))  # 20 samples, 2000 features
         label = pd.Series([0] * 10 + [1] * 10)
         hold_out_data_df = convert_to_single_df(data, label)
-        balanced_df = standardize_sample_size_of_hold_out_data(hold_out_data_df, shuffle_seed=42)
+        balanced_df = standardize_sample_size_of_hold_out_data_single_df(hold_out_data_df, shuffle_seed=42)
         self.assertEqual(balanced_df["label"].value_counts().tolist(), [7, 7])
+
+    def test_standardize_sample_size_of_hold_out_data_single_df_no_shuffle_seed(self):
+        """Test standardizing the sample size of the hold out data without shuffling."""
+        data = pd.DataFrame(np.random.randn(20, 2000))
+        label = pd.Series([0] * 10 + [1] * 10)
+        hold_out_data_df = convert_to_single_df(data, label)
+        balanced_df = standardize_sample_size_of_hold_out_data_single_df(hold_out_data_df, shuffle_seed=None)
+        self.assertEqual(balanced_df["label"].value_counts().tolist(), [7, 7])
+
+    def test_standardize_sample_size_of_hold_out_data_shuffled_indices(self):
+        """Test standardizing the sample size of the hold out data with shuffled indices."""
+        data = pd.DataFrame(np.random.randn(20, 2000))
+        label = pd.Series([0] * 10 + [1] * 10)
+        hold_out_data_df = convert_to_single_df(data, label)
+        start_balanced_df, start_label = standardize_sample_size_of_hold_out_data(hold_out_data_df, shuffle_seed=None)
+        index_comparison = start_balanced_df.index
+        np.testing.assert_array_equal(index_comparison, start_label.index)
+        np.testing.assert_array_equal(index_comparison, start_balanced_df.index)
+        for seed in range(10):
+            balanced_df, balanced_label = standardize_sample_size_of_hold_out_data(hold_out_data_df, shuffle_seed=seed)
+            self.assertNotEqual(set(balanced_df.index), set(start_balanced_df.index))
+            self.assertNotEqual(set(balanced_label.index), set(start_label.index))
+            self.assertNotEqual(set(balanced_df.index), set(index_comparison))
+            np.testing.assert_array_equal(balanced_df.index, balanced_label.index)
+            index_comparison = balanced_df.index
 
     def test_convert_to_single_df(self):
         """Test converting data and labels into a single dataframe."""
@@ -86,15 +118,30 @@ class TestDataLoaderTools(unittest.TestCase):
         df = load_data_df(meta_data_dict)
         self.assertEqual(df.shape, (30, 2001))
 
-        meta_data_dict = {"data_name": "random", "experiment_id": "test", "shuffle_seed": 42}
+        meta_data_dict = {
+            "data_name": "random_lognormal",
+            "experiment_id": "random_lognormal_test",
+            "shuffle_seed": 42,
+            "path_for_random_noise": ".",
+            "data_shape_random_noise": (30, 2000),
+        }
+        df = load_data_df(meta_data_dict)
+        self.assertEqual(df.shape, (30, 2001))
+
+        meta_data_dict = {
+            "data_name": "random",
+            "experiment_id": "random_test",
+            "shuffle_seed": 42,
+            "path_for_random_noise": ".",
+            "data_shape_random_noise": (30, 2000),
+        }
         df = load_data_df(meta_data_dict)
         self.assertEqual(df.shape, (30, 2001))
 
         meta_data_dict = {"data_name": "colon", "experiment_id": "test_experiment_id", "shuffle_seed": None}
-        df = load_data_df(meta_data_dict, generate_random_noise=True, path_for_random_noise=".")
+        df = load_data_df(meta_data_dict)
         self.assertEqual(df.shape, (30, 2001))
 
 
 if __name__ == "__main__":
     unittest.main()
-
