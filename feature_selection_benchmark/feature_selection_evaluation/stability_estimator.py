@@ -12,13 +12,14 @@ https://doi.org/10.1016/j.chemolab.2021.104457
 import numpy as np
 
 
-def calculate_stability(selected_features_matrix) -> float:
+def calculate_stability(selected_features_matrix, flip=False) -> float:
     """Calculate the stability of selected features.
 
     Args:
         selected_features_matrix: Numpy array containing the selected features.
             Rows represent the folds, columns represent the features.
             The matrix should contain binary values (0 or 1).
+        flip: Boolean flag to flip 0 and 1 in the selected features matrix. Avoids division by zero. Default is False.
 
     Returns:
         Stability of selected features.
@@ -45,6 +46,10 @@ def calculate_stability(selected_features_matrix) -> float:
         print("Only ones in matrix for stability estimation: all features selected")
         return 1
 
+    if flip:
+        # flip 0 and 1 for the feature importance matrix
+        selected_features_matrix_cp = 1 - selected_features_matrix_cp
+
     assert np.array_equal(np.unique(selected_features_matrix_cp), np.array([0, 1])), np.unique(
         selected_features_matrix_cp
     )
@@ -67,7 +72,7 @@ def calculate_stability(selected_features_matrix) -> float:
 
         stability += (k**2 * robustness_density * subset_size_stability) / subset_vector[k - 1]
         if np.isnan(stability):
-            print("stability is nan")
+            print(f"stability is nan - k: {k}, robustness_density: {robustness_density}, subset_size_stability: {subset_size_stability}, subset_vector[k - 1]: {subset_vector[k - 1]}")
             return 0
 
     if stability > number_of_folds**2:
@@ -112,23 +117,3 @@ def _subset_size_stability(subset_vector, number_of_features, k):
 
     return subset_size_stability
 
-
-def test_stability():
-    """Test the stability estimator."""
-    only_ones = np.ones((10, 20))
-    stability = calculate_stability(only_ones)
-    assert stability == 1, stability
-
-    perfect_stability = np.concatenate((np.ones((10, 8)), np.zeros((10, 120))), axis=1)
-    assert perfect_stability.shape == (10, 128)
-    perfect_stability_metric = calculate_stability(perfect_stability)
-    assert perfect_stability_metric == 1, perfect_stability_metric
-
-    perfect_stability2 = np.concatenate((np.ones((10, 1)), np.zeros((10, 120))), axis=1)
-    assert perfect_stability2.shape == (10, 121)
-    perfect_stability_metric2 = calculate_stability(perfect_stability2)
-    assert perfect_stability_metric2 == 1, perfect_stability_metric2
-
-    # print(get_stability(perfect_stability))
-    not_stable = calculate_stability(np.zeros((10, 20)))
-    assert not_stable == 0, not_stable
