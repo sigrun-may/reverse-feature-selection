@@ -27,7 +27,7 @@ def main():
 
     # iterate over all files in the directory
     for file in result_base_path.iterdir():
-        if "result_dict" not in file.name:
+        if "result_dict" not in file.name and "random_noise" not in file.name:
             continue
 
         # extract the experiment id from the file name
@@ -73,6 +73,10 @@ def main():
             "verbose_optuna": True,
             "n_trials_optuna": 50,
         }
+
+        if "random_noise" in file.name:
+            meta_data_dict["data_shape_random_noise"] = (62, 2000)
+            meta_data_dict["path_for_random_noise"] = "/home/sigrun/PycharmProjects/reverse_feature_selection/data/random_noise"
 
         # load data
         data_df = load_data_df(meta_data_dict)
