@@ -159,11 +159,29 @@ def load_train_test_data_for_standardized_sample_size(meta_data_dict: dict) -> t
     Returns:
         Tuple containing train data and hold out set as test data.
     """
-    # generate function from string
-    load_data_function = globals()[f"load_{meta_data_dict['data_name']}"]
+    if "random" in meta_data_dict["data_name"]:
+        # print working directory
+        print(Path.cwd())
 
-    # standardize sample size to balanced data
-    label, data = load_data_function()
+        path_for_random_noise = "../../data/random_noise/"
+        # path_for_random_noise = meta_data_dict["path_for_random_noise"]
+        # try to load the artificial data if it exists
+        data_df_path = Path(
+            f"{path_for_random_noise}/{meta_data_dict['experiment_id']}_{meta_data_dict['data_shape_random_noise']}_df.csv"
+        )
+        if data_df_path.exists():
+            data_df = pd.read_csv(data_df_path)
+        else:
+            raise FileNotFoundError(f"Data file {data_df_path} not found.")
+
+        data = data_df.iloc[:, 1:]
+        label = data_df["label"]
+    else:
+        # generate function from string
+        load_data_function = globals()[f"load_{meta_data_dict['data_name']}"]
+
+        # standardize sample size to balanced data
+        label, data = load_data_function()
 
     # shuffle data before selecting samples, if shuffle_seed is set
     data, label = shuffle(data, label, meta_data_dict["shuffle_seed"])
@@ -252,7 +270,7 @@ def load_data_df(meta_data_dict: dict) -> pd.DataFrame:
         # standardize sample size to balanced data of 30 samples
         class_indices_0, _ = get_indices_for_class(data_df["label"], 0, 15)
         class_indices_1, _ = get_indices_for_class(data_df["label"], 1, 15)
-        data_df = data_df.iloc[class_indices_0 + class_indices_1]
+        data_df =  convert_to_single_df(data_df.iloc[class_indices_0 + class_indices_1, 1:], data_df.iloc[class_indices_0 + class_indices_1, 0])
     else:
         # load data
         assert meta_data_dict["data_name"] in ["colon", "prostate", "leukemia_big"], "Invalid data name."
