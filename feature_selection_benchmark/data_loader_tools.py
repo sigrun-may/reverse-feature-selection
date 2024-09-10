@@ -96,9 +96,10 @@ def get_indices_for_class(label_series: pd.Series, class_label: int, max_samples
     assert class_label in label_series.unique(), f"Class label {class_label} not found in label series."
 
     # check if max_samples is smaller than the number of samples for the class label
-    assert (
-        max_samples <= label_series[label_series == class_label].shape[0]
-    ), f"Number of samples {label_series[label_series == class_label].shape[0]} for class label {class_label} is smaller than max_samples {max_samples}."
+    assert max_samples <= label_series[label_series == class_label].shape[0], (
+        f"Number of samples {label_series[label_series == class_label].shape[0]} for class label {class_label} "
+        f"is smaller than max_samples {max_samples}."
+    )
 
     train_indices = []
     test_indices = []
@@ -160,9 +161,6 @@ def load_train_test_data_for_standardized_sample_size(meta_data_dict: dict) -> t
         Tuple containing train data and hold out set as test data.
     """
     if "random" in meta_data_dict["data_name"]:
-        # print working directory
-        print(Path.cwd())
-
         path_for_random_noise = "../../data/random_noise/"
         # path_for_random_noise = meta_data_dict["path_for_random_noise"]
         # try to load the artificial data if it exists
@@ -270,7 +268,9 @@ def load_data_df(meta_data_dict: dict) -> pd.DataFrame:
         # standardize sample size to balanced data of 30 samples
         class_indices_0, _ = get_indices_for_class(data_df["label"], 0, 15)
         class_indices_1, _ = get_indices_for_class(data_df["label"], 1, 15)
-        data_df =  convert_to_single_df(data_df.iloc[class_indices_0 + class_indices_1, 1:], data_df.iloc[class_indices_0 + class_indices_1, 0])
+        data_df = convert_to_single_df(
+            data_df.iloc[class_indices_0 + class_indices_1, 1:], data_df.iloc[class_indices_0 + class_indices_1, 0]
+        )
     else:
         # load data
         assert meta_data_dict["data_name"] in ["colon", "prostate", "leukemia_big"], "Invalid data name."
