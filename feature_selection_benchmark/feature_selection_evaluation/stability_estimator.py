@@ -72,7 +72,10 @@ def calculate_stability(selected_features_matrix, flip=False) -> float:
 
         stability += (k**2 * robustness_density * subset_size_stability) / subset_vector[k - 1]
         if np.isnan(stability):
-            print(f"stability is nan - k: {k}, robustness_density: {robustness_density}, subset_size_stability: {subset_size_stability}, subset_vector[k - 1]: {subset_vector[k - 1]}")
+            print(
+                f"stability is nan - k: {k}, robustness_density: {robustness_density}, "
+                f"subset_size_stability: {subset_size_stability}, subset_vector[k - 1]: {subset_vector[k - 1]}"
+            )
             return 0
 
     if stability > number_of_folds**2:
@@ -116,4 +119,3 @@ def _subset_size_stability(subset_vector, number_of_features, k):
         raise ValueError("Incorrect subset vector")
 
     return subset_size_stability
-
