@@ -145,7 +145,7 @@ def sklearn_random_forest(data_df: pd.DataFrame, train_indices: np.ndarray, meta
     study = optuna.create_study(
         # storage = "sqlite:///optuna_test.db",
         # load_if_exists = True,
-        direction="minimize",
+        direction="maximize",
         sampler=TPESampler(
             multivariate=True,
             seed=42,
