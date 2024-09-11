@@ -32,7 +32,7 @@ class TestRepeatedExperimentsReverseRF(unittest.TestCase):
     @patch("feature_selection_benchmark.repeated_experiments_reverse_rf.Path.mkdir")
     @patch(
         "feature_selection_benchmark.repeated_experiments_reverse_rf.sys.argv",
-        new=["script_name", "/home/sigrun/PycharmProjects/reverse_feature_selection/results"],
+        new=["script_name", "../results"],
     )
     def test_main(self, mock_mkdir, mock_load_data_df, mock_cross_validate, mock_pickle_dump):
         """Test main function."""
