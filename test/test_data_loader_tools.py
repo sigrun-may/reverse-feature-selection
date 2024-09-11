@@ -6,9 +6,9 @@
 
 """Data loader tools test script."""
 
+import os
 import unittest
 from unittest.mock import patch
-import os
 
 import numpy as np
 import pandas as pd
@@ -75,10 +75,10 @@ class TestDataLoaderTools(unittest.TestCase):
         """Test converting data and labels into a single dataframe."""
         x = pd.DataFrame(np.random.randn(30, 2000))
         y = pd.Series([0] * 15 + [1] * 15)
-        df = convert_to_single_df(x, y)
-        self.assertEqual(df.shape, (30, 2001))
-        self.assertEqual(df.columns[0], "label")
-        self.assertTrue(all(df["label"].isin([0, 1])))
+        test_df = convert_to_single_df(x, y)
+        self.assertEqual(test_df.shape, (30, 2001))
+        self.assertEqual(test_df.columns[0], "label")
+        self.assertTrue(all(test_df["label"].isin([0, 1])))
 
     def test_get_indices_for_class(self):
         """Test getting train and test indices for a specific class label."""
@@ -115,8 +115,8 @@ class TestDataLoaderTools(unittest.TestCase):
         mock_read_csv.return_value = pd.DataFrame(np.random.randn(30, 2001))
 
         meta_data_dict = {"data_name": "colon", "experiment_id": "test", "shuffle_seed": 42}
-        df = load_data_df(meta_data_dict)
-        self.assertEqual(df.shape, (30, 2001))
+        test_df = load_data_df(meta_data_dict)
+        self.assertEqual(test_df.shape, (30, 2001))
 
         meta_data_dict = {
             "data_name": "random_lognormal",
@@ -125,8 +125,8 @@ class TestDataLoaderTools(unittest.TestCase):
             "path_for_random_noise": ".",
             "data_shape_random_noise": (30, 2000),
         }
-        df = load_data_df(meta_data_dict)
-        self.assertEqual(df.shape, (30, 2001))
+        test_df = load_data_df(meta_data_dict)
+        self.assertEqual(test_df.shape, (30, 2001))
 
         meta_data_dict = {
             "data_name": "random",
@@ -135,12 +135,12 @@ class TestDataLoaderTools(unittest.TestCase):
             "path_for_random_noise": ".",
             "data_shape_random_noise": (30, 2000),
         }
-        df = load_data_df(meta_data_dict)
-        self.assertEqual(df.shape, (30, 2001))
+        test_df = load_data_df(meta_data_dict)
+        self.assertEqual(test_df.shape, (30, 2001))
 
         meta_data_dict = {"data_name": "colon", "experiment_id": "test_experiment_id", "shuffle_seed": None}
-        df = load_data_df(meta_data_dict)
-        self.assertEqual(df.shape, (30, 2001))
+        test_df = load_data_df(meta_data_dict)
+        self.assertEqual(test_df.shape, (30, 2001))
 
 
 if __name__ == "__main__":
