@@ -28,7 +28,7 @@ def main():
 
     # iterate over all files in the directory
     for file in result_base_path.iterdir():
-        if "result_dict" not in file.name and "random_noise" not in file.name:
+        if "result_dict" not in file.name:
             continue
 
         # extract the experiment id from the file name
