@@ -13,7 +13,8 @@ import sys
 from pathlib import Path
 
 import git
-from standard_rf import calculate_feature_importance
+# from standard_rf import calculate_feature_importance
+from ranger_rf import calculate_feature_importance
 
 from feature_selection_benchmark import cross_validation
 from feature_selection_benchmark.data_loader_tools import load_data_df
@@ -73,10 +74,9 @@ def main():
             "verbose_optuna": True,
             "n_trials_optuna": 50,
         }
-
         if "random_noise" in file.name:
             meta_data_dict["data_shape_random_noise"] = (62, 2000)
-            meta_data_dict["path_for_random_noise"] = "/home/sigrun/PycharmProjects/reverse_feature_selection/data/random_noise"
+            meta_data_dict["path_for_random_noise"] = "../data/random_noise"
 
         # load data
         data_df = load_data_df(meta_data_dict)
@@ -89,7 +89,7 @@ def main():
         result_dict["standard_random_forest_meta_data"] = meta_data_dict
 
         # save results
-        result_dict_path = Path(f"{result_base_path}/{meta_data_dict['experiment_id']}_result_dict.pkl")
+        result_dict_path = Path(f"{result_base_path}/{meta_data_dict['experiment_id']}_ranger_result_dict.pkl")
         with open(result_dict_path, "wb") as result_file:
             pickle.dump(result_dict, result_file, protocol=pickle.HIGHEST_PROTOCOL)
 
