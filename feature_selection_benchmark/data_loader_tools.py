@@ -240,7 +240,8 @@ def load_data_df(meta_data_dict: dict) -> pd.DataFrame:
 
         # try to load the artificial data if it exists
         data_df_path = Path(
-            f"{meta_data_dict['path_for_random_noise']}/{meta_data_dict['experiment_id']}_{meta_data_dict['data_shape_random_noise']}_df.csv"
+            f"{meta_data_dict['path_for_random_noise']}/{meta_data_dict['experiment_id']}_"
+            f"{meta_data_dict['data_shape_random_noise']}_df.csv"
         )
         if data_df_path.exists():
             data_df = pd.read_csv(data_df_path)
@@ -277,4 +278,3 @@ def load_data_df(meta_data_dict: dict) -> pd.DataFrame:
         data_df, _ = load_train_test_data_for_standardized_sample_size(meta_data_dict)
         assert data_df.shape[0] == 30, f"Number of samples is not 30: {data_df.shape[0]}"
     return data_df
-    # return pd.read_csv(f"../../data/artificial_biomarker_data_2.csv").iloc[:, list(range(10)) + list(range(-7, 0))]
