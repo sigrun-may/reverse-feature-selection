@@ -39,7 +39,7 @@ def optimized_ranger_random_forest_importance(
     def optuna_objective(trial):
         params = {
             "max_depth": trial.suggest_int("max_depth", 1, 15),
-            "num_trees": trial.suggest_int("num_trees", 20, 21),
+            "num_trees": trial.suggest_int("num_trees", 20, 2000),
             # "mtry": trial.suggest_int("mtry", 1, data_df.shape[1] - 1),
             "mtry": trial.suggest_int("mtry", 1, 20),
             "min_node_size": trial.suggest_int("min_node_size", 2, 5),
@@ -130,7 +130,7 @@ def sklearn_random_forest(data_df: pd.DataFrame, train_indices: np.ndarray, meta
         rf_clf = RandomForestClassifier(
             oob_score=roc_auc_score,
             max_depth=trial.suggest_int("max_depth", 1, 15),
-            n_estimators=trial.suggest_int("n_estimators", 20, 21),
+            n_estimators=trial.suggest_int("n_estimators", 20, 2000),
             max_features=trial.suggest_int("max_features", 1, data_df.shape[1] - 1),
             min_samples_leaf=trial.suggest_int("min_samples_leaf", 2, math.floor(len(train_indices) / 2)),
             min_samples_split=trial.suggest_int("min_samples_split", 2, 5),
