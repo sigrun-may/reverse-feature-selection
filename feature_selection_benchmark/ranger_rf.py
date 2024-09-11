@@ -5,7 +5,7 @@
 # which is available at https://opensource.org/licenses/MIT
 
 """Standard embedded feature selection with sklearn random forest."""
-
+import concurrent.futures
 import math
 import warnings
 
@@ -16,14 +16,14 @@ import rpy2.robjects as ro
 from optuna.samplers import TPESampler
 from rpy2.robjects import pandas2ri
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import brier_score_loss, roc_auc_score
+from sklearn.metrics import roc_auc_score
 
 warnings.filterwarnings("ignore")
 
 
 def optimized_ranger_random_forest_importance(
     data_df: pd.DataFrame, train_indices: np.ndarray, meta_data: dict, importance_type: str
-) -> np.ndarray:
+) -> dict:
     """Calculate importance with the R ranger package with optimized hyperparameters.
 
     Args:
@@ -71,7 +71,7 @@ def optimized_ranger_random_forest_importance(
     feature_importances, _ =  ranger_random_forest(
         data_df, train_indices, hyperparameters, importance_type
     )
-    return feature_importances
+    return {importance_type: feature_importances}
 
 
 def calculate_feature_importance(data_df: pd.DataFrame, train_indices: np.ndarray, meta_data: dict) -> dict:
@@ -86,19 +86,31 @@ def calculate_feature_importance(data_df: pd.DataFrame, train_indices: np.ndarra
         The feature importances, the summed shap values, the permutation importance, the out-of-bag (OOB) score
         and the best hyperparameter values.
     """
-    # TODO: uncomment the following line to use sklearn random forest
+    # parallelize hyperparameter optimizations
+    with concurrent.futures.ProcessPoolExecutor(max_workers=3) as executor:
+        # Submit methods with their specific arguments
+        future_sklearn = executor.submit(sklearn_random_forest, data_df, train_indices, meta_data)
+        future_permutation = executor.submit(optimized_ranger_random_forest_importance, data_df, train_indices, meta_data, "permutation")
+        future_gini_corrected = executor.submit(optimized_ranger_random_forest_importance, data_df, train_indices, meta_data, "impurity_corrected")
+
+        # Collect results as they complete
+        result_dict = {}
+        for future in concurrent.futures.as_completed([future_sklearn, future_permutation, future_gini_corrected]):
+            # merge dictionaries
+            result_dict.update(future.result())
+
     # result_dict = sklearn_random_forest(data_df, train_indices, meta_data)
-    result_dict = {}
-    # log the importance
-    print("Ranger permutation importance")
-    result_dict["permutation_importance"] = optimized_ranger_random_forest_importance(
-        data_df, train_indices, meta_data, "permutation"
-    )
-    # log the importance
-    print("Ranger impurity_corrected importance ")
-    result_dict["impurity_corrected"] = optimized_ranger_random_forest_importance(
-        data_df, train_indices, meta_data, "impurity_corrected"
-    )
+    # # log the importance
+    # print("Ranger permutation importance")
+    # result_dict["permutation_importance"] = optimized_ranger_random_forest_importance(
+    #     data_df, train_indices, meta_data, "permutation"
+    # )
+    # # log the importance
+    # print("Ranger impurity_corrected importance ")
+    # result_dict["impurity_corrected"] = optimized_ranger_random_forest_importance(
+    #     data_df, train_indices, meta_data, "impurity_corrected"
+    # )
+    print(result_dict.keys())
     return result_dict
 
 
@@ -116,7 +128,7 @@ def sklearn_random_forest(data_df: pd.DataFrame, train_indices: np.ndarray, meta
     """
     def optuna_objective(trial):
         rf_clf = RandomForestClassifier(
-            oob_score=brier_score_loss,
+            oob_score=roc_auc_score,
             max_depth=trial.suggest_int("max_depth", 1, 15),
             n_estimators=trial.suggest_int("n_estimators", 20, 21),
             max_features=trial.suggest_int("max_features", 1, data_df.shape[1] - 1),
@@ -207,6 +219,7 @@ def ranger_random_forest(
                                  num.trees = num_trees,
                                  seed = seed_random_forest,
                                  oob.error = TRUE,
+                                 num.threads = 1,
                                 )
       # Retrieve the OOB error for debugging
       oob_error <- rf_model$prediction.error
