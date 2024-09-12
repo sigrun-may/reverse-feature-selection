@@ -67,10 +67,11 @@ def optimized_ranger_random_forest_importance(
     hyperparameters = study.best_params
     hyperparameters["seed"] = meta_data["random_state"]
 
-    feature_importances, _ =  ranger_random_forest(
+    feature_importances, oob_score =  ranger_random_forest(
         data_df, train_indices, hyperparameters, importance_type
     )
-    return {importance_type: feature_importances}
+    return {importance_type: feature_importances, f"best_params_ranger_{importance_type}": hyperparameters,
+            f"oob_score_{importance_type}": oob_score}
 
 
 def calculate_feature_importance(data_df: pd.DataFrame, train_indices: np.ndarray, meta_data: dict) -> dict:
