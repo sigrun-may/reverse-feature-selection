@@ -42,10 +42,15 @@ def optimized_ranger_random_forest_importance(
             "num_trees": trial.suggest_int("num_trees", 20, meta_data["max_trees_random_forest"]),
             "mtry": trial.suggest_int("mtry", 1, data_df.shape[1] - 1),
             "min_node_size": trial.suggest_int("min_node_size", 2, 5),
+            "regularization_factor": trial.suggest_float("regularization_factor", 0.01, 0.9),
             "seed": meta_data["random_state"],
         }
-        _, oob_score = ranger_random_forest(data_df, train_indices, params, importance_type)
-        return oob_score
+        _, oob = ranger_random_forest(data_df, train_indices, params, importance_type)
+
+        # stop HPO if OOB score (proportion of misclassified observations) is already 0.0
+        if math.isclose(oob, 0.0, rel_tol=1e-5):
+            trial.study.stop()
+        return oob
 
     study = optuna.create_study(
         # storage = "sqlite:///optuna_test.db",
@@ -87,15 +92,15 @@ def calculate_feature_importance(data_df: pd.DataFrame, train_indices: np.ndarra
         and the best hyperparameter values.
     """
     # parallelize hyperparameter optimizations
-    with concurrent.futures.ProcessPoolExecutor(max_workers=3) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=2) as executor:
         # Submit methods with their specific arguments
         future_sklearn = executor.submit(sklearn_random_forest, data_df, train_indices, meta_data)
         future_permutation = executor.submit(optimized_ranger_random_forest_importance, data_df, train_indices, meta_data, "permutation")
-        future_gini_corrected = executor.submit(optimized_ranger_random_forest_importance, data_df, train_indices, meta_data, "impurity_corrected")
+        # future_gini_corrected = executor.submit(optimized_ranger_random_forest_importance, data_df, train_indices, meta_data, "impurity_corrected")
 
         # Collect results as they complete
         result_dict = {}
-        for future in concurrent.futures.as_completed([future_sklearn, future_permutation, future_gini_corrected]):
+        for future in concurrent.futures.as_completed([future_sklearn, future_permutation]):
             # merge dictionaries
             result_dict.update(future.result())
 
@@ -104,11 +109,6 @@ def calculate_feature_importance(data_df: pd.DataFrame, train_indices: np.ndarra
     # print("Ranger permutation importance")
     # result_dict["permutation_importance"] = optimized_ranger_random_forest_importance(
     #     data_df, train_indices, meta_data, "permutation"
-    # )
-    # # log the importance
-    # print("Ranger impurity_corrected importance ")
-    # result_dict["impurity_corrected"] = optimized_ranger_random_forest_importance(
-    #     data_df, train_indices, meta_data, "impurity_corrected"
     # )
     print(result_dict.keys())
     return result_dict
@@ -134,13 +134,17 @@ def sklearn_random_forest(data_df: pd.DataFrame, train_indices: np.ndarray, meta
             max_features=trial.suggest_int("max_features", 1, data_df.shape[1] - 1),
             min_samples_leaf=trial.suggest_int("min_samples_leaf", 2, math.floor(len(train_indices) / 2)),
             min_samples_split=trial.suggest_int("min_samples_split", 2, 5),
-            min_impurity_decrease=trial.suggest_float("min_impurity_decrease", 0.1, 0.5),
+            min_impurity_decrease=trial.suggest_float("min_impurity_decrease", 0.01, 0.9),
             random_state=meta_data["random_state"],
             class_weight="balanced_subsample",
             n_jobs=-1,
         )
         rf_clf.fit(data_df.iloc[train_indices, 1:], data_df.loc[train_indices, "label"])
         score = rf_clf.oob_score_
+
+        # stop HPO if OOB score (AUC) is already 1.0
+        if math.isclose(score, 1.0, rel_tol=1e-5):
+            trial.study.stop()
         return score
 
     study = optuna.create_study(
@@ -204,28 +208,34 @@ def ranger_random_forest(
     library(ranger)
 
     # train a ranger model with optimized hyperparameters    
-    train_ranger <- function(data, label, max_depth, num_trees, mtry, min_node_size, seed_random_forest, importance_type){
+    train_ranger <- function(data, label, max_depth, num_trees, mtry, min_node_size, seed_random_forest, 
+                             importance_type, regularization_factor){
 
-      # # ensure label is a factor
-      # data[[label]] <- as.factor(data[[label]])
+      # ensure label is a factor
+      data[[label]] <- as.factor(data[[label]])
 
       # train the ranger model with optimized parameters
       rf_model <- ranger::ranger(formula = as.formula(paste(label, "~ .")), 
-                                 data = data, 
+                                 data = data,
                                  importance = importance_type,
+                                 scale.permutation.importance = TRUE,
+                                 regularization.factor = regularization_factor,
+                                 regularization.usedepth = TRUE,
+                                 replace = FALSE,
+                                 sample.fraction = 0.896551724137931, # 26 from 29 samples
                                  min.node.size = min_node_size,
                                  mtry = mtry,
                                  max.depth = max_depth,
                                  num.trees = num_trees,
                                  seed = seed_random_forest,
                                  oob.error = TRUE,
-                                 num.threads = 1,
                                 )
       # Retrieve the OOB error for debugging
       oob_error <- rf_model$prediction.error
 
       # get permutation importance
       importance <- rf_model$variable.importance
+      
       result <- c(oob_error, importance)
       return(result)
     }
@@ -242,8 +252,9 @@ def ranger_random_forest(
     # call the R function from Python
     # function(data, label, max_depth, num_trees, mtry, min_node_size, seed_random_forest)
     result_vector = train_ranger(
-        pandas2ri.py2rpy(data), "label", hyperparameters["max_depth"], hyperparameters["num_trees"], hyperparameters["mtry"],
-        hyperparameters["min_node_size"], hyperparameters["seed"], importance_type
+        pandas2ri.py2rpy(data), "label", hyperparameters["max_depth"], hyperparameters["num_trees"],
+        hyperparameters["mtry"], hyperparameters["min_node_size"], hyperparameters["seed"], importance_type,
+        hyperparameters["regularization_factor"]
     )
     # # check if the result_vector is an array of floats
     # assert isinstance(result_vector, np.ndarray), "Result vector is not a numpy array."
