@@ -68,7 +68,7 @@ def define_random_seeds() -> list:
     list_of_seeds = [random_seeds_0, random_seeds_1, random_seeds_2]
 
     # flatten list of seeds to check if the random seeds are equal
-    flattened_lists_of_seeds = sum(list_of_seeds, [])
+    flattened_lists_of_seeds = [seed for sublist in list_of_seeds for seed in sublist]
     assert len(flattened_lists_of_seeds) == 90, "Number of random seeds is not equal to 90."
     if len(set(flattened_lists_of_seeds)) != 90:
         # find equal elements within the list
