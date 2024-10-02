@@ -36,6 +36,7 @@ def optimized_ranger_random_forest_importance(
     Returns:
         The permutation importances.
     """
+
     def optuna_objective(trial):
         params = {
             "max_depth": trial.suggest_int("max_depth", 1, 15),
@@ -72,11 +73,12 @@ def optimized_ranger_random_forest_importance(
     hyperparameters = study.best_params
     hyperparameters["seed"] = meta_data["random_state"]
 
-    feature_importances, oob_score =  ranger_random_forest(
-        data_df, train_indices, hyperparameters, importance_type
-    )
-    return {importance_type: feature_importances, f"best_params_ranger_{importance_type}": hyperparameters,
-            f"oob_score_{importance_type}": oob_score}
+    feature_importances, oob_score = ranger_random_forest(data_df, train_indices, hyperparameters, importance_type)
+    return {
+        importance_type: feature_importances,
+        f"best_params_ranger_{importance_type}": hyperparameters,
+        f"oob_score_{importance_type}": oob_score,
+    }
 
 
 def calculate_feature_importance(data_df: pd.DataFrame, train_indices: np.ndarray, meta_data: dict) -> dict:
@@ -95,8 +97,11 @@ def calculate_feature_importance(data_df: pd.DataFrame, train_indices: np.ndarra
     with concurrent.futures.ProcessPoolExecutor(max_workers=2) as executor:
         # Submit methods with their specific arguments
         future_sklearn = executor.submit(sklearn_random_forest, data_df, train_indices, meta_data)
-        future_permutation = executor.submit(optimized_ranger_random_forest_importance, data_df, train_indices, meta_data, "permutation")
-        # future_gini_corrected = executor.submit(optimized_ranger_random_forest_importance, data_df, train_indices, meta_data, "impurity_corrected")
+        future_permutation = executor.submit(
+            optimized_ranger_random_forest_importance, data_df, train_indices, meta_data, "permutation"
+        )
+        # future_gini_corrected = executor.submit(optimized_ranger_random_forest_importance, data_df, train_indices,
+        # meta_data, "impurity_corrected")
 
         # Collect results as they complete
         result_dict = {}
@@ -126,6 +131,7 @@ def sklearn_random_forest(data_df: pd.DataFrame, train_indices: np.ndarray, meta
         The feature importances, the summed shap values, the permutation importance, the out-of-bag (OOB) score
         and the best hyperparameter values.
     """
+
     def optuna_objective(trial):
         rf_clf = RandomForestClassifier(
             oob_score=roc_auc_score,
@@ -235,7 +241,7 @@ def ranger_random_forest(
 
       # get permutation importance
       importance <- rf_model$variable.importance
-      
+
       result <- c(oob_error, importance)
       return(result)
     }
@@ -252,9 +258,15 @@ def ranger_random_forest(
     # call the R function from Python
     # function(data, label, max_depth, num_trees, mtry, min_node_size, seed_random_forest)
     result_vector = train_ranger(
-        pandas2ri.py2rpy(data), "label", hyperparameters["max_depth"], hyperparameters["num_trees"],
-        hyperparameters["mtry"], hyperparameters["min_node_size"], hyperparameters["seed"], importance_type,
-        hyperparameters["regularization_factor"]
+        pandas2ri.py2rpy(data),
+        "label",
+        hyperparameters["max_depth"],
+        hyperparameters["num_trees"],
+        hyperparameters["mtry"],
+        hyperparameters["min_node_size"],
+        hyperparameters["seed"],
+        importance_type,
+        hyperparameters["regularization_factor"],
     )
     # # check if the result_vector is an array of floats
     # assert isinstance(result_vector, np.ndarray), "Result vector is not a numpy array."
