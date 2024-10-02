@@ -1,0 +1,143 @@
+# Copyright (c) 2024 Sigrun May,
+# Ostfalia Hochschule für angewandte Wissenschaften
+#
+# This software is distributed under the terms of the MIT license
+# which is available at https://opensource.org/licenses/MIT
+
+"""Feature selection evaluation test script."""
+
+import numpy as np
+import pandas as pd
+import pytest
+from sklearn.datasets import make_classification
+from sklearn.metrics import accuracy_score, average_precision_score, roc_auc_score
+
+from feature_selection_benchmark.feature_selection_evaluation.evaluate_feature_selection import (
+    calculate_performance,
+    calculate_performance_metrics_on_hold_out_data,
+    calculate_performance_metrics_on_shuffled_hold_out_subset,
+    train_and_predict,
+)
+
+# Create a random number generator
+rng = np.random.default_rng()
+
+
+# Mock data for testing
+def create_mock_data(n_samples=50, n_features=200):
+    x, y = make_classification(n_samples=n_samples, n_features=n_features, random_state=42)
+    data = pd.DataFrame(x)
+    data.insert(0, "label", y)
+    return data
+
+
+# Mock feature importance
+def create_mock_feature_importance():
+    return rng.choice([0, 1], size=(200,), p=[0.7, 0.3])
+
+
+@pytest.fixture
+def mock_data():
+    return create_mock_data()
+
+
+@pytest.fixture
+def mock_train_data():
+    mock = create_mock_data()
+    return mock.iloc[:30]
+
+
+@pytest.fixture
+def mock_test_data():
+    mock = create_mock_data()
+    return mock.iloc[30:]
+
+
+@pytest.fixture
+def mock_feature_importance():
+    return create_mock_feature_importance()
+
+
+@pytest.fixture
+def mock_input_result_dict():
+    return {
+        "reverse_random_forest": [
+            {"feature_subset_selection": rng.choice([0, 1], size=(200,), p=[0.7, 0.3])} for _ in range(50)
+        ],
+        "standard_random_forest": [{"method1": rng.choice([0, 1], size=(200,), p=[0.7, 0.3])} for _ in range(50)],
+        "evaluation": {},
+    }
+
+
+def test_train_and_predict(mock_data, mock_feature_importance):
+    train_data = mock_data.iloc[:20]
+    test_data = mock_data.iloc[20:]
+    seed = 42
+
+    predicted_y, predicted_proba_y, y_test = train_and_predict(train_data, test_data, mock_feature_importance, seed)
+
+    assert len(predicted_y) == len(y_test)
+    assert len(predicted_proba_y) == len(y_test)
+    assert predicted_proba_y.shape[1] == 2  # Check if probabilities for both classes are returned
+
+
+def test_calculate_performance():
+    y_true = np.array([0, 1, 0, 1])
+    y_predict = np.array([0, 1, 0, 0])
+    y_predict_proba = np.array([[0.8, 0.2], [0.1, 0.9], [0.7, 0.3], [0.4, 0.6]])
+
+    performance_metrics = calculate_performance(y_predict, y_predict_proba, y_true)
+
+    assert "Average Precision Score" in performance_metrics
+    assert "AUC" in performance_metrics
+    assert "Accuracy" in performance_metrics
+
+    assert performance_metrics["Average Precision Score"] == average_precision_score(y_true, y_predict)
+    assert performance_metrics["AUC"] == roc_auc_score(y_true, y_predict_proba[:, 1])
+    assert performance_metrics["Accuracy"] == accuracy_score(y_true, y_predict)
+
+
+def test_all_zero_feature_importance(mock_data):
+    train_data = mock_data.iloc[:20]
+    test_data = mock_data.iloc[20:]
+    feature_importance = np.zeros(200)
+    with pytest.raises(AssertionError):
+        train_and_predict(train_data, test_data, feature_importance, 42)
+
+
+def test_consistent_random_state(mock_data, mock_feature_importance):
+    train_data = mock_data.iloc[:20]
+    test_data = mock_data.iloc[20:]
+    seed = 42
+    y_pred1, y_proba1, y_true1 = train_and_predict(train_data, test_data, mock_feature_importance, seed)
+    y_pred2, y_proba2, y_true2 = train_and_predict(train_data, test_data, mock_feature_importance, seed)
+    assert np.array_equal(y_pred1, y_pred2)
+    assert np.array_equal(y_proba1, y_proba2)
+
+
+def test_calculate_performance_metrics_on_hold_out_data(mock_train_data, mock_test_data, mock_feature_importance):
+    seed = 42
+    shuffle_seed = 1
+    performance_metrics = calculate_performance_metrics_on_hold_out_data(
+        mock_feature_importance, shuffle_seed, mock_test_data, seed, mock_train_data
+    )
+    assert isinstance(performance_metrics, dict)
+    assert "Accuracy" in performance_metrics
+    assert "AUC" in performance_metrics
+    assert "Average Precision Score" in performance_metrics
+
+
+def test_calculate_performance_metrics_on_shuffled_hold_out_subset(
+    mock_train_data, mock_test_data, mock_feature_importance
+):
+    seed = 42
+    performance_metrics_list = calculate_performance_metrics_on_shuffled_hold_out_subset(
+        mock_train_data, mock_test_data, mock_feature_importance, seed
+    )
+    assert isinstance(performance_metrics_list, list)
+    assert len(performance_metrics_list) == 16
+    for metrics in performance_metrics_list:
+        assert isinstance(metrics, dict)
+        assert "Accuracy" in metrics
+        assert "AUC" in metrics
+        assert "Average Precision Score" in metrics
