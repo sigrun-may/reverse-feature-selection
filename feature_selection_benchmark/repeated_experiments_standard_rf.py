@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 
 import git
+
 # from standard_rf import calculate_feature_importance
 from ranger_rf import calculate_feature_importance
 
@@ -90,7 +91,7 @@ def main():
         result_dict["standard_random_forest_meta_data"] = meta_data_dict
 
         # save results
-        result_dict_path = Path(f"{result_base_path}/{meta_data_dict['experiment_id']}_3HP_result_dict.pkl")
+        result_dict_path = Path(f"{result_base_path}/{meta_data_dict['experiment_id']}_2HPreg_result_dict.pkl")
         with open(result_dict_path, "wb") as result_file:
             pickle.dump(result_dict, result_file, protocol=pickle.HIGHEST_PROTOCOL)
 
