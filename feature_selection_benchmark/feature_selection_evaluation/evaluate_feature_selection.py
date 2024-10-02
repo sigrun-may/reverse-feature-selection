@@ -15,6 +15,7 @@ import joblib
 import numpy as np
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import plotly.io as pio
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
@@ -22,6 +23,7 @@ from sklearn.metrics import (
     average_precision_score,
     roc_auc_score,
 )
+from sklearn.tree import DecisionTreeClassifier
 
 from feature_selection_benchmark.data_loader_tools import (
     load_train_test_data_for_standardized_sample_size,
@@ -68,15 +70,16 @@ def train_and_predict(
     assert feature_subset_x_test.shape == (test_data.shape[0], np.count_nonzero(feature_importance))
 
     # train and evaluate the model
-    clf = RandomForestClassifier(
-        n_estimators=20,  # Fewer trees to avoid overfitting
-        max_features=None,  # Consider all selected features at each split
-        max_depth=4,  # Limit the depth of the trees
-        min_samples_leaf=2,  # More samples needed at each leaf node
-        bootstrap=False,  # Use the whole dataset for each tree
-        class_weight="balanced",  # Adjust weights for class imbalance if any
-        random_state=seed,  # Set random seed for reproducibility
-    )
+    # clf = RandomForestClassifier(
+    #     n_estimators=20,  # Fewer trees to avoid overfitting
+    #     max_features=None,  # Consider all selected features at each split
+    #     max_depth=4,  # Limit the depth of the trees
+    #     min_samples_leaf=2,  # More samples needed at each leaf node
+    #     bootstrap=False,  # Use the whole dataset for each tree
+    #     class_weight="balanced",  # Adjust weights for class imbalance if any
+    #     random_state=seed,  # Set random seed for reproducibility
+    # )
+    clf = DecisionTreeClassifier(random_state=seed)
     clf.fit(feature_subset_x_train, y_train)
     predicted_proba_y = clf.predict_proba(feature_subset_x_test)
     predicted_y = clf.predict(feature_subset_x_test)
@@ -98,15 +101,9 @@ def calculate_performance(y_predict, y_predict_proba, y_true) -> dict[str, float
     probability_positive_class = np.array([proba[1] for proba in y_predict_proba])
     performance_metrics_dict = {
         # for the given hold out test set the healthy control 0 is the minority class
-        # "F1": f1_score(y_true, y_predict, average="binary", pos_label=0),
         "Average Precision Score": average_precision_score(y_true, y_predict),
         "AUC": roc_auc_score(y_true, probability_positive_class),
         "Accuracy": accuracy_score(y_true, y_predict),
-        # "Specificity": recall_score(y_true, y_predict, pos_label=0),  # recall for the negative class
-        # "Sensitivity": recall_score(y_true, y_predict, pos_label=1),  # recall for the positive class
-        # "F1": f1_score(y_true, y_predict, average="macro"),
-        # "AUPRC": average_precision_score(y_true, y_predict),
-        # "AUROC": roc_auc_score(y_true, probability_positive_class),
     }
     return performance_metrics_dict
 
@@ -186,12 +183,12 @@ def evaluate_reverse_random_forest(
     # initialize the flip parameter for the stability estimator
     flip = False
 
-    # initialize feature importance matrix with zeros
+    # initialize feature importance matrix with zeros (number of iterations x number of features)
     feature_importance_matrix = np.zeros((len(loo_cv_iteration_list), len(loo_cv_iteration_list[0])))
     performance_metrics = []
 
     # iterate over the leave-one-out cross-validation iterations
-    for i, cv_iteration_result in enumerate(loo_cv_iteration_list):
+    for loo_idx, cv_iteration_result in enumerate(loo_cv_iteration_list):
         # if "feature_subset_selection" not in cv_iteration_result:
         #     feature_subset_selection_array = np.zeros(len(cv_iteration_result))
         #
@@ -207,15 +204,18 @@ def evaluate_reverse_random_forest(
         #
         #     cv_iteration_result["feature_subset_selection"] = feature_subset_selection_array
 
-        feature_importance_matrix[i] = cv_iteration_result["feature_subset_selection"]
+        feature_importance_matrix[loo_idx] = cv_iteration_result["feature_subset_selection"]
 
         # check if the feature subset selection is empty
         if np.count_nonzero(cv_iteration_result["feature_subset_selection"]) == 0:
             flip = True  # flip the feature importance matrix for the stability estimator to avoid division by zero
+            logging.warning(
+                f"Feature subset selection is empty for iteration {loo_idx}, skipping performance metrics calculation."
+            )
             continue  # skip calculating the performance metrics
 
         # calculate the performance metrics
-        train_data_df = experiment_data_df.drop(index=i)
+        train_data_df = experiment_data_df.drop(index=loo_idx)
         assert train_data_df.shape[0] == experiment_data_df.shape[0] - 1
         performance_metrics.extend(
             calculate_performance_metrics_on_shuffled_hold_out_subset(
@@ -262,7 +262,7 @@ def evaluate_standard_random_forest(
         if "score" in importance_calculation_method or "best" in importance_calculation_method:
             continue
 
-        # initialize feature importance matrix with zeros
+        # initialize feature importance matrix with zeros (number of iterations x number of features)
         feature_importance_matrix = np.zeros(
             (len(loo_cv_iteration_list), len(loo_cv_iteration_list[0][importance_calculation_method]))
         )
@@ -270,19 +270,23 @@ def evaluate_standard_random_forest(
         performance_metrics = []
 
         # iterate over the leave-one-out cross-validation iterations
-        for i, loo_cv_iteration in enumerate(loo_cv_iteration_list):
+        for loo_idx, loo_cv_iteration in enumerate(loo_cv_iteration_list):
             feature_importances = loo_cv_iteration[importance_calculation_method]
-            feature_importance_matrix[i] = feature_importances
+            feature_importance_matrix[loo_idx] = feature_importances
 
+            # check if the feature subset selection is empty
             if np.count_nonzero(feature_importances) == 0:
                 flip = True  # flip the feature importance matrix for the stability estimator to avoid division by zero
+                logging.warning(
+                    f"Feature subset selection is empty for iteration {loo_idx}, skipping performance metrics calculation."
+                )
                 continue  # skip calculating the performance metrics
 
             # calculate the performance metrics
-            train_data_df = experiment_data_df.drop(index=i)
+            train_data_df = experiment_data_df.drop(index=loo_idx)
             assert train_data_df.shape[0] == experiment_data_df.shape[0] - 1
 
-            # parallelize 8 iterations of shuffling the hold out test data with joblib
+            # parallelize 16 iterations of shuffling the hold out test data with joblib
             performance_metrics.extend(
                 joblib.Parallel(n_jobs=4)(
                     joblib.delayed(calculate_performance_metrics_on_hold_out_data)(
@@ -299,15 +303,11 @@ def evaluate_standard_random_forest(
             #     train_data_df, hold_out_test_data_df, feature_importances, seed_random_forest
             # )
             # performance_metrics.append(calculate_performance(y_predict, y_predict_proba, y_true))
-        #
-        # binarize the feature importance matrix
-        feature_importance_matrix = np.where(feature_importance_matrix != 0, 1, 0)
 
         # store the results in the result dictionary
         input_result_dict["evaluation"][importance_calculation_method] = {
             "importance_matrix": feature_importance_matrix,
             "stability": stability_estimator.calculate_stability(feature_importance_matrix, flip),
-            # "stability": 0.0,
             "number of selected features": np.count_nonzero(feature_importance_matrix, axis=1),
             "performance_metrics": pd.DataFrame(performance_metrics),
         }
@@ -399,8 +399,6 @@ def evaluate_repeated_experiments(
         random_states_rf.append(result_dict["standard_random_forest_meta_data"]["random_state"])
         if "reverse_random_forest_meta_data" in result_dict:
             random_seeds_reverse_rf.append(result_dict["reverse_random_forest_meta_data"]["random_seeds"])
-        else:
-            print(experiment_id)
 
         # check if the result dictionary already contains the evaluation results
         if "evaluation" in result_dict:
@@ -413,13 +411,24 @@ def evaluate_repeated_experiments(
         repeated_result_dicts.append(result_dict)
 
     assert len(random_states_rf) == len(repeated_experiments), "Random states are missing."
-    assert len(set(random_states_rf)) == len(repeated_experiments), "Random states are equal."
+    assert len(set(random_states_rf)) == len(repeated_experiments), "Random states have duplicates."
+    check_random_seeds_equality(random_seeds_reverse_rf, repeated_experiments)
 
+    return repeated_result_dicts
+
+
+def check_random_seeds_equality(random_seeds_reverse_rf, repeated_experiments):
+    """Check if the random seeds are equal for the repeated experiments.
+
+    Args:
+        random_seeds_reverse_rf: The random seeds for the reverse random forest.
+        repeated_experiments: The list of repeated experiments.
+    """
     if len(random_seeds_reverse_rf) != len(repeated_experiments):
         print("Random seeds are missing. Only found " + str(len(random_seeds_reverse_rf)))
 
     # flatten list of seeds to check if the random seeds are equal
-    flattened_lists_of_seeds: list[int] = sum(random_seeds_reverse_rf, [])
+    flattened_lists_of_seeds: list[int] = [seed for sublist in random_seeds_reverse_rf for seed in sublist]
     if len(set(flattened_lists_of_seeds)) != len(repeated_experiments) * 30:
         # find equal elements within the list
         equal_elements = [
@@ -428,8 +437,6 @@ def evaluate_repeated_experiments(
         print("total number of equal elements: ", len(equal_elements))
         print(set(equal_elements))
         print("number of equal elements: ", len(set(equal_elements)))
-
-    return repeated_result_dicts
 
 
 def summarize_evaluation_results(
@@ -459,6 +466,7 @@ def summarize_evaluation_results(
                 )
                 summarized_result_dict[key]["stability"].append(value["stability"])
                 summarized_result_dict[key]["number of selected features"].extend(value["number of selected features"])
+
 
     # initialize the summarized dataframe with the columns of the performance metrics
     summarized_df = pd.DataFrame(columns=summarized_result_dict["reverse_random_forest"]["performance_metrics"].columns)
@@ -576,50 +584,140 @@ def plot_average_results(
 
     summarized_result_df["method"] = summarized_result_df.index
 
+    # rename the method names for better readability
+    for method in summarized_result_df["method"]:
+        if method == "reverse_random_forest":
+            summarized_result_df.loc[method, "method"] = "reverse random forest"
+        elif method == "gini_impurity_default_parameters":
+            summarized_result_df.loc[method, "method"] = "without HPO"
+        elif method == "gini_impurity":
+            summarized_result_df.loc[method, "method"] = "gini impurity"
+
+    color_map = {
+        "reverse random forest": "red",
+        "without HPO": "green",
+        "gini impurity": "green",
+        "permutation": "blue",
+    }
+
+    # set the positions for the text labels
+    text_positions_dict = {
+        # text = gini, without HPO, permutation, reverse random forest
+        "Colon Cancer": ["top center", "bottom right", "bottom left", "bottom right"],
+        "Prostate Cancer": ["top right", "top center", "bottom left", "bottom right"],
+        # text = permutation, gini, without HPO, reverse random forest
+        "Leukemia": ["bottom right", "top center", "bottom left", "bottom center"],
+        "default": ["bottom left", "bottom left", "bottom left", "bottom left"],
+    }
+    text_positions = text_positions_dict.get(data_display_name, text_positions_dict["default"])
+    print(data_display_name)
+    print(text_positions, summarized_result_df["method"])
+    assert len(text_positions) == len(summarized_result_df["method"])
+    assert isinstance(text_positions, list)
     x_axis_title = "Stability of Feature Selection"
     for performance_metric in summarized_result_df.columns:
+        # skip the columns without performance metrics
         if performance_metric in ["number of selected features", "stability", "method"] or "std" in performance_metric:
             continue
 
-        fig = px.scatter(
-            summarized_result_df,
-            x="stability",
-            y=performance_metric,
-            error_y=f"{performance_metric}_std",
-            error_x="stability_std",
-            hover_data=["method"],
-            text=[
-                "gini",
-                "without HPO",
-                # "shap",
-                "gini corrected",
-                "permutation",
-                "reverse random forest",
-            ],  # "method",  # Add method name to each data point
-            template="plotly_white",
-            height=250,
-            color="method",
+        # if not performance_metric == "Accuracy":
+        #     continue
+
+        # plot scatter plot with error bars
+        fig = go.Figure()
+
+        fig.add_trace(
+            go.Scatter(
+                x=summarized_result_df["stability"],
+                y=summarized_result_df[performance_metric],
+                error_y=dict(
+                    type='data',
+                    array=summarized_result_df[f"{performance_metric}_std"],
+                    color="lightgrey",
+                ),
+                error_x=dict(
+                    type='data',
+                    array=summarized_result_df["stability_std"],
+                    color="lightgrey",
+                ),
+                # error_y=dict(type='data', array=summarized_result_df[f"{performance_metric}_std"]),
+                # error_x=dict(type='data', array=summarized_result_df["stability_std"]),
+                mode='markers+text',
+                text=summarized_result_df["method"],
+                textposition=text_positions,
+                marker=dict(color=summarized_result_df["method"].apply(lambda x: color_map[x])),
+            )
         )
-        # unoptimized, gini, shap, permutation, reverse
-        if data_display_name == "Leukemia":
-            fig.update_traces(textposition=["top left", "bottom right", "bottom center", "top right", "bottom left"])
-        elif "olon" in data_display_name:
-            fig.update_traces(textposition=["top left", "bottom right", "bottom center", "top left", "bottom right"])
-        else:
-            fig.update_traces(textposition=["top left", "top right", "bottom center", "top left", "bottom right"])
+        # # Add annotations with arrows
+        # for i, method in enumerate(summarized_result_df["method"]):
+        #     if "gini" in method and "Colon" in data_display_name:
+        #         ax = 5
+        #     else:
+        #         ax = 0
+        #     fig.add_annotation(
+        #         x=summarized_result_df["stability"].iloc[i],
+        #         y=summarized_result_df[performance_metric].iloc[i],
+        #         text=method,
+        #         showarrow=False,
+        #         arrowhead=0,
+        #         ax=ax,  # Adjust these values to position the text
+        #         ay=90,  # Adjust these values to position the text
+        #     )
+
+        # Update the axes and layout
         fig.update_xaxes(range=[0, 1.01])
         fig.update_yaxes(range=[0, 1.09])
         fig.update_layout(
+            title=data_display_name,
             xaxis_title=x_axis_title,
             yaxis_title=performance_metric,
-            margin={"l": 10, "r": 10, "t": 10, "b": 10},
+            margin=dict(l=10, r=10, t=25, b=10),
             showlegend=False,
+            template="plotly_white",
+            height=200,
         )
+
         # save figure as pdf
         if save:
             plot_path = f"{path}/{data_display_name}_{performance_metric}.pdf"
             pio.write_image(fig, plot_path)
         fig.show()
+
+        # fig = px.scatter(
+        #     summarized_result_df,
+        #     x="stability",
+        #     y=performance_metric,
+        #     error_y=f"{performance_metric}_std",
+        #     error_x="stability_std",
+        #     hover_data=["method"],
+        #     # text=[
+        #     #     "gini",
+        #     #     "without HPO",
+        #     #     # "shap",
+        #     #     # "gini corrected",
+        #     #     "permutation",
+        #     #     "reverse random forest",
+        #     # ],  # "method",  # Add method name to each data point
+        #     text=summarized_result_df["method"],
+        #     template="plotly_white",
+        #     height=200,
+        #     color="method",
+        # )
+        # fig.update_xaxes(range=[0, 1.01])
+        # fig.update_yaxes(range=[0, 1.09])
+        # fig.update_layout(
+        #     xaxis_title=x_axis_title,
+        #     yaxis_title=performance_metric,
+        #     margin={"l": 10, "r": 10, "t": 10, "b": 10},
+        #     showlegend=True,
+        # )
+        # fig.update_traces(textposition=text_positions)
+        #
+        # # save figure as pdf
+        # if save:
+        #     plot_path = f"{path}/{data_display_name}_{performance_metric}.pdf"
+        #     pio.write_image(fig, plot_path)
+        # fig.show()
 
         # remove x-axis title
         x_axis_title = ""
@@ -628,7 +726,7 @@ def plot_average_results(
 def evaluate_data(
     base_path: str, list_of_experiments: list[str], seeds: list[int], data_display_name: str, save_plots: bool = False
 ):
-    """Evaluate the feature selection results for the given data.
+    """Evaluate the feature selection results of the experiment series of the given data set.
 
     Args:
         base_path: The base path to the pickled results files.
@@ -640,8 +738,21 @@ def evaluate_data(
     Returns:
         The summarized evaluation results.
     """
-    # evaluate the feature selection results for the given data
-    list_of_result_dicts = evaluate_repeated_experiments(base_path, list_of_experiments, seeds)
+    if Path(f"{base_path}/{data_display_name}__123evaluation_results.pkl").exists():
+        # try to load the pickled evaluation results
+        with open(f"{base_path}/{data_display_name}_evaluation_results.pkl", "rb") as file:
+            list_of_result_dicts = pickle.load(file)
+
+    else:
+        # evaluate the feature selection results for the given data
+        list_of_result_dicts = evaluate_repeated_experiments(base_path, list_of_experiments, seeds)
+        # Pickle the list of result dictionaries
+        try:
+            with open(f"{base_path}/{data_display_name}_evaluation_results.pkl", "wb") as file:
+                pickle.dump(list_of_result_dicts, file)
+        except (OSError, pickle.PicklingError) as e:
+            logging.error(f"Failed to save evaluation results: {e}")
+
     summarized_evaluation_results = summarize_evaluation_results(list_of_result_dicts)
     create_latex_table(summarized_evaluation_results, data_display_name)
 
@@ -652,11 +763,16 @@ def evaluate_data(
         os.makedirs(base_path_to_save_plots, exist_ok=True)
     else:
         base_path_to_save_plots = ""
-    plot_average_results(summarized_evaluation_results, save_plots, base_path_to_save_plots, data_display_name)
+
+    if "Random" not in data_display_name:
+        plot_average_results(summarized_evaluation_results, save_plots, base_path_to_save_plots, data_display_name)
+
+    # evaluation_results_dict = prepare_evaluation_results_for_plot(list_of_result_dicts)
+
     return summarized_evaluation_results
 
 
-def run_evaluation():
+def main():
     """Run the evaluation for the given experiments."""
     # seeds for the random forest classifier for each repeated experiment
     seeds = [2042, 2043, 2044]
@@ -667,66 +783,60 @@ def run_evaluation():
 
     # evaluate the feature selection results for the given data
     experiments_dict = {
-        # "Colon Cancer": [
-        #     "colon_0_shuffle_seed_None",
-        #     "colon_1_shuffle_seed_None",
-        #     "colon_2_shuffle_seed_None",
-        # ],
-        # "Prostate Cancer": [
-        #     "prostate_0_shuffle_seed_None",
-        #     "prostate_1_shuffle_seed_None",
-        #     "prostate_2_shuffle_seed_None",
-        # ],
-        # "Leukemia": [
-        #     "leukemia_big_0_shuffle_seed_None",
-        #     "leukemia_big_1_shuffle_seed_None",
-        #     "leukemia_big_2_shuffle_seed_None",
-        # ],
         "Colon Cancer": [
-            "colon_0_shuffle_seed_None_pcg",
-            "colon_1_shuffle_seed_None_pcg",
-            "colon_2_shuffle_seed_None_pcg",
+            "colon_0_shuffle_seed_None_2HPreg",
+            "colon_1_shuffle_seed_None_2HPreg",
+            "colon_2_shuffle_seed_None_2HPreg",
         ],
         "Prostate Cancer": [
-            "prostate_0_shuffle_seed_None_pcg",
-            "prostate_1_shuffle_seed_None_pcg",
-            "prostate_2_shuffle_seed_None_pcg",
+            "prostate_0_shuffle_seed_None_2HPreg",
+            "prostate_1_shuffle_seed_None_2HPreg",
+            "prostate_2_shuffle_seed_None_2HPreg",
         ],
         "Leukemia": [
-            "leukemia_big_0_shuffle_seed_None_pcg",
-            "leukemia_big_1_shuffle_seed_None_pcg",
-            "leukemia_big_2_shuffle_seed_None_pcg",
+            "leukemia_big_0_shuffle_seed_None_2HPreg",
+            "leukemia_big_1_shuffle_seed_None_2HPreg",
+            "leukemia_big_2_shuffle_seed_None_2HPreg",
         ],
-        # "Random Noise Lognormal": [
-        #     "random_noise_lognormal_0_shuffle_seed_None_srf",
-        #     "random_noise_lognormal_1_shuffle_seed_None_srf",
-        #     "random_noise_lognormal_2_shuffle_seed_None_srf",
-        # ],
-        # "Random Noise Normal": [
-        #     "random_noise_normal_0_shuffle_seed_None_srf",
-        #     "random_noise_normal_1_shuffle_seed_None_srf",
-        #     "random_noise_normal_2_shuffle_seed_None_srf",
+        "Random Noise Normal": [
+            "random_noise_normal_0_shuffle_seed_None_2HPreg",
+            "random_noise_normal_1_shuffle_seed_None_2HPreg",
+            "random_noise_normal_2_shuffle_seed_None_2HPreg",
+        ],
+        "Random Noise Lognormal": [
+            "random_noise_lognormal_0_shuffle_seed_None_2HPreg",
+            "random_noise_lognormal_1_shuffle_seed_None_2HPreg",
+            "random_noise_lognormal_2_shuffle_seed_None_2HPreg",
+        ],
+        # "Leukemia": [
+        #     "leukemia_big_0_shuffle_seed_None_3HP",
+        #     "leukemia_big_1_shuffle_seed_None_3HP",
+        #     #"leukemia_big_2_shuffle_seed_None_3HP",
         # ],
         # "Colon Cancer": [
-        #     "colon_s10",
-        #     "colon_s20",
-        #     # "colon_s30",
-        #     # "colon_s40",
-        #     "colon_shift_00",
+        #     #"colon_0_shuffle_seed_None_3HP",
+        #     "colon_1_shuffle_seed_None_3HP",
+        #     "colon_2_shuffle_seed_None_3HP",
         # ],
         # "Prostate Cancer": [
-        #     "prostate_shift_00",
-        #     "prostate_shift_01",
-        #     "prostate_shift_02",
+        #     "prostate_0_shuffle_seed_None_3HP",
+        #     "prostate_1_shuffle_seed_None_3HP",
+        #     "prostate_2_shuffle_seed_None_3HP",
         # ],
-        # "Leukemia": [
-        #     "leukemia_shift_00",
-        #     "leukemia_big_shift10",
-        #     "leukemia_shift_02",
+        # "Random Noise Normal": [
+        #     "random_noise_normal_0_shuffle_seed_None_3HP",
+        #     "random_noise_normal_1_shuffle_seed_None_3HP",
+        #     "random_noise_normal_2_shuffle_seed_None_3HP",
+        # ],
+        # "Random Noise Lognormal": [
+        #     #"random_noise_lognormal_0_shuffle_seed_None_3HP",
+        #     "random_noise_lognormal_1_shuffle_seed_None_3HP",
+        #     "random_noise_lognormal_2_shuffle_seed_None_3HP",
         # ],
     }
     for data_display_name, experiment_id_list in experiments_dict.items():
         evaluate_data(base_path, experiment_id_list, seeds, data_display_name=data_display_name, save_plots=True)
 
 
-run_evaluation()
+if __name__ == "__main__":
+    main()
