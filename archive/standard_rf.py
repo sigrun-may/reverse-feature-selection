@@ -13,11 +13,10 @@ import numpy as np
 import optuna
 import pandas as pd
 import rpy2.robjects as ro
-import shap
 from optuna.samplers import TPESampler
 from rpy2.robjects import pandas2ri
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import brier_score_loss, roc_auc_score, accuracy_score
 
 warnings.filterwarnings("ignore")
 
@@ -37,9 +36,9 @@ def calculate_feature_importance(data_df: pd.DataFrame, train_indices: np.ndarra
 
     def optuna_objective(trial):
         rf_clf = RandomForestClassifier(
-            oob_score=roc_auc_score,
+            oob_score=accuracy_score,
             max_depth=trial.suggest_int("max_depth", 1, 15),
-            n_estimators=trial.suggest_int("n_estimators", 20, 200),
+            n_estimators=trial.suggest_int("n_estimators", 20, 3000),
             max_features=trial.suggest_int("max_features", 1, data_df.shape[1] - 1),
             min_samples_leaf=trial.suggest_int("min_samples_leaf", 2, math.floor(len(train_indices) / 2)),
             min_samples_split=trial.suggest_int("min_samples_split", 2, 5),
@@ -85,30 +84,30 @@ def calculate_feature_importance(data_df: pd.DataFrame, train_indices: np.ndarra
     gini_feature_importances_optimized = clf.feature_importances_
     print("number of selected features (gini optimized): ", np.sum(gini_feature_importances_optimized > 0))
 
-    # calculate shap values
-    explainer = shap.TreeExplainer(clf)
-    shap_values = explainer.shap_values(data_df.iloc[train_indices, 1:])
-    sum_shap_values = np.zeros(data_df.shape[1] - 1)
-    for values_per_sample in shap_values:
-        positive_shap_values = np.abs(values_per_sample[:, 0])
-        sum_shap_values += positive_shap_values
+    # # calculate shap values
+    # explainer = shap.TreeExplainer(clf)
+    # shap_values = explainer.shap_values(data_df.iloc[train_indices, 1:])
+    # sum_shap_values = np.zeros(data_df.shape[1] - 1)
+    # for values_per_sample in shap_values:
+    #     positive_shap_values = np.abs(values_per_sample[:, 0])
+    #     sum_shap_values += positive_shap_values
 
     # calculate permutation importance with R applying optimized parameters
     # L. Breiman, “Random Forests”, Machine Learning, 45(1), 5-32, 2001.
-    permutation_importances = ranger_permutation_importance(
+    permutation_importances = ranger_ramdom_forest_importance(
         data_df, train_indices, study.best_params, meta_data["random_state"]
     )
     return {
         "gini_impurity": gini_feature_importances_optimized,
         "gini_impurity_default_parameters": gini_feature_importances,
-        "summed_shap_values": sum_shap_values,
+        # "summed_shap_values": sum_shap_values,
         "permutation_importance": permutation_importances,
         "train_oob_score": clf.oob_score_,
         "best_params": study.best_params,
     }
 
 
-def ranger_permutation_importance(
+def ranger_ramdom_forest_importance(
     data_df: pd.DataFrame, train_indices, best_params: dict, random_state: int
 ) -> np.ndarray:
     """Calculate permutation importance with R.
@@ -118,6 +117,7 @@ def ranger_permutation_importance(
         train_indices: The indices of the training split.
         best_params: The best hyperparameters.
         random_state: The random state for reproducibility.
+        importance_type: The type of importance to calculate. Either "permutation" or "impurity_corrected".
 
     Returns:
         The permutation importances.
@@ -161,18 +161,19 @@ def ranger_permutation_importance(
     # define the function
     train_ranger = ro.globalenv["train_ranger"]
     data = data_df.iloc[train_indices, :]
+    assert data.shape[0] == len(train_indices), "Data and train indices do not match."
+    assert data.shape[0] < data_df.shape[0], "Training data was not selected."
 
     # transform the params dictionary to single hyperparameters
     max_depth = best_params["max_depth"]
     num_trees = best_params["n_estimators"]
     mtry = best_params["max_features"]
     min_node_size = best_params["min_samples_split"]
-    seed = random_state
 
     # call the R function from Python
     # function(data, label, max_depth, num_trees, mtry, min_node_size, seed_random_forest)
     permutation_importances = train_ranger(
-        pandas2ri.py2rpy(data), "label", max_depth, num_trees, mtry, min_node_size, seed
+        pandas2ri.py2rpy(data), "label", max_depth, num_trees, mtry, min_node_size, random_state
     )
     print("number of selected features (permutation_importances): ", np.sum(permutation_importances > 0))
     return permutation_importances
