@@ -21,9 +21,7 @@ from sklearn.metrics import roc_auc_score
 warnings.filterwarnings("ignore")
 
 
-def optimized_ranger_random_forest_importance(
-    data_df: pd.DataFrame, train_indices: np.ndarray, meta_data: dict, importance_type: str
-) -> dict:
+def optimized_ranger_random_forest_importance(data_df: pd.DataFrame, train_indices: np.ndarray, meta_data: dict) -> dict:
     """Calculate importance with the R ranger package with optimized hyperparameters.
 
     Args:
@@ -31,7 +29,6 @@ def optimized_ranger_random_forest_importance(
         train_indices: The indices of the training split.
         meta_data: The metadata related to the dataset and experiment. Must contain the random state
             for reproducibility of the random forest. Key: "random_state".
-        importance_type: The type of importance to calculate. Either "permutation" or "impurity_corrected".
 
     Returns:
         The permutation importances.
@@ -42,11 +39,10 @@ def optimized_ranger_random_forest_importance(
             "max_depth": trial.suggest_int("max_depth", 1, 15),
             "num_trees": trial.suggest_int("num_trees", 20, meta_data["max_trees_random_forest"]),
             "mtry": trial.suggest_int("mtry", 1, data_df.shape[1] - 1),
-            "min_node_size": trial.suggest_int("min_node_size", 2, 5),
-            "regularization_factor": trial.suggest_float("regularization_factor", 0.01, 0.9),
+            "regularization_factor": trial.suggest_float("regularization_factor", 0.001, 0.99),
             "seed": meta_data["random_state"],
         }
-        _, oob = ranger_random_forest(data_df, train_indices, params, importance_type)
+        oob, _  = ranger_random_forest(data_df, train_indices, params)
 
         # stop HPO if OOB score (proportion of misclassified observations) is already 0.0
         if math.isclose(oob, 0.0, rel_tol=1e-5):
@@ -59,7 +55,9 @@ def optimized_ranger_random_forest_importance(
         direction="minimize",
         sampler=TPESampler(
             multivariate=True,
-            seed=42,
+            consider_magic_clip=True,
+            constant_liar=True,
+            seed=48,
         ),
     )
     if not meta_data["verbose_optuna"]:  # deactivate logging on cluster
@@ -73,11 +71,11 @@ def optimized_ranger_random_forest_importance(
     hyperparameters = study.best_params
     hyperparameters["seed"] = meta_data["random_state"]
 
-    feature_importances, oob_score = ranger_random_forest(data_df, train_indices, hyperparameters, importance_type)
+    oob_score, feature_importances = ranger_random_forest(data_df, train_indices, hyperparameters)
     return {
-        importance_type: feature_importances,
-        f"best_params_ranger_{importance_type}": hyperparameters,
-        f"oob_score_{importance_type}": oob_score,
+        "permutation": feature_importances,
+        f"best_params_ranger_permutation": hyperparameters,
+        f"oob_score_permutation": oob_score,
     }
 
 
@@ -98,24 +96,13 @@ def calculate_feature_importance(data_df: pd.DataFrame, train_indices: np.ndarra
         # Submit methods with their specific arguments
         future_sklearn = executor.submit(sklearn_random_forest, data_df, train_indices, meta_data)
         future_permutation = executor.submit(
-            optimized_ranger_random_forest_importance, data_df, train_indices, meta_data, "permutation"
+            optimized_ranger_random_forest_importance, data_df, train_indices, meta_data
         )
-        # future_gini_corrected = executor.submit(optimized_ranger_random_forest_importance, data_df, train_indices,
-        # meta_data, "impurity_corrected")
-
         # Collect results as they complete
         result_dict = {}
         for future in concurrent.futures.as_completed([future_sklearn, future_permutation]):
             # merge dictionaries
             result_dict.update(future.result())
-
-    # result_dict = sklearn_random_forest(data_df, train_indices, meta_data)
-    # # log the importance
-    # print("Ranger permutation importance")
-    # result_dict["permutation_importance"] = optimized_ranger_random_forest_importance(
-    #     data_df, train_indices, meta_data, "permutation"
-    # )
-    print(result_dict.keys())
     return result_dict
 
 
@@ -140,7 +127,7 @@ def sklearn_random_forest(data_df: pd.DataFrame, train_indices: np.ndarray, meta
             max_features=trial.suggest_int("max_features", 1, data_df.shape[1] - 1),
             min_samples_leaf=trial.suggest_int("min_samples_leaf", 2, math.floor(len(train_indices) / 2)),
             min_samples_split=trial.suggest_int("min_samples_split", 2, 5),
-            min_impurity_decrease=trial.suggest_float("min_impurity_decrease", 0.01, 0.9),
+            min_impurity_decrease=trial.suggest_float("min_impurity_decrease", 0.001, 0.99),
             random_state=meta_data["random_state"],
             class_weight="balanced_subsample",
             n_jobs=-1,
@@ -159,7 +146,9 @@ def sklearn_random_forest(data_df: pd.DataFrame, train_indices: np.ndarray, meta
         direction="maximize",
         sampler=TPESampler(
             multivariate=True,
-            seed=42,
+            consider_magic_clip=True,
+            constant_liar=True,
+            seed=48,
         ),
     )
     if not meta_data["verbose_optuna"]:  # deactivate logging on cluster
@@ -191,16 +180,13 @@ def sklearn_random_forest(data_df: pd.DataFrame, train_indices: np.ndarray, meta
     }
 
 
-def ranger_random_forest(
-    data_df: pd.DataFrame, train_indices, hyperparameters: dict, importance_type: str
-) -> tuple[np.ndarray, float]:
+def ranger_random_forest(data_df: pd.DataFrame, train_indices, hyperparameters: dict) -> tuple[float, np.ndarray]:
     """Calculate permutation importance with R.
 
     Args:
         data_df: The training data.
         train_indices: The indices of the training split.
         hyperparameters: The best hyperparameters.
-        importance_type: The type of importance to calculate. Either "permutation" or "impurity_corrected".
 
     Returns:
         The permutation importances.
@@ -214,8 +200,8 @@ def ranger_random_forest(
     library(ranger)
 
     # train a ranger model with optimized hyperparameters    
-    train_ranger <- function(data, label, max_depth, num_trees, mtry, min_node_size, seed_random_forest, 
-                             importance_type, regularization_factor){
+    train_ranger <- function(data, label, max_depth, num_trees, mtry, seed_random_forest, 
+                             regularization_factor){
 
       # ensure label is a factor
       data[[label]] <- as.factor(data[[label]])
@@ -223,21 +209,25 @@ def ranger_random_forest(
       # train the ranger model with optimized parameters
       rf_model <- ranger::ranger(formula = as.formula(paste(label, "~ .")), 
                                  data = data,
-                                 importance = importance_type,
+                                 importance = "permutation",
                                  scale.permutation.importance = TRUE,
                                  regularization.factor = regularization_factor,
-                                 regularization.usedepth = TRUE,
-                                 replace = FALSE,
+                                 # regularization.usedepth = TRUE,
+                                 # replace = FALSE,
                                  sample.fraction = 0.896551724137931, # 26 from 29 samples
-                                 min.node.size = min_node_size,
                                  mtry = mtry,
                                  max.depth = max_depth,
                                  num.trees = num_trees,
                                  seed = seed_random_forest,
                                  oob.error = TRUE,
+                                 num.threads = 1,
                                 )
       # Retrieve the OOB error for debugging
       oob_error <- rf_model$prediction.error
+      
+      # # print treetype used
+      # print("treetype: ")
+      # print(rf_model$treetype)
 
       # get permutation importance
       importance <- rf_model$variable.importance
@@ -256,27 +246,24 @@ def ranger_random_forest(
     assert isinstance(data, pd.DataFrame), "Data is not a pandas DataFrame."
 
     # call the R function from Python
-    # function(data, label, max_depth, num_trees, mtry, min_node_size, seed_random_forest)
     result_vector = train_ranger(
         pandas2ri.py2rpy(data),
         "label",
         hyperparameters["max_depth"],
         hyperparameters["num_trees"],
         hyperparameters["mtry"],
-        hyperparameters["min_node_size"],
         hyperparameters["seed"],
-        importance_type,
         hyperparameters["regularization_factor"],
     )
-    # # check if the result_vector is an array of floats
-    # assert isinstance(result_vector, np.ndarray), "Result vector is not a numpy array."
-    # assert all(isinstance(x, float) for x in result_vector), "Result vector contains non-float values."
-
-    # assert len(result_vector) == data_df.shape[1] # number of features + 1 (oob_error)
+    # check if the result_vector is an array of floats
+    assert isinstance(result_vector, np.ndarray), "Result vector is not a numpy array."
+    assert all(isinstance(x, float) for x in result_vector), "Result vector contains non-float values."
+    assert len(result_vector) == data_df.shape[1] # number of features + 1 (oob_error)
     oob_error = result_vector[0]
     feature_importances = result_vector[1:]
-    # assert isinstance(feature_importances, np.ndarray), "Feature importances are not a numpy array."
-    # assert isinstance(oob_error, float), "OOB error is not a float."
-    # assert feature_importances.shape[0] == data_df.shape[1] - 1 # exclude the label column
+    assert isinstance(feature_importances, np.ndarray), "Feature importances are not a numpy array."
+    assert isinstance(oob_error, float), "OOB error is not a float."
+    assert feature_importances.shape[0] == data_df.shape[1] - 1 # exclude the label column
     # print("number of selected features (permutation_importances): ", np.sum(feature_importances > 0))
-    return feature_importances, oob_error
+    return oob_error, feature_importances
+
