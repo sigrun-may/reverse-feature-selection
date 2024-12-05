@@ -220,7 +220,7 @@ def ranger_random_forest(data_df: pd.DataFrame, train_indices, hyperparameters: 
                                  num.trees = num_trees,
                                  seed = seed_random_forest,
                                  oob.error = TRUE,
-                                 num.threads = 1,
+                                 # num.threads = 1,
                                 )
       # Retrieve the OOB error for debugging
       oob_error <- rf_model$prediction.error
