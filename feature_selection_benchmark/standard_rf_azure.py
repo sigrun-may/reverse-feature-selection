@@ -29,8 +29,8 @@ def main():
 
     # iterate over all files in the directory
     for file in result_base_path.iterdir():
-        #if "result_dict" not in file.name:
-        if "shuffle_seed_None" not in file.name or "rf" in file.name:
+        if "random" not in file.name:
+        # if "shuffle_seed_None" not in file.name or "rf" in file.name:
             continue
 
         # extract the experiment id from the file name
@@ -78,8 +78,9 @@ def main():
             "max_trees_random_forest": 2000,
         }
         if "random_noise" in file.name:
-            meta_data_dict["data_shape_random_noise"] = (62, 2000)
-            meta_data_dict["path_for_random_noise"] = result_base_path
+            assert meta_data_dict["data_shape_random_noise"] == (62, 2000)
+            # The path to the directory where generated random noise is stored.
+            meta_data_dict["path_for_random_noise"] = f"{result_base_path}/random_noise"
 
         # load data
         data_df = load_data_df(meta_data_dict)
