@@ -79,11 +79,16 @@ def main():
         }
         if "random_noise" in file.name:
             meta_data_dict["data_shape_random_noise"] = (62, 2000)
-            meta_data_dict["path_for_random_noise"] = "../data/random_noise"
+            meta_data_dict["path_for_random_noise"] = result_base_path
 
         # load data
         data_df = load_data_df(meta_data_dict)
         print("number of samples", data_df.shape[0], "number of features", data_df.shape[1] - 1)
+
+        # drop old data for standard random forest
+        if "standard_random_forest" in result_dict:
+            result_dict.pop("standard_random_forest")
+            result_dict.pop("standard_random_forest_meta_data")
 
         # calculate raw feature subset data for standard random forest
         result_dict["standard_random_forest"] = cross_validation.cross_validate(
@@ -95,7 +100,6 @@ def main():
         result_dict_path = Path(f"{result_base_path}/{meta_data_dict['experiment_id']}_rf_result_dict.pkl")
         with open(result_dict_path, "wb") as result_file:
             pickle.dump(result_dict, result_file, protocol=pickle.HIGHEST_PROTOCOL)
-        break
 
 if __name__ == "__main__":
     main()
