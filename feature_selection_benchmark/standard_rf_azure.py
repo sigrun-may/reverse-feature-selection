@@ -29,8 +29,9 @@ def main():
 
     # iterate over all files in the directory
     for file in result_base_path.iterdir():
-        if "random" not in file.name:
-        # if "shuffle_seed_None" not in file.name or "rf" in file.name:
+        # exclude files that are not related to the random noise data set
+        # or the ranger random forest
+        if "random" in file.name or "rf" not in file.name:
             continue
 
         # extract the experiment id from the file name
@@ -78,7 +79,7 @@ def main():
             "max_trees_random_forest": 2000,
         }
         if "random_noise" in file.name:
-            assert meta_data_dict["data_shape_random_noise"] == (62, 2000)
+            meta_data_dict["data_shape_random_noise"] = (62, 2000)
             # The path to the directory where generated random noise is stored.
             meta_data_dict["path_for_random_noise"] = f"{result_base_path}/random_noise"
 
@@ -98,7 +99,7 @@ def main():
         result_dict["standard_random_forest_meta_data"] = meta_data_dict
 
         # save results
-        result_dict_path = Path(f"{result_base_path}/{meta_data_dict['experiment_id']}_rf_result_dict.pkl")
+        result_dict_path = Path(f"{result_base_path}/{meta_data_dict['experiment_id']}_ranger_result_dict.pkl")
         with open(result_dict_path, "wb") as result_file:
             pickle.dump(result_dict, result_file, protocol=pickle.HIGHEST_PROTOCOL)
 
