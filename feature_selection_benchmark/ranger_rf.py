@@ -207,20 +207,19 @@ def ranger_random_forest(data_df: pd.DataFrame, train_indices, hyperparameters: 
       data[[label]] <- as.factor(data[[label]])
 
       # train the ranger model with optimized parameters
-      rf_model <- ranger::ranger(formula = as.formula(paste(label, "~ .")), 
+      rf_model <- ranger::ranger(formula = label  ~ .,
                                  data = data,
                                  importance = "permutation",
                                  scale.permutation.importance = TRUE,
                                  regularization.factor = regularization_factor,
-                                 # regularization.usedepth = TRUE,
-                                 # replace = FALSE,
+                                 min.node.size = 2,
                                  sample.fraction = 0.896551724137931, # 26 from 29 samples
                                  mtry = mtry,
                                  max.depth = max_depth,
                                  num.trees = num_trees,
                                  seed = seed_random_forest,
                                  oob.error = TRUE,
-                                 # num.threads = 1,
+                                 num.threads = 1,
                                 )
       # Retrieve the OOB error for debugging
       oob_error <- rf_model$prediction.error
