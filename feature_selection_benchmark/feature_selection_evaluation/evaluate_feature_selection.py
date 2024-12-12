@@ -193,21 +193,6 @@ def evaluate_reverse_random_forest(
 
     # iterate over the leave-one-out cross-validation iterations
     for loo_idx, cv_iteration_result in enumerate(loo_cv_iteration_list):
-        # if "feature_subset_selection" not in cv_iteration_result:
-        #     feature_subset_selection_array = np.zeros(len(cv_iteration_result))
-        #
-        #     # extract feature selection array
-        #     for j, p_value in enumerate(cv_iteration_result["p_value"]):
-        #         # check if the value of the "p_value" column is smaller or equal than 0.05
-        #         if p_value is not None and p_value <= 0.05:
-        #             # get index of the column with the fraction_mean value
-        #             fraction_mean_index = cv_iteration_result.columns.get_loc("fraction_mean")
-        #
-        #             # extract the fraction of selected features
-        #             feature_subset_selection_array[j] = cv_iteration_result.iloc[j, fraction_mean_index]
-        #
-        #     cv_iteration_result["feature_subset_selection"] = feature_subset_selection_array
-
         feature_importance_matrix[loo_idx] = cv_iteration_result["feature_subset_selection"]
 
         # check if the feature subset selection is empty
@@ -291,22 +276,7 @@ def evaluate_standard_random_forest(
             assert train_data_df.shape[0] == experiment_data_df.shape[0] - 1
 
             # parallelize 16 iterations of shuffling the hold out test data with joblib
-            performance_metrics.extend(
-                joblib.Parallel(n_jobs=4)(
-                    joblib.delayed(calculate_performance_metrics_on_hold_out_data)(
-                        feature_importances,
-                        hold_out_shuffle_iteration,
-                        hold_out_test_data_df,
-                        seed_random_forest,
-                        train_data_df,
-                    )
-                    for hold_out_shuffle_iteration in range(16)
-                )
-            )
-            # y_predict, y_predict_proba, y_true = train_and_predict(
-            #     train_data_df, hold_out_test_data_df, feature_importances, seed_random_forest
-            # )
-            # performance_metrics.append(calculate_performance(y_predict, y_predict_proba, y_true))
+            performance_metrics.extend(calculate_performance_metrics_on_shuffled_hold_out_subset(train_data_df, hold_out_test_data_df, feature_importances, seed_random_forest))
 
         # store the results in the result dictionary
         input_result_dict["evaluation"][importance_calculation_method] = {
@@ -958,7 +928,7 @@ def main():
     summarized_evaluation_results_list = []
     data_display_names_list = []
     for data_display_name, experiment_id_list in experiments_dict.items():
-        summarized_evaluation_results = evaluate_data(base_path, experiment_id_list, seeds, data_display_name=data_display_name, reload_evaluation_results=True)
+        summarized_evaluation_results = evaluate_data(base_path, experiment_id_list, seeds, data_display_name=data_display_name, reload_evaluation_results=False)
         if "Random" not in data_display_name:
             summarized_evaluation_results_list.append(summarized_evaluation_results)
             data_display_names_list.append(data_display_name)
