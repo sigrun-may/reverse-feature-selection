@@ -14,16 +14,16 @@ from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
-import plotly.express as px
+# import plotly.express as px
 import plotly.graph_objects as go
 import plotly.io as pio
+from plotly.subplots import make_subplots
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
     accuracy_score,
     average_precision_score,
-    roc_auc_score,
+    roc_auc_score, cohen_kappa_score, recall_score, precision_score,
 )
-from sklearn.tree import DecisionTreeClassifier
 
 from feature_selection_benchmark.data_loader_tools import (
     load_train_test_data_for_standardized_sample_size,
@@ -32,6 +32,9 @@ from feature_selection_benchmark.data_loader_tools import (
 from feature_selection_benchmark.feature_selection_evaluation import stability_estimator
 
 pio.kaleido.scope.mathjax = None
+
+# initialize the logger
+logging.basicConfig(level=logging.INFO)
 
 
 def train_and_predict(
@@ -70,16 +73,13 @@ def train_and_predict(
     assert feature_subset_x_test.shape == (test_data.shape[0], np.count_nonzero(feature_importance))
 
     # train and evaluate the model
-    # clf = RandomForestClassifier(
-    #     n_estimators=20,  # Fewer trees to avoid overfitting
-    #     max_features=None,  # Consider all selected features at each split
-    #     max_depth=4,  # Limit the depth of the trees
-    #     min_samples_leaf=2,  # More samples needed at each leaf node
-    #     bootstrap=False,  # Use the whole dataset for each tree
-    #     class_weight="balanced",  # Adjust weights for class imbalance if any
-    #     random_state=seed,  # Set random seed for reproducibility
-    # )
-    clf = DecisionTreeClassifier(random_state=seed)
+    clf = RandomForestClassifier(
+        n_estimators=20,  # Fewer trees to avoid overfitting
+        max_features=None,  # Consider all selected features at each split
+        max_depth=4,  # Limit the depth of the trees
+        min_samples_leaf=2,  # More samples needed at each leaf node
+        random_state=seed,  # Set random seed for reproducibility
+    )
     clf.fit(feature_subset_x_train, y_train)
     predicted_proba_y = clf.predict_proba(feature_subset_x_test)
     predicted_y = clf.predict(feature_subset_x_test)
@@ -104,6 +104,10 @@ def calculate_performance(y_predict, y_predict_proba, y_true) -> dict[str, float
         "Average Precision Score": average_precision_score(y_true, y_predict),
         "AUC": roc_auc_score(y_true, probability_positive_class),
         "Accuracy": accuracy_score(y_true, y_predict),
+        "Sensitivity": recall_score(y_true, y_predict),
+        "Specificity": recall_score(y_true, y_predict, pos_label=0),
+        "Cohen's Kappa": cohen_kappa_score(y_true, y_predict),
+        "Precision": precision_score(y_true, y_predict),
     }
     return performance_metrics_dict
 
@@ -158,7 +162,7 @@ def calculate_performance_metrics_on_shuffled_hold_out_subset(
             seed_for_random_forest,
             train_data_df,
         )
-        for hold_out_shuffle_iteration in range(16)
+        for hold_out_shuffle_iteration in range(4)
     )
 
 
@@ -484,7 +488,6 @@ def summarize_evaluation_results(
         summarized_df.loc[f"{feature_selection_method_name}_std", "number of selected features"] = np.std(
             metrics["number of selected features"]
         )
-
     return summarized_df
 
 
@@ -499,7 +502,7 @@ def create_latex_table(summarized_evaluation_results_df: pd.DataFrame, data_disp
 
     for column_name in df_for_latex:
         # round the floats to five decimal places
-        df_for_latex[column_name] = df_for_latex[column_name].apply(lambda x: f"{x:.5f}")
+        df_for_latex[column_name] = df_for_latex[column_name].apply(lambda x: f"{x:.3f}")
 
         for index_name in df_for_latex.index:
             if "std" not in index_name:
@@ -540,6 +543,13 @@ def create_latex_table(summarized_evaluation_results_df: pd.DataFrame, data_disp
                     index=True, caption=f"Performance metrics for {data_display_name}"
                 )
             )
+            counter -= 3
+        if counter > 0:
+            print(
+                df_for_latex[performance_metrics_list[-counter:]].to_latex(
+                    index=True, caption=f"Performance metrics for {data_display_name}"
+                )
+            )
     else:
         print(
             df_for_latex[performance_metrics_list].to_latex(
@@ -551,6 +561,87 @@ def create_latex_table(summarized_evaluation_results_df: pd.DataFrame, data_disp
             index=True, caption=f"Number of selected features and stability for {data_display_name}"
         )
     )
+
+def extend_figure(summarized_results_list: list[pd.DataFrame], data_display_names_list: list[str], performance_metric: str = "Accuracy"):
+    color_map = {
+        "reverse random forest": "red",
+        "without HPO": "black",
+        "gini impurity": "green",
+        "permutation": "blue",
+    }
+    # set the positions for the text labels
+    text_positions_dict = {
+        # text = gini, without HPO, permutation, reverse random forest
+        "Colon Cancer": ["top center", "bottom right", "bottom right", "bottom right"],
+        "Prostate Cancer": ["top center", "top left", "bottom center", "top right"],
+        # text = permutation, gini, without HPO, reverse random forest
+        "Leukemia": ["top left", "top center", "bottom left", "bottom center"],
+        "default": ["bottom left", "bottom left", "bottom left", "bottom left"],
+    }
+    fig = make_subplots(rows=3, cols=1, shared_xaxes=True, shared_yaxes=True, subplot_titles=data_display_names_list,
+                        x_title="Stability of Feature Selection",
+                        y_title=performance_metric, horizontal_spacing=0, vertical_spacing=0.03,
+                        # figure=fig
+                        )
+    row_number = 1
+    for summarized_result_df, data_display_name in zip(summarized_results_list, data_display_names_list):
+        # extract the standard deviation values for each performance metric
+        column_lists = [
+            [summarized_result_df.loc[idx, column_name] for idx in summarized_result_df.index if "std" in idx]
+            for column_name in summarized_result_df.columns
+        ]
+
+        # delete rows with "_std" from the index
+        summarized_result_df = summarized_result_df.drop(
+            index=[index for index in summarized_result_df.index if "std" in index]
+        )
+
+        # insert std as columns with column_name_std to the dataframe
+        for std_list, column in zip(column_lists, summarized_result_df.columns, strict=True):
+            summarized_result_df.loc[:, f"{column}_std"] = std_list
+
+        summarized_result_df["method"] = summarized_result_df.index
+        # rename the method names for better readability
+        for method in summarized_result_df["method"]:
+            if method == "reverse_random_forest":
+                summarized_result_df.loc[method, "method"] = "reverse random forest"
+            elif method == "gini_impurity_default_parameters":
+                summarized_result_df.loc[method, "method"] = "without HPO"
+            elif method == "gini_impurity":
+                summarized_result_df.loc[method, "method"] = "gini impurity"
+
+        text_positions = text_positions_dict.get(data_display_name, text_positions_dict["default"])
+        assert len(text_positions) == len(summarized_result_df["method"])
+        assert isinstance(text_positions, list)
+        fig.add_trace(
+            go.Scatter(
+                x=summarized_result_df["stability"],
+                y=summarized_result_df[performance_metric],
+                error_y=dict(
+                    type='data',
+                    array=summarized_result_df[f"{performance_metric}_std"],
+                    color="lightgrey",
+                ),
+                error_x=dict(
+                    type='data',
+                    array=summarized_result_df["stability_std"],
+                    color="lightgrey",
+                ),
+                mode='markers+text',
+                text=summarized_result_df["method"],
+                textposition=text_positions,
+                marker=dict(color=summarized_result_df["method"].apply(lambda x: color_map[x])),
+            ),
+            row=row_number, col=1
+        )
+        row_number += 1
+    # Update the axes and layout
+    fig.update_xaxes(range=[0, 1.001])
+    fig.update_yaxes(range=[0, 1.2])
+    fig.update_layout(showlegend=False, margin=dict(l=60, r=10, t=25, b=50))
+    fig.show()
+    return fig
+
 
 
 def plot_average_results(
@@ -615,6 +706,8 @@ def plot_average_results(
     assert len(text_positions) == len(summarized_result_df["method"])
     assert isinstance(text_positions, list)
     x_axis_title = "Stability of Feature Selection"
+
+    fig = make_subplots(rows=3, cols=1)
     for performance_metric in summarized_result_df.columns:
         # skip the columns without performance metrics
         if performance_metric in ["number of selected features", "stability", "method"] or "std" in performance_metric:
@@ -624,9 +717,9 @@ def plot_average_results(
         #     continue
 
         # plot scatter plot with error bars
-        fig = go.Figure()
-
+        # fig = go.Figure()
         fig.add_trace(
+        # fig.add_trace(
             go.Scatter(
                 x=summarized_result_df["stability"],
                 y=summarized_result_df[performance_metric],
@@ -664,24 +757,24 @@ def plot_average_results(
         #         ay=90,  # Adjust these values to position the text
         #     )
 
-        # Update the axes and layout
-        fig.update_xaxes(range=[0, 1.01])
-        fig.update_yaxes(range=[0, 1.09])
-        fig.update_layout(
-            title=data_display_name,
-            xaxis_title=x_axis_title,
-            yaxis_title=performance_metric,
-            margin=dict(l=10, r=10, t=25, b=10),
-            showlegend=False,
-            template="plotly_white",
-            height=200,
-        )
+    # Update the axes and layout
+    fig.update_xaxes(range=[0, 1.01])
+    fig.update_yaxes(range=[0, 1.09])
+    fig.update_layout(
+        title=data_display_name,
+        xaxis_title=x_axis_title,
+        yaxis_title=performance_metric,
+        margin=dict(l=10, r=10, t=25, b=10),
+        showlegend=False,
+        template="plotly_white",
+        height=200,
+    )
 
-        # save figure as pdf
-        if save:
-            plot_path = f"{path}/{data_display_name}_{performance_metric}.pdf"
-            pio.write_image(fig, plot_path)
-        fig.show()
+    # save figure as pdf
+    if save:
+        plot_path = f"{path}/{data_display_name}_{performance_metric}.pdf"
+        pio.write_image(fig, plot_path)
+    fig.show()
 
         # fig = px.scatter(
         #     summarized_result_df,
@@ -720,11 +813,11 @@ def plot_average_results(
         # fig.show()
 
         # remove x-axis title
-        x_axis_title = ""
+        # x_axis_title = ""
 
 
 def evaluate_data(
-    base_path: str, list_of_experiments: list[str], seeds: list[int], data_display_name: str, save_plots: bool = False
+    base_path: str, list_of_experiments: list[str], seeds: list[int], data_display_name: str, reload_evaluation_results: bool = False
 ):
     """Evaluate the feature selection results of the experiment series of the given data set.
 
@@ -733,18 +826,20 @@ def evaluate_data(
         list_of_experiments: A list of the experiment ids of repeated experiments to evaluate.
         seeds: A list of random seeds for the random forest classifier to ensure reproducibility.
         data_display_name: The name of the data set to display.
-        save_plots: A boolean indicating whether to save the plots. Defaults to False.
+        reload_evaluation_results: A boolean indicating whether to reload the evaluation results. Defaults to False.
 
     Returns:
         The summarized evaluation results.
     """
-    if Path(f"{base_path}/{data_display_name}__123evaluation_results.pkl").exists():
+    if reload_evaluation_results and Path(f"{base_path}/{data_display_name}_evaluation_results.pkl").exists():
+        logging.info(f"Loading evaluation results for {data_display_name}")
         # try to load the pickled evaluation results
         with open(f"{base_path}/{data_display_name}_evaluation_results.pkl", "rb") as file:
             list_of_result_dicts = pickle.load(file)
 
     else:
         # evaluate the feature selection results for the given data
+        logging.info(f"Evaluating {data_display_name}")
         list_of_result_dicts = evaluate_repeated_experiments(base_path, list_of_experiments, seeds)
         # Pickle the list of result dictionaries
         try:
@@ -756,18 +851,16 @@ def evaluate_data(
     summarized_evaluation_results = summarize_evaluation_results(list_of_result_dicts)
     create_latex_table(summarized_evaluation_results, data_display_name)
 
-    # plot the average results and the standard deviation
-    if save_plots:
-        # path to directory to save the plots
-        base_path_to_save_plots = f"{base_path}/images"
-        os.makedirs(base_path_to_save_plots, exist_ok=True)
-    else:
-        base_path_to_save_plots = ""
-
-    if "Random" not in data_display_name:
-        plot_average_results(summarized_evaluation_results, save_plots, base_path_to_save_plots, data_display_name)
-
-    # evaluation_results_dict = prepare_evaluation_results_for_plot(list_of_result_dicts)
+    # # plot the average results and the standard deviation
+    # if save_plots:
+    #     # path to directory to save the plots
+    #     base_path_to_save_plots = f"{base_path}/images"
+    #     os.makedirs(base_path_to_save_plots, exist_ok=True)
+    # else:
+    #     base_path_to_save_plots = ""
+    #
+    # if "Random" not in data_display_name:
+    #     plot_average_results(summarized_evaluation_results, save_plots, base_path_to_save_plots, data_display_name)
 
     return summarized_evaluation_results
 
@@ -784,30 +877,55 @@ def main():
     # evaluate the feature selection results for the given data
     experiments_dict = {
         "Colon Cancer": [
-            "colon_0_shuffle_seed_None_2HPreg",
-            "colon_1_shuffle_seed_None_2HPreg",
-            "colon_2_shuffle_seed_None_2HPreg",
+            "colon_0_shuffle_seed_None_rf",
+            "colon_1_shuffle_seed_None_rf",
+            "colon_2_shuffle_seed_None_rf",
         ],
         "Prostate Cancer": [
-            "prostate_0_shuffle_seed_None_2HPreg",
-            "prostate_1_shuffle_seed_None_2HPreg",
-            "prostate_2_shuffle_seed_None_2HPreg",
+            "prostate_0_shuffle_seed_None_rf",
+            "prostate_1_shuffle_seed_None_rf",
+            "prostate_2_shuffle_seed_None_rf",
         ],
         "Leukemia": [
-            "leukemia_big_0_shuffle_seed_None_2HPreg",
-            "leukemia_big_1_shuffle_seed_None_2HPreg",
-            "leukemia_big_2_shuffle_seed_None_2HPreg",
+            "leukemia_big_0_shuffle_seed_None_rf",
+            "leukemia_big_1_shuffle_seed_None_rf",
+            "leukemia_big_2_shuffle_seed_None_rf",
         ],
         "Random Noise Normal": [
-            "random_noise_normal_0_shuffle_seed_None_2HPreg",
-            "random_noise_normal_1_shuffle_seed_None_2HPreg",
-            "random_noise_normal_2_shuffle_seed_None_2HPreg",
+            "random_noise_normal_0_shuffle_seed_None_ranger",
+            "random_noise_normal_1_shuffle_seed_None_ranger",
+            "random_noise_normal_2_shuffle_seed_None_ranger",
         ],
         "Random Noise Lognormal": [
-            "random_noise_lognormal_0_shuffle_seed_None_2HPreg",
-            "random_noise_lognormal_1_shuffle_seed_None_2HPreg",
-            "random_noise_lognormal_2_shuffle_seed_None_2HPreg",
+            "random_noise_lognormal_0_shuffle_seed_None_ranger",
+            "random_noise_lognormal_1_shuffle_seed_None_ranger",
+            "random_noise_lognormal_2_shuffle_seed_None_ranger",
         ],
+        # "Colon Cancer": [
+        #     "colon_0_shuffle_seed_None_2HPreg",
+        #     "colon_1_shuffle_seed_None_2HPreg",
+        #     "colon_2_shuffle_seed_None_2HPreg",
+        # ],
+        # "Prostate Cancer": [
+        #     "prostate_0_shuffle_seed_None_2HPreg",
+        #     "prostate_1_shuffle_seed_None_2HPreg",
+        #     "prostate_2_shuffle_seed_None_2HPreg",
+        # ],
+        # "Leukemia": [
+        #     "leukemia_big_0_shuffle_seed_None_2HPreg",
+        #     "leukemia_big_1_shuffle_seed_None_2HPreg",
+        #     "leukemia_big_2_shuffle_seed_None_2HPreg",
+        # ],
+        # "Random Noise Normal": [
+        #     "random_noise_normal_0_shuffle_seed_None_2HPreg",
+        #     "random_noise_normal_1_shuffle_seed_None_2HPreg",
+        #     "random_noise_normal_2_shuffle_seed_None_2HPreg",
+        # ],
+        # "Random Noise Lognormal": [
+        #     "random_noise_lognormal_0_shuffle_seed_None_2HPreg",
+        #     "random_noise_lognormal_1_shuffle_seed_None_2HPreg",
+        #     "random_noise_lognormal_2_shuffle_seed_None_2HPreg",
+        # ],
         # "Leukemia": [
         #     "leukemia_big_0_shuffle_seed_None_3HP",
         #     "leukemia_big_1_shuffle_seed_None_3HP",
@@ -834,8 +952,22 @@ def main():
         #     "random_noise_lognormal_2_shuffle_seed_None_3HP",
         # ],
     }
+    performance_metric = "Average Precision Score"
+    #performance_metric = "Accuracy"
+    #performance_metric = "AUC"
+    summarized_evaluation_results_list = []
+    data_display_names_list = []
     for data_display_name, experiment_id_list in experiments_dict.items():
-        evaluate_data(base_path, experiment_id_list, seeds, data_display_name=data_display_name, save_plots=True)
+        summarized_evaluation_results = evaluate_data(base_path, experiment_id_list, seeds, data_display_name=data_display_name, reload_evaluation_results=True)
+        if "Random" not in data_display_name:
+            summarized_evaluation_results_list.append(summarized_evaluation_results)
+            data_display_names_list.append(data_display_name)
+    fig = extend_figure(summarized_evaluation_results_list, data_display_names_list, performance_metric=performance_metric)
+
+    # save figure
+    # pio.write_image(fig, f"{base_path}/images/{performance_metric}.pdf", width=3508, height=2480)
+    pio.write_image(fig, f"{base_path}/images/{performance_metric}.pdf", width=1000, height=600)
+
 
 
 if __name__ == "__main__":
