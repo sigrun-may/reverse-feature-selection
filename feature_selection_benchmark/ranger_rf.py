@@ -21,7 +21,9 @@ from sklearn.metrics import roc_auc_score
 warnings.filterwarnings("ignore")
 
 
-def optimized_ranger_random_forest_importance(data_df: pd.DataFrame, train_indices: np.ndarray, meta_data: dict) -> dict:
+def optimized_ranger_random_forest_importance(
+    data_df: pd.DataFrame, train_indices: np.ndarray, meta_data: dict
+) -> dict:
     """Calculate importance with the R ranger package with optimized hyperparameters.
 
     Args:
@@ -42,7 +44,7 @@ def optimized_ranger_random_forest_importance(data_df: pd.DataFrame, train_indic
             "regularization_factor": trial.suggest_float("regularization_factor", 0.001, 0.99),
             "seed": meta_data["random_state"],
         }
-        oob, _  = ranger_random_forest(data_df, train_indices, params)
+        oob, _ = ranger_random_forest(data_df, train_indices, params)
 
         # stop HPO if OOB score (proportion of misclassified observations) is already 0.0
         if math.isclose(oob, 0.0, rel_tol=1e-5):
@@ -74,8 +76,8 @@ def optimized_ranger_random_forest_importance(data_df: pd.DataFrame, train_indic
     oob_score, feature_importances = ranger_random_forest(data_df, train_indices, hyperparameters)
     return {
         "permutation": feature_importances,
-        f"best_params_ranger_permutation": hyperparameters,
-        f"oob_score_permutation": oob_score,
+        "best_params_ranger_permutation": hyperparameters,
+        "oob_score_permutation": oob_score,
     }
 
 
@@ -200,8 +202,7 @@ def ranger_random_forest(data_df: pd.DataFrame, train_indices, hyperparameters: 
     library(ranger)
 
     # train a ranger model with optimized hyperparameters    
-    train_ranger <- function(data, label, max_depth, num_trees, mtry, seed_random_forest, 
-                             regularization_factor){
+    train_ranger <- function(data, label, max_depth, num_trees, mtry, seed_random_forest, regularization_factor){
 
       # ensure label is a factor
       data[[label]] <- as.factor(data[[label]])
@@ -223,10 +224,6 @@ def ranger_random_forest(data_df: pd.DataFrame, train_indices, hyperparameters: 
                                 )
       # Retrieve the OOB error for debugging
       oob_error <- rf_model$prediction.error
-      
-      # # print treetype used
-      # print("treetype: ")
-      # print(rf_model$treetype)
 
       # get permutation importance
       importance <- rf_model$variable.importance
@@ -257,12 +254,10 @@ def ranger_random_forest(data_df: pd.DataFrame, train_indices, hyperparameters: 
     # check if the result_vector is an array of floats
     assert isinstance(result_vector, np.ndarray), "Result vector is not a numpy array."
     assert all(isinstance(x, float) for x in result_vector), "Result vector contains non-float values."
-    assert len(result_vector) == data_df.shape[1] # number of features + 1 (oob_error)
+    assert len(result_vector) == data_df.shape[1]  # number of features + 1 (oob_error)
     oob_error = result_vector[0]
     feature_importances = result_vector[1:]
     assert isinstance(feature_importances, np.ndarray), "Feature importances are not a numpy array."
     assert isinstance(oob_error, float), "OOB error is not a float."
-    assert feature_importances.shape[0] == data_df.shape[1] - 1 # exclude the label column
-    # print("number of selected features (permutation_importances): ", np.sum(feature_importances > 0))
+    assert feature_importances.shape[0] == data_df.shape[1] - 1  # exclude the label column
     return oob_error, feature_importances
-
