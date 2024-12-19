@@ -27,7 +27,7 @@ def calculate_oob_errors(
     train_df: pd.DataFrame,
     corr_matrix_df: pd.DataFrame,
     meta_data: dict,
-) -> tuple[list | None, list | None]:
+) -> tuple[list | None, list | None, int]:
     """Calculate out-of-bag (OOB) error for labeled and unlabeled training data.
 
     Args:
@@ -73,7 +73,7 @@ def calculate_oob_errors(
 
         # If the feature importance of the label feature is zero, it means the label was not considered in the model
         if label_importance_zero:
-            return None, None
+            return None, None, x_train.shape[1]
 
         # Store the OOB score for the labeled model
         oob_errors_labeled.append(clf1.oob_score_)
@@ -84,7 +84,7 @@ def calculate_oob_errors(
 
         # Store the OOB score for the unlabeled model
         oob_errors_unlabeled.append(clf2.oob_score_)
-    return oob_errors_labeled, oob_errors_unlabeled
+    return oob_errors_labeled, oob_errors_unlabeled, x_train.shape[1]
 
 
 def select_feature_subset(data_df: pd.DataFrame, train_indices: np.ndarray, meta_data: dict) -> pd.DataFrame:
@@ -136,15 +136,19 @@ def select_feature_subset(data_df: pd.DataFrame, train_indices: np.ndarray, meta
         delayed(calculate_oob_errors)(target_feature_name, train_df, correlation_matrix_df, meta_data)
         for target_feature_name in data_df.columns[1:]
     )
-    labeled_errors_list = []
-    unlabeled_errors_list = []
     p_value_list: list[float | None] = []
     fraction_list_mean: list[float | None] = []
     fraction_list_median: list[float | None] = []
-    for labeled_error_distribution, unlabeled_error_distribution in out:
-        labeled_errors_list.append(labeled_error_distribution)
-        unlabeled_errors_list.append(unlabeled_error_distribution)
 
+    # Unpack the results from the parallel processing
+    labeled_error_distribution_list, unlabeled_error_distribution_list, features_count_in_train_df = zip(
+        *out, strict=True
+    )
+
+    # Calculate the p-value and fraction differences based on the mean and median of the distributions
+    for labeled_error_distribution, unlabeled_error_distribution in zip(
+        labeled_error_distribution_list, unlabeled_error_distribution_list, strict=True
+    ):
         if labeled_error_distribution is None or unlabeled_error_distribution is None:
             # the current target feature was deselected because the feature importance of the label was zero
             p_value_list.append(None)
@@ -170,29 +174,36 @@ def select_feature_subset(data_df: pd.DataFrame, train_indices: np.ndarray, meta
         fraction_list_median.append(fraction_median_based)
 
     feature_subset_selection_list = []
+    feature_subset_selection_list_median = []
     # extract feature selection array
-    for p_value, fraction_mean in zip(p_value_list, fraction_list_mean, strict=True):
+    for p_value, fraction_mean, fraction_median in zip(
+        p_value_list, fraction_list_mean, fraction_list_median, strict=True
+    ):
         # check if the value of the "p_value" column is smaller or equal than 0.05
         if p_value is not None and p_value <= 0.05:
             feature_subset_selection_list.append(fraction_mean)
+            feature_subset_selection_list_median.append(fraction_median)
         else:
             feature_subset_selection_list.append(0.0)
+            feature_subset_selection_list_median.append(0.0)
 
     assert (
-        len(labeled_errors_list)
-        == len(unlabeled_errors_list)
+        len(labeled_error_distribution_list)
+        == len(unlabeled_error_distribution_list)
         == len(p_value_list)
         == len(fraction_list_mean)
         == len(fraction_list_median)
         == len(feature_subset_selection_list)
+        == len(feature_subset_selection_list_median)
         == data_df.shape[1] - 1  # exclude label column
     )
-
     result_df = pd.DataFrame(index=data_df.columns[1:])
     result_df["feature_subset_selection"] = feature_subset_selection_list
-    result_df["unlabeled_errors"] = unlabeled_errors_list
-    result_df["labeled_errors"] = labeled_errors_list
+    result_df["feature_subset_selection_median"] = feature_subset_selection_list_median
+    result_df["unlabeled_errors"] = unlabeled_error_distribution_list
+    result_df["labeled_errors"] = labeled_error_distribution_list
     result_df["p_value"] = p_value_list
     result_df["fraction_mean"] = fraction_list_mean
     result_df["fraction_median"] = fraction_list_median
+    result_df["train_features_count"] = np.full(len(feature_subset_selection_list), features_count_in_train_df)
     return result_df
