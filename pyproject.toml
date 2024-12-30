@@ -64,11 +64,10 @@ requests = "*"
 bs4 = "*"
 optuna = {version = "*", optional = true}
 plotly = {version = "*", optional = true}
-shap = {version = "*", optional = true}
 rpy2 = {version = "*", optional = true}
 
 [tool.poetry.extras]
-benchmark = ["optuna", "plotly", "shap", "rpy2"]
+benchmark = ["optuna", "plotly", "rpy2"]
 
 [tool.poetry.group.lint.dependencies]
 black = "*"
@@ -128,6 +127,8 @@ ignore = [
   "PT011",  # `pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception
   "PT001",  # Use `@pytest.fixture()` over `@pytest.fixture`
   "RUF015",  # Prefer `next(iter(sentences))` over single element slice
+  "S301",  # `pickle` and modules that wrap it can be unsafe when used to deserialize untrusted data, possible security issue
+  "G004",  # Logging statement uses f-string
 ]
 
 [tool.ruff.lint.per-file-ignores]
