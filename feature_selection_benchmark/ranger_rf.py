@@ -201,7 +201,7 @@ def ranger_random_forest(data_df: pd.DataFrame, train_indices, hyperparameters: 
     r_script = """
     library(ranger)
 
-    # train a ranger model with optimized hyperparameters    
+    # train a ranger model with optimized hyperparameters
     train_ranger <- function(data, label, max_depth, num_trees, mtry, seed_random_forest, regularization_factor){
 
       # ensure label is a factor
