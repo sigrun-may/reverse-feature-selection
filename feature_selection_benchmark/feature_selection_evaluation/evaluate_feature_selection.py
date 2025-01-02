@@ -14,7 +14,6 @@ from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
-# import plotly.express as px
 import plotly.graph_objects as go
 import plotly.io as pio
 from plotly.subplots import make_subplots
@@ -22,7 +21,10 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
     accuracy_score,
     average_precision_score,
-    roc_auc_score, cohen_kappa_score, recall_score, precision_score,
+    cohen_kappa_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
 )
 
 from feature_selection_benchmark.data_loader_tools import (
@@ -36,11 +38,14 @@ pio.kaleido.scope.mathjax = None
 # initialize the logger
 logging.basicConfig(level=logging.INFO)
 
+# define number of jobs for parallel processing
+N_JOBS = 4
+
 
 def train_and_predict(
     train_data: pd.DataFrame,
     test_data: pd.DataFrame,
-    feature_importance: np.ndarray,
+    feature_importance,
     seed: int,
 ) -> tuple:
     """Trains a model and predicts the labels for the test data.
@@ -48,7 +53,7 @@ def train_and_predict(
     Args:
         train_data: The training data.
         test_data: The test data.
-        feature_importance: The feature importance.
+        feature_importance: The feature importance. Must be array_like for numpy.
         seed: The random state for reproducibility.
 
     Returns:
@@ -86,17 +91,47 @@ def train_and_predict(
     return predicted_y, predicted_proba_y, y_test
 
 
-def calculate_performance(y_predict, y_predict_proba, y_true) -> dict[str, float]:
-    """Calculate the performance metrics for the predicted labels.
+def calculate_performance_metrics(
+    train_data_df: pd.DataFrame,
+    feature_subset_selection,
+    hold_out_test_data_df: pd.DataFrame,
+    shuffle_seed_hold_out_data: int,
+    seed_for_random_forest: int,
+):
+    """Calculate the performance metrics for the given hold-out test data.
 
     Args:
-        y_predict: The predicted labels.
-        y_predict_proba: The predicted probabilities.
-        y_true: The true labels.
+        train_data_df: The training data.
+        feature_subset_selection: The selected feature subset. Must be array_like for numpy.
+        hold_out_test_data_df: The hold-out test data.
+        shuffle_seed_hold_out_data: The random seed for shuffling the hold-out test data. Corresponds to the integer
+            of the number of hold-out test data shuffles starting with zero.
+        seed_for_random_forest: The random seed for reproducibility of the random forest.
 
     Returns:
-        A dictionary containing the performance metrics.
+        The performance metrics for the given hold-out test data.
     """
+    assert np.count_nonzero(feature_subset_selection) > 0, "No features selected."
+    assert "label" in train_data_df.columns, "Label column is missing."
+    assert "label" in hold_out_test_data_df.columns, "Label column is missing."
+    assert train_data_df.shape[1] - 1 == feature_subset_selection.size, train_data_df.shape[1]
+    assert hold_out_test_data_df.shape[1] - 1 == feature_subset_selection.size, hold_out_test_data_df.shape[1]
+    # check if train_data_df and hold_out_test_data_df are pd.DataFrames
+    assert isinstance(train_data_df, pd.DataFrame), "train_data_df is not a pd.DataFrame."
+    assert isinstance(hold_out_test_data_df, pd.DataFrame), "hold_out_test_data_df is not a pd.DataFrame."
+    # check if the indices are unique
+    assert train_data_df.index.is_unique, "Indices are not unique."
+    assert hold_out_test_data_df.index.is_unique, "Indices are not unique."
+
+    standardized_hold_out_test_data_df = standardize_sample_size_of_hold_out_data_single_df(
+        hold_out_test_data_df, shuffle_seed=shuffle_seed_hold_out_data
+    )
+    y_predict, y_predict_proba, y_true = train_and_predict(
+        train_data_df,
+        standardized_hold_out_test_data_df,
+        feature_subset_selection,
+        seed_for_random_forest,
+    )
     # extract the probability for the positive class for briar score calculation
     probability_positive_class = np.array([proba[1] for proba in y_predict_proba])
     performance_metrics_dict = {
@@ -112,182 +147,92 @@ def calculate_performance(y_predict, y_predict_proba, y_true) -> dict[str, float
     return performance_metrics_dict
 
 
-def calculate_performance_metrics_on_hold_out_data(
-    feature_subset_selection, shuffle_seed_hold_out_data, hold_out_test_data_df, seed_for_random_forest, train_data_df
-):
-    """Calculate the performance metrics for the given hold-out test data.
-
-    Args:
-        feature_subset_selection: The selected feature subset.
-        shuffle_seed_hold_out_data: The random seed for shuffling the hold-out test data.
-        hold_out_test_data_df: The hold-out test data.
-        seed_for_random_forest: The random seed for reproducibility of the random forest.
-        train_data_df: The training data.
-
-    Returns:
-        The performance metrics for the given hold-out test data.
-    """
-    standardized_hold_out_test_data_df = standardize_sample_size_of_hold_out_data_single_df(
-        hold_out_test_data_df, shuffle_seed=shuffle_seed_hold_out_data
-    )
-    y_predict, y_predict_proba, y_true = train_and_predict(
-        train_data_df,
-        standardized_hold_out_test_data_df,
-        feature_subset_selection,
-        seed_for_random_forest,
-    )
-    return calculate_performance(y_predict, y_predict_proba, y_true)
-
-
 def calculate_performance_metrics_on_shuffled_hold_out_subset(
-    train_data_df, hold_out_test_data_df, feature_subset_selection, seed_for_random_forest
+    train_data_df: pd.DataFrame,
+    feature_subset_selection,
+    hold_out_test_data_df: pd.DataFrame,
+    seed_for_random_forest: int,
 ) -> list[dict[str, float]]:
     """Calculate the performance metrics for the given hold-out test data.
 
     Args:
         train_data_df: The training data.
+        feature_subset_selection: The selected feature subset. Must be array_like for numpy.
         hold_out_test_data_df: The hold-out test data.
-        feature_subset_selection: The selected feature subset.
         seed_for_random_forest: The random seed for reproducibility of the random forest.
 
     Returns:
         The performance metrics for the given hold-out test data.
     """
     # parallelize iterations of shuffling the hold out test data with joblib
-    return joblib.Parallel(n_jobs=4)(
-        joblib.delayed(calculate_performance_metrics_on_hold_out_data)(
-            feature_subset_selection,
-            hold_out_shuffle_iteration,
-            hold_out_test_data_df,
-            seed_for_random_forest,
+    return joblib.Parallel(n_jobs=N_JOBS)(
+        joblib.delayed(calculate_performance_metrics)(
             train_data_df,
+            feature_subset_selection,
+            hold_out_test_data_df,
+            (hold_out_shuffle_iteration+10000),
+            seed_for_random_forest,
         )
-        for hold_out_shuffle_iteration in range(4)
+        for hold_out_shuffle_iteration in range(100)
     )
 
 
-def evaluate_reverse_random_forest(
-    input_result_dict: dict,
-    seed_for_random_forest: int,
+def evaluate_feature_selection(
+    loo_cv_iteration_list: list,
     experiment_data_df: pd.DataFrame,
     hold_out_test_data_df: pd.DataFrame,
-):
-    """Evaluate the feature selection results of the reverse random forest method.
+    seed_for_random_forest: int,
+    feature_selection_method_key: str,
+) -> dict:
+    """Evaluate the feature selection results.
 
     Args:
-        input_result_dict: The result dictionary containing the feature selection results.
-        seed_for_random_forest: The random seed for reproducibility.
+        loo_cv_iteration_list: List of leave-one-out cross-validation iterations.
         experiment_data_df: The experiment data containing the features and labels.
         hold_out_test_data_df: The hold-out data set as test data.
+        seed_for_random_forest: The random seed for reproducibility.
+        feature_selection_method_key: The key to access feature importance in the iteration results.
+
+    Returns:
+        A dictionary containing the evaluation results.
     """
-    assert "reverse_random_forest" in input_result_dict
-    loo_cv_iteration_list = input_result_dict["reverse_random_forest"]
-    assert len(loo_cv_iteration_list) == experiment_data_df.shape[0], len(loo_cv_iteration_list)
-
-    # initialize the flip parameter for the stability estimator
+    # flip is set to True if the feature subset selection is empty for at least one iteration
     flip = False
-
-    # initialize feature importance matrix with zeros (number of iterations x number of features)
-    feature_importance_matrix = np.zeros((len(loo_cv_iteration_list), len(loo_cv_iteration_list[0])))
-    performance_metrics = []
-
-    # iterate over the leave-one-out cross-validation iterations
+    feature_importance_matrix = np.zeros(
+        (len(loo_cv_iteration_list), len(loo_cv_iteration_list[0][feature_selection_method_key]))
+    )
+    performance_metrics_list = []
     for loo_idx, cv_iteration_result in enumerate(loo_cv_iteration_list):
-        feature_importance_matrix[loo_idx] = cv_iteration_result["feature_subset_selection"]
-
-        # check if the feature subset selection is empty
-        if np.count_nonzero(cv_iteration_result["feature_subset_selection"]) == 0:
-            flip = True  # flip the feature importance matrix for the stability estimator to avoid division by zero
+        feature_importances = cv_iteration_result[feature_selection_method_key]
+        if np.count_nonzero(feature_importances) == 0:
+            flip = True
             logging.warning(
-                f"Feature subset selection is empty for iteration {loo_idx}, skipping performance metrics calculation."
+                f"Feature subset selection is empty for iteration {loo_idx}, "
+                f"skipping performance metrics calculation."
             )
-            continue  # skip calculating the performance metrics
+            continue
 
-        # calculate the performance metrics
+        feature_importance_matrix[loo_idx] = feature_importances
         train_data_df = experiment_data_df.drop(index=loo_idx)
         assert train_data_df.shape[0] == experiment_data_df.shape[0] - 1
-        performance_metrics.extend(
+
+        performance_metrics_list.extend(
             calculate_performance_metrics_on_shuffled_hold_out_subset(
                 train_data_df,
+                feature_importances,
                 hold_out_test_data_df,
-                cv_iteration_result["feature_subset_selection"],
                 seed_for_random_forest,
             )
         )
-
-    # store the results in the result dictionary
-    input_result_dict["evaluation"]["reverse_random_forest"] = {
+    return {
         "importance_matrix": feature_importance_matrix,
         "stability": stability_estimator.calculate_stability(feature_importance_matrix, flip),
         "number of selected features": np.count_nonzero(feature_importance_matrix, axis=1),
-        "performance_metrics": pd.DataFrame(performance_metrics),
+        "performance_metrics_df": pd.DataFrame(performance_metrics_list),
     }
 
 
-def evaluate_standard_random_forest(
-    input_result_dict: dict,
-    seed_random_forest: int,
-    experiment_data_df: pd.DataFrame,
-    hold_out_test_data_df: pd.DataFrame,
-):
-    """Evaluate the feature selection results of the different standard random forest methods.
-
-    Args:
-        input_result_dict: The result dictionary containing the feature selection results.
-        seed_random_forest: The random seed for reproducibility of the random forest.
-        experiment_data_df: The experiment data containing the features and labels.
-        hold_out_test_data_df: The hold-out data set as test data.
-    """
-    # evaluate the feature selection results for the standard random forest
-    loo_cv_iteration_list = input_result_dict["standard_random_forest"]
-    assert len(loo_cv_iteration_list) == experiment_data_df.shape[0], len(loo_cv_iteration_list)
-
-    # initialize the flip parameter for the stability estimator
-    flip = False
-
-    # evaluate each importance calculation method
-    for importance_calculation_method in loo_cv_iteration_list[0]:
-        # exclude the train oob score and the best hyperparameters
-        if "score" in importance_calculation_method or "best" in importance_calculation_method:
-            continue
-
-        # initialize feature importance matrix with zeros (number of iterations x number of features)
-        feature_importance_matrix = np.zeros(
-            (len(loo_cv_iteration_list), len(loo_cv_iteration_list[0][importance_calculation_method]))
-        )
-
-        performance_metrics = []
-
-        # iterate over the leave-one-out cross-validation iterations
-        for loo_idx, loo_cv_iteration in enumerate(loo_cv_iteration_list):
-            feature_importances = loo_cv_iteration[importance_calculation_method]
-            feature_importance_matrix[loo_idx] = feature_importances
-
-            # check if the feature subset selection is empty
-            if np.count_nonzero(feature_importances) == 0:
-                flip = True  # flip the feature importance matrix for the stability estimator to avoid division by zero
-                logging.warning(
-                    f"Feature subset selection is empty for iteration {loo_idx}, skipping performance metrics calculation."
-                )
-                continue  # skip calculating the performance metrics
-
-            # calculate the performance metrics
-            train_data_df = experiment_data_df.drop(index=loo_idx)
-            assert train_data_df.shape[0] == experiment_data_df.shape[0] - 1
-
-            # parallelize 16 iterations of shuffling the hold out test data with joblib
-            performance_metrics.extend(calculate_performance_metrics_on_shuffled_hold_out_subset(train_data_df, hold_out_test_data_df, feature_importances, seed_random_forest))
-
-        # store the results in the result dictionary
-        input_result_dict["evaluation"][importance_calculation_method] = {
-            "importance_matrix": feature_importance_matrix,
-            "stability": stability_estimator.calculate_stability(feature_importance_matrix, flip),
-            "number of selected features": np.count_nonzero(feature_importance_matrix, axis=1),
-            "performance_metrics": pd.DataFrame(performance_metrics),
-        }
-
-
-def evaluate_experiment(
+def evaluate_benchmark_experiment(
     input_result_dict: dict,
     seed_random_forest: int,
 ):
@@ -305,48 +250,49 @@ def evaluate_experiment(
     # initialize the evaluation results
     input_result_dict["evaluation"] = {}
 
-    # evaluate the feature selection results for the standard random forest
+    # load the experiment data and the hold-out test data
     experiment_data_df, hold_out_test_data_df = load_train_test_data_for_standardized_sample_size(
         input_result_dict["reverse_random_forest_meta_data"]
     )
-    evaluate_standard_random_forest(input_result_dict, seed_random_forest, experiment_data_df, hold_out_test_data_df)
-    evaluate_reverse_random_forest(input_result_dict, seed_random_forest, experiment_data_df, hold_out_test_data_df)
+    # evaluate the feature selection results for the different standard random forest methods
+    loo_cv_iteration_list = input_result_dict["standard_random_forest"]
+    assert len(loo_cv_iteration_list) == experiment_data_df.shape[0], len(loo_cv_iteration_list)
 
-    # check if all evaluation performance metrics are different
-    for performance_metric in input_result_dict["evaluation"]["reverse_random_forest"]["performance_metrics"]:
-        comparison_series = input_result_dict["evaluation"]["reverse_random_forest"]["performance_metrics"][
+    for importance_calculation_method in loo_cv_iteration_list[0]:
+        if "score" in importance_calculation_method or "best" in importance_calculation_method:
+            continue
+
+        input_result_dict["evaluation"][importance_calculation_method] = evaluate_feature_selection(
+            loo_cv_iteration_list,
+            experiment_data_df,
+            hold_out_test_data_df,
+            seed_random_forest,
+            importance_calculation_method,
+        )
+
+    # evaluate the feature selection results for the reverse random forest method
+    loo_cv_iteration_list = input_result_dict["reverse_random_forest"]
+    assert len(loo_cv_iteration_list) == experiment_data_df.shape[0], len(loo_cv_iteration_list)
+
+    input_result_dict["evaluation"]["reverse_random_forest"] = evaluate_feature_selection(
+        loo_cv_iteration_list,
+        experiment_data_df,
+        hold_out_test_data_df,
+        seed_random_forest,
+        "feature_subset_selection",
+    )
+    # check if all evaluation performance metrics for reverse rf are different
+    for performance_metric in input_result_dict["evaluation"]["reverse_random_forest"]["performance_metrics_df"]:
+        comparison_series = input_result_dict["evaluation"]["reverse_random_forest"]["performance_metrics_df"][
             performance_metric
         ]
         for key, value in input_result_dict["evaluation"].items():
             if "reverse" not in key:
                 # compare two columns of a pandas dataframe
-                assert not comparison_series.equals(value["performance_metrics"][performance_metric])
+                assert not comparison_series.equals(value["performance_metrics_df"][performance_metric])
 
 
-def load_experiment_results(result_dict_path: str, experiment_id: str) -> dict:
-    """Load the raw experiment results from a pickle file.
-
-    Args:
-        result_dict_path: The path to dictionary of the pickled results files.
-        experiment_id: The id of the experiment.
-
-    Returns:
-        The loaded experiment results.
-
-    Raises:
-        FileNotFoundError: If the file does not exist.
-    """
-    file_path = os.path.join(result_dict_path, f"{experiment_id}_result_dict.pkl")
-    if not Path(file_path).exists():
-        raise FileNotFoundError(f"File {file_path} not found.")
-
-    with open(file_path, "rb") as file:
-        result_dict = pickle.load(file)
-
-    return result_dict
-
-
-def evaluate_repeated_experiments(
+def evaluate_repeated_benchmark_experiments(
     result_dict_path: str,
     repeated_experiments: list[str],
     seeds: list[int],
@@ -361,17 +307,26 @@ def evaluate_repeated_experiments(
     Returns:
         Evaluation results for each feature selection method.
     """
+    # Initialize lists to store the random seeds to ensure the uniqueness of each random seed
     random_states_rf = []
     random_seeds_reverse_rf = []
 
-    repeated_result_dicts = []
+    list_of_result_dicts = []
 
     # iterate over all repeated experiments
     for experiment_id, seed in zip(repeated_experiments, seeds, strict=True):
-        logging.info(f"Evaluating experiment {experiment_id}")
-        result_dict = load_experiment_results(result_dict_path, experiment_id)
+        # load the result dictionary for the given experiment
+        file_path = os.path.join(result_dict_path, f"{experiment_id}_result_dict.pkl")
+        if not Path(file_path).exists():
+            raise FileNotFoundError(f"File {file_path} not found.")
+
+        with open(file_path, "rb") as file:
+            result_dict = pickle.load(file)
+
+        # collect the random states for the standard random forest from the metadata
         random_states_rf.append(result_dict["standard_random_forest_meta_data"]["random_state"])
         if "reverse_random_forest_meta_data" in result_dict:
+            # collect the random seeds for the reverse random forest from the metadata
             random_seeds_reverse_rf.append(result_dict["reverse_random_forest_meta_data"]["random_seeds"])
 
         # check if the result dictionary already contains the evaluation results
@@ -381,14 +336,52 @@ def evaluate_repeated_experiments(
             del result_dict["evaluation"]
 
         # evaluate the experiment
-        evaluate_experiment(result_dict, seed)
-        repeated_result_dicts.append(result_dict)
+        evaluate_benchmark_experiment(result_dict, seed)
+        list_of_result_dicts.append(result_dict)
 
-    assert len(random_states_rf) == len(repeated_experiments), "Random states are missing."
-    assert len(set(random_states_rf)) == len(repeated_experiments), "Random states have duplicates."
+    assert len(random_states_rf) == len(repeated_experiments), "Seeds are missing."
+    assert len(set(random_states_rf)) == len(repeated_experiments), "Seeds have duplicates."
     check_random_seeds_equality(random_seeds_reverse_rf, repeated_experiments)
+    return list_of_result_dicts
 
-    return repeated_result_dicts
+
+def evaluate_data_set(
+    base_path: str,
+    list_of_experiments: list[str],
+    seeds: list[int],
+    data_display_name: str,
+    reload_evaluation_results: bool = False,
+):
+    """Evaluate the feature selection results of the experiment series of the given data set.
+
+    Args:
+        base_path: The base path to the pickled results files.
+        list_of_experiments: A list of the experiment ids of repeated experiments to evaluate.
+        seeds: A list of random seeds for the random forest classifier to ensure reproducibility.
+        data_display_name: The name of the data set to display.
+        reload_evaluation_results: A boolean indicating whether to reload the evaluation results. Defaults to False.
+
+    Returns:
+        The summarized evaluation results.
+    """
+    if reload_evaluation_results and Path(f"{base_path}/{data_display_name}_evaluation_results.pkl").exists():
+        logging.info(f"Loading evaluation results for {data_display_name}")
+        # load the pickled evaluation results
+        with open(f"{base_path}/{data_display_name}_evaluation_results.pkl", "rb") as file:
+            list_of_result_dicts = pickle.load(file)
+
+    else:
+        # evaluate the feature selection results for the given data
+        logging.info(f"Evaluating {data_display_name}")
+        list_of_result_dicts = evaluate_repeated_benchmark_experiments(base_path, list_of_experiments, seeds)
+
+        # pickle the list of result dictionaries
+        with open(f"{base_path}/{data_display_name}_evaluation_results.pkl", "wb") as file:
+            pickle.dump(list_of_result_dicts, file)
+
+    summarized_evaluation_results = summarize_evaluation_results(list_of_result_dicts)
+    create_latex_table(summarized_evaluation_results, data_display_name)
+    return summarized_evaluation_results
 
 
 def check_random_seeds_equality(random_seeds_reverse_rf, repeated_experiments):
@@ -418,6 +411,11 @@ def summarize_evaluation_results(
 ) -> pd.DataFrame:
     """Summarize the evaluation results for the given list of result dictionaries.
 
+    Summarizes a list of result dictionaries containing evaluation results into a single pandas DataFrame.
+    It aggregates performance metrics, stability, and the number of selected features for each feature selection
+    method across multiple experiments. The function calculates the mean and standard deviation for these metrics
+    and returns the summarized results in a DataFrame.
+
     Args:
         list_of_result_dicts: A list of result dictionaries containing the evaluation results.
 
@@ -425,31 +423,55 @@ def summarize_evaluation_results(
         The summarized evaluation results.
     """
     summarized_result_dict: dict[str, dict] = {}
+    intermediate_result_dict = summarized_result_dict.copy()
+
     for result_dict in list_of_result_dicts:
         for key, value in result_dict["evaluation"].items():
             assert isinstance(value["stability"], float)
             if key not in summarized_result_dict:
                 summarized_result_dict[key] = {
-                    "performance_metrics": value["performance_metrics"],
+                    "performance_metrics_df": value["performance_metrics_df"],
                     "stability": [value["stability"]],
                     "number of selected features": value["number of selected features"].tolist(),
                 }
             else:
-                summarized_result_dict[key]["performance_metrics"] = pd.concat(
-                    [summarized_result_dict[key]["performance_metrics"], value["performance_metrics"]], axis=0
+                summarized_result_dict[key]["performance_metrics_df"] = pd.concat(
+                    [summarized_result_dict[key]["performance_metrics_df"], value["performance_metrics_df"]], axis=0
                 )
                 summarized_result_dict[key]["stability"].append(value["stability"])
                 summarized_result_dict[key]["number of selected features"].extend(value["number of selected features"])
 
+        mean_of_summarized_result_dict = {
+            key: {
+                "performance_metrics_df": value["performance_metrics_df"].mean(),
+                "stability": np.mean(value["stability"]),
+                "number of selected features": np.mean(value["number of selected features"]),
+            }
+            for key, value in summarized_result_dict.items()
+        }
+        # check if the mean of the lists in the intermediate_result_dict differ in every iteration
+        if len(intermediate_result_dict) > 0:
+            # check if the mean in mean_of_summarized_result_dict is different from the previous iteration
+            for key, value in mean_of_summarized_result_dict.items():
+                assert not intermediate_result_dict[key]["performance_metrics_df"].equals(
+                    value["performance_metrics_df"]
+                )
+                assert intermediate_result_dict[key]["stability"] != value["stability"]
+                assert (
+                    intermediate_result_dict[key]["number of selected features"] != value["number of selected features"]
+                )
+        intermediate_result_dict = mean_of_summarized_result_dict.copy()
 
     # initialize the summarized dataframe with the columns of the performance metrics
-    summarized_df = pd.DataFrame(columns=summarized_result_dict["reverse_random_forest"]["performance_metrics"].columns)
+    summarized_df = pd.DataFrame(
+        columns=summarized_result_dict["reverse_random_forest"]["performance_metrics_df"].columns
+    )
     for feature_selection_method_name, metrics in summarized_result_dict.items():
         if "shap" in feature_selection_method_name:
             continue
 
-        summarized_df.loc[feature_selection_method_name] = metrics["performance_metrics"].mean()
-        summarized_df.loc[f"{feature_selection_method_name}_std"] = metrics["performance_metrics"].std()
+        summarized_df.loc[feature_selection_method_name] = metrics["performance_metrics_df"].mean()
+        summarized_df.loc[f"{feature_selection_method_name}_std"] = metrics["performance_metrics_df"].std()
         summarized_df.loc[feature_selection_method_name, "stability"] = np.mean(metrics["stability"])
         summarized_df.loc[f"{feature_selection_method_name}_std", "stability"] = np.std(metrics["stability"])
         summarized_df.loc[feature_selection_method_name, "number of selected features"] = np.mean(
@@ -471,7 +493,7 @@ def create_latex_table(summarized_evaluation_results_df: pd.DataFrame, data_disp
     df_for_latex = summarized_evaluation_results_df.copy()
 
     for column_name in df_for_latex:
-        # round the floats to five decimal places
+        # round the floats to three decimal places
         df_for_latex[column_name] = df_for_latex[column_name].apply(lambda x: f"{x:.3f}")
 
         for index_name in df_for_latex.index:
@@ -479,7 +501,7 @@ def create_latex_table(summarized_evaluation_results_df: pd.DataFrame, data_disp
                 # insert latex code and append std to mean values
                 df_for_latex.loc[index_name, column_name] = (
                     f"${df_for_latex.loc[index_name, column_name]}"
-                    f"\pm{df_for_latex.loc[index_name+'_std', column_name]}$"
+                    f"\pm{df_for_latex.loc[index_name+'_std', column_name]}$"  # noqa: W605
                 )
             else:
                 continue
@@ -532,45 +554,425 @@ def create_latex_table(summarized_evaluation_results_df: pd.DataFrame, data_disp
         )
     )
 
-def extend_figure(summarized_results_list: list[pd.DataFrame], data_display_names_list: list[str], performance_metric: str = "Accuracy"):
-    color_map = {
-        "reverse random forest": "red",
-        "without HPO": "black",
-        "gini impurity": "green",
-        "permutation": "blue",
-    }
-    # set the positions for the text labels
-    text_positions_dict = {
-        # text = gini, without HPO, permutation, reverse random forest
-        "Colon Cancer": ["top center", "bottom right", "bottom right", "bottom right"],
-        "Prostate Cancer": ["top center", "top left", "bottom center", "top right"],
-        # text = permutation, gini, without HPO, reverse random forest
-        "Leukemia": ["top left", "top center", "bottom left", "bottom center"],
-        "default": ["bottom left", "bottom left", "bottom left", "bottom left"],
-    }
-    fig = make_subplots(rows=3, cols=1, shared_xaxes=True, shared_yaxes=True, subplot_titles=data_display_names_list,
-                        x_title="Stability of Feature Selection",
-                        y_title=performance_metric, horizontal_spacing=0, vertical_spacing=0.03,
-                        # figure=fig
-                        )
-    row_number = 1
-    for summarized_result_df, data_display_name in zip(summarized_results_list, data_display_names_list):
-        # extract the standard deviation values for each performance metric
-        column_lists = [
-            [summarized_result_df.loc[idx, column_name] for idx in summarized_result_df.index if "std" in idx]
-            for column_name in summarized_result_df.columns
-        ]
 
-        # delete rows with "_std" from the index
-        summarized_result_df = summarized_result_df.drop(
-            index=[index for index in summarized_result_df.index if "std" in index]
+def initialize_figure(data_names_list: list[str], performance_metric: str) -> tuple:
+    """Initialize the figure for the given data names list and performance metric.
+
+    Args:
+        data_names_list: The list of names of the analysed data sets.
+        performance_metric: The performance metric to display. Possible values are "Accuracy", "AUC",
+            "Average Precision Score", "Cohen's Kappa", "Precision", "Sensitivity", "Specificity".
+
+    Returns:
+        The initialized figure, color map, and text positions dictionary.
+    """
+    # check if data_names_list contains repetitions of the same data set with a different correlation threshold
+    if "thres" in data_names_list[0]:
+        # intialize the figure with the given data name
+        fig = go.Figure(
+            layout_title_text="Different values for the correlation threshold parameter",
+            # make background white
+            layout={
+                "paper_bgcolor": "white",
+                "plot_bgcolor": "white",
+            },
+        )
+        fig.update_xaxes(title="Stability of Feature Selection")
+        fig.update_yaxes(title=performance_metric)
+        fig.update_layout(margin={"l": 60, "r": 10, "t": 25, "b": 50})
+        # # set color map
+        # color_map = {
+        #     "threshold 0.1": "white",
+        #     "threshold 0.2": "lightgrey",
+        #     "threshold 0.3": "grey",
+        #     "threshold 0.4": "darkgrey",
+        # }
+        # # set the positions for the text labels
+        # text_positions_dict = {
+        #     "Leukemia threshold 0.1": "middle center",
+        #     "Leukemia threshold 0.2": "middle center",
+        #     "Leukemia threshold 0.3": "middle center",
+        #     "Leukemia threshold 0.4": "middle center",
+        #     "default": "middle center",
+        # }
+        color_map = text_positions_dict = None
+
+    else:
+        # set the colors for the different methods
+        color_map = {
+            "reverse random forest": "red",
+            "without HPO": "black",
+            "gini impurity": "green",
+            "permutation": "blue",
+        }
+        # set the positions for the text labels
+        text_positions_dict = {
+            # text = gini, without HPO, permutation, reverse random forest
+            "Colon Cancer": ["top center", "bottom right", "bottom right", "bottom right"],
+            "Prostate Cancer": ["top center", "top left", "bottom center", "top right"],
+            # text = permutation, gini, without HPO, reverse random forest
+            "Leukemia": ["top left", "top center", "bottom left", "bottom center"],
+            "default": ["bottom left", "bottom left", "bottom left", "bottom left"],
+        }
+        fig = make_subplots(
+            rows=len(data_names_list),
+            cols=1,
+            shared_xaxes=True,
+            shared_yaxes=True,
+            subplot_titles=data_names_list,
+            x_title="Stability of Feature Selection",
+            y_title=performance_metric,
+            horizontal_spacing=0,
+            vertical_spacing=0.03,
+        )
+        # Update the axes and layout
+        fig.update_xaxes(range=[0, 1.001])
+        fig.update_yaxes(range=[0, 1.2])
+        fig.update_layout(showlegend=False, margin={"l": 60, "r": 10, "t": 25, "b": 50})
+
+    return fig, color_map, text_positions_dict
+
+
+#
+# def extend_figure(
+#     summarized_results_list: list[pd.DataFrame],
+#     data_display_names_list: list[str],
+#     performance_metric: str = "Accuracy",
+# ):
+#     """Extend the figure with the given summarized results.
+#
+#     Args:
+#         summarized_results_list: The list of summarized results.
+#         data_display_names_list: The list of data display names.
+#         performance_metric: The performance metric to display. Defaults to "Accuracy".
+#     """
+#     color_map = {
+#         "reverse random forest": "red",
+#         "without HPO": "black",
+#         "gini impurity": "green",
+#         "permutation": "blue",
+#     }
+#     # set the positions for the text labels
+#     text_positions_dict = {
+#         # text = gini, without HPO, permutation, reverse random forest
+#         "Colon Cancer": ["top center", "bottom right", "bottom right", "bottom right"],
+#         "Prostate Cancer": ["top center", "top left", "bottom center", "top right"],
+#         # text = permutation, gini, without HPO, reverse random forest
+#         "Leukemia": ["top left", "top center", "bottom left", "bottom center"],
+#         "default": ["bottom left", "bottom left", "bottom left", "bottom left"],
+#     }
+#     fig = make_subplots(
+#         rows=3,
+#         cols=1,
+#         shared_xaxes=True,
+#         shared_yaxes=True,
+#         subplot_titles=data_display_names_list,
+#         x_title="Stability of Feature Selection",
+#         y_title=performance_metric,
+#         horizontal_spacing=0,
+#         vertical_spacing=0.03,
+#         # figure=fig
+#     )
+#     # Update the axes and layout
+#     fig.update_xaxes(range=[0, 1.001])
+#     fig.update_yaxes(range=[0, 1.2])
+#     fig.update_layout(showlegend=False, margin={"l": 60, "r": 10, "t": 25, "b": 50})
+#
+#     row_number = 1
+#     for summarized_result_df, data_display_name in zip(summarized_results_list, data_display_names_list, strict=True):
+#         # extract the standard deviation values for each performance metric
+#         column_lists = [
+#             [summarized_result_df.loc[idx, column_name] for idx in summarized_result_df.index if "std" in idx]
+#             for column_name in summarized_result_df.columns
+#         ]
+#
+#         # delete rows with "_std" from the index
+#         summarized_result_df = summarized_result_df.drop(
+#             index=[index for index in summarized_result_df.index if "std" in index]
+#         )
+#
+#         # insert std as columns with column_name_std to the dataframe
+#         for std_list, column in zip(column_lists, summarized_result_df.columns, strict=True):
+#             summarized_result_df.loc[:, f"{column}_std"] = std_list
+#
+#         summarized_result_df["method"] = summarized_result_df.index
+#         # rename the method names for better readability
+#         for method in summarized_result_df["method"]:
+#             if method == "reverse_random_forest":
+#                 summarized_result_df.loc[method, "method"] = "reverse random forest"
+#             elif method == "gini_impurity_default_parameters":
+#                 summarized_result_df.loc[method, "method"] = "without HPO"
+#             elif method == "gini_impurity":
+#                 summarized_result_df.loc[method, "method"] = "gini impurity"
+#
+#         text_positions = text_positions_dict.get(data_display_name, text_positions_dict["default"])
+#         assert len(text_positions) == len(summarized_result_df["method"])
+#         assert isinstance(text_positions, list)
+#         fig.add_trace(
+#             go.Scatter(
+#                 x=summarized_result_df["stability"],
+#                 y=summarized_result_df[performance_metric],
+#                 error_y={
+#                     "type": "data",
+#                     "array": summarized_result_df[f"{performance_metric}_std"],
+#                     "color": "lightgrey",
+#                 },
+#                 error_x={
+#                     "type": "data",
+#                     "array": summarized_result_df["stability_std"],
+#                     "color": "lightgrey",
+#                 },
+#                 mode="markers+text",
+#                 text=summarized_result_df["method"],
+#                 textposition=text_positions,
+#                 marker={"color": summarized_result_df["method"].apply(lambda x: color_map[x])},
+#             ),
+#             row=row_number,
+#             col=1,
+#         )
+#         row_number += 1
+#
+#     fig.show()
+#     return fig
+#
+#
+# def plot_average_results(
+#     summarized_result_df: pd.DataFrame,
+#     save: bool = False,
+#     path: str = "",
+#     data_display_name: str = "Data",
+# ):
+#     """Plot the average results and the standard deviation for the given result dictionary.
+#
+#     Args:
+#         summarized_result_df: The dataframe containing the evaluated results to plot.
+#         save: A boolean indicating whether to save the plot as a pdf. Defaults to False.
+#         path: The path to save the plot. Defaults to an empty string.
+#         data_display_name: The name of the data to plot. Defaults to "Data".
+#     """
+#     # extract the standard deviation values for each performance metric
+#     column_lists = [
+#         [summarized_result_df.loc[idx, column_name] for idx in summarized_result_df.index if "std" in idx]
+#         for column_name in summarized_result_df.columns
+#     ]
+#
+#     # delete rows with "_std" from the index
+#     summarized_result_df = summarized_result_df.drop(
+#         index=[index for index in summarized_result_df.index if "std" in index]
+#     )
+#
+#     # insert std as columns with column_name_std to the dataframe
+#     for std_list, column in zip(column_lists, summarized_result_df.columns, strict=True):
+#         summarized_result_df.loc[:, f"{column}_std"] = std_list
+#
+#     summarized_result_df["method"] = summarized_result_df.index
+#
+#     # rename the method names for better readability
+#     for method in summarized_result_df["method"]:
+#         if method == "reverse_random_forest":
+#             summarized_result_df.loc[method, "method"] = "reverse random forest"
+#         elif method == "gini_impurity_default_parameters":
+#             summarized_result_df.loc[method, "method"] = "without HPO"
+#         elif method == "gini_impurity":
+#             summarized_result_df.loc[method, "method"] = "gini impurity"
+#
+#     color_map = {
+#         "reverse random forest": "red",
+#         "without HPO": "green",
+#         "gini impurity": "green",
+#         "permutation": "blue",
+#     }
+#
+#     # set the positions for the text labels
+#     text_positions_dict = {
+#         # text = gini, without HPO, permutation, reverse random forest
+#         "Colon Cancer": ["top center", "bottom right", "bottom left", "bottom right"],
+#         "Prostate Cancer": ["top right", "top center", "bottom left", "bottom right"],
+#         # text = permutation, gini, without HPO, reverse random forest
+#         "Leukemia": ["bottom right", "top center", "bottom left", "bottom center"],
+#         "default": ["bottom left", "bottom left", "bottom left", "bottom left"],
+#     }
+#     text_positions = text_positions_dict.get(data_display_name, text_positions_dict["default"])
+#     print(data_display_name)
+#     print(text_positions, summarized_result_df["method"])
+#     assert len(text_positions) == len(summarized_result_df["method"])
+#     assert isinstance(text_positions, list)
+#     x_axis_title = "Stability of Feature Selection"
+#
+#     fig = make_subplots(rows=3, cols=1)
+#     for performance_metric in summarized_result_df.columns:
+#         # skip the columns without performance metrics
+#         if performance_metric in ["number of selected features", "stability", "method"] or
+#         "std" in performance_metric:
+#             continue
+#
+#         # if not performance_metric == "Accuracy":
+#         #     continue
+#
+#         # plot scatter plot with error bars
+#         fig.add_trace(
+#             go.Scatter(
+#                 x=summarized_result_df["stability"],
+#                 y=summarized_result_df[performance_metric],
+#                 error_y={
+#                     "type": "data",
+#                     "array": summarized_result_df[f"{performance_metric}_std"],
+#                     "color": "lightgrey",
+#                 },
+#                 error_x={
+#                     "type": "data",
+#                     "array": summarized_result_df["stability_std"],
+#                     "color": "lightgrey",
+#                 },
+#                 mode="markers+text",
+#                 text=summarized_result_df["method"],
+#                 textposition=text_positions,
+#                 marker={"color": summarized_result_df["method"].apply(lambda x: color_map[x])},
+#             )
+#         )
+#
+#     # Update the axes and layout
+#     fig.update_xaxes(range=[0, 1.01])
+#     fig.update_yaxes(range=[0, 1.09])
+#     fig.update_layout(
+#         title=data_display_name,
+#         xaxis_title=x_axis_title,
+#         yaxis_title=performance_metric,
+#         margin={"l": 10, "r": 10, "t": 25, "b": 10},
+#         showlegend=False,
+#         template="plotly_white",
+#         height=200,
+#     )
+#
+#     # save figure as pdf
+#     if save:
+#         plot_path = f"{path}/{data_display_name}_{performance_metric}.pdf"
+#         pio.write_image(fig, plot_path)
+#     fig.show()
+#
+#     # fig = px.scatter(
+#     #     summarized_result_df,
+#     #     x="stability",
+#     #     y=performance_metric,
+#     #     error_y=f"{performance_metric}_std",
+#     #     error_x="stability_std",
+#     #     hover_data=["method"],
+#     #     # text=[
+#     #     #     "gini",
+#     #     #     "without HPO",
+#     #     #     # "shap",
+#     #     #     # "gini corrected",
+#     #     #     "permutation",
+#     #     #     "reverse random forest",
+#     #     # ],  # "method",  # Add method name to each data point
+#     #     text=summarized_result_df["method"],
+#     #     template="plotly_white",
+#     #     height=200,
+#     #     color="method",
+#     # )
+#     # fig.update_xaxes(range=[0, 1.01])
+#     # fig.update_yaxes(range=[0, 1.09])
+#     # fig.update_layout(
+#     #     xaxis_title=x_axis_title,
+#     #     yaxis_title=performance_metric,
+#     #     margin={"l": 10, "r": 10, "t": 10, "b": 10},
+#     #     showlegend=True,
+#     # )
+#     # fig.update_traces(textposition=text_positions)
+#     #
+#     # # save figure as pdf
+#     # if save:
+#     #     plot_path = f"{path}/{data_display_name}_{performance_metric}.pdf"
+#     #     pio.write_image(fig, plot_path)
+#     # fig.show()
+#
+#     # remove x-axis title
+#     # x_axis_title = ""
+
+
+def visualize_results(
+    summarized_evaluation_results_df: pd.DataFrame,
+    data_display_name: str,
+    performance_metric: str,
+    row_number: int,
+    fig=None,
+    color_map=None,
+    text_positions_dict=None,
+):
+    """Visualize the results for the given data set.
+
+    Args:
+        summarized_evaluation_results_df: Dataframe containing the summarized evaluation results of repeated experiments
+            for one data set.
+        data_display_name: The name of the data set to display.
+        performance_metric: The performance metric to display.
+        row_number: The row number of the subplot.
+        fig: The plotly figure to extend. Defaults to None.
+        color_map: The color map for the different methods. Defaults to None.
+        text_positions_dict: The text positions for the method labels. Defaults to None.
+
+    Returns:
+        The updated plotly figure.
+    """
+    # extract the standard deviation values for each performance metric
+    column_lists = [
+        [
+            summarized_evaluation_results_df.loc[idx, column_name]
+            for idx in summarized_evaluation_results_df.index
+            if "std" in idx
+        ]
+        for column_name in summarized_evaluation_results_df.columns
+    ]
+    # delete rows with "_std" from the index
+    summarized_result_df = summarized_evaluation_results_df.drop(
+        index=[index for index in summarized_evaluation_results_df.index if "std" in index]
+    )
+    # insert std as columns with column_name_std to the dataframe
+    for std_list, column in zip(column_lists, summarized_result_df.columns, strict=True):
+        summarized_result_df.loc[:, f"{column}_std"] = std_list
+
+    summarized_result_df["method"] = summarized_result_df.index
+
+    # check if the data set is a correlation threshold parameter experiment
+    if "threshold" in data_display_name:
+        # drop all methods except for the reverse random forest
+        summarized_result_df = summarized_result_df.loc[["reverse_random_forest"]]
+
+        # rename the method name and append the current threshold
+        summarized_result_df.loc["reverse_random_forest", "method"] = f"{' '.join(data_display_name.split(' ')[1:])}"
+
+        # round number of selected features to two decimal places
+        summarized_result_df["number of selected features"] = summarized_result_df["number of selected features"].round(
+            2
         )
 
-        # insert std as columns with column_name_std to the dataframe
-        for std_list, column in zip(column_lists, summarized_result_df.columns, strict=True):
-            summarized_result_df.loc[:, f"{column}_std"] = std_list
-
-        summarized_result_df["method"] = summarized_result_df.index
+        fig.add_trace(
+            go.Scatter(
+                x=summarized_result_df["stability"],
+                y=summarized_result_df[performance_metric],
+                error_y={
+                    "type": "data",
+                    "array": summarized_result_df[f"{performance_metric}_std"],
+                    "color": "lightgrey",
+                },
+                error_x={
+                    "type": "data",
+                    "array": summarized_result_df["stability_std"],
+                    "color": "lightgrey",
+                },
+                mode="markers+text",
+                text=summarized_result_df["number of selected features"],
+                # set size corresponding to the number of selected features
+                marker_size=summarized_result_df["number of selected features"],
+                # add text as element to legend
+                name=summarized_result_df["method"].to_numpy[0],
+                # marker={"color": summarized_result_df["method"].apply(lambda x: color_map[x])},
+            ),
+        )
+    else:
+        text_positions = text_positions_dict.get(data_display_name, text_positions_dict["default"])
+        assert len(text_positions) == len(summarized_result_df["method"])
+        assert isinstance(text_positions, list)
         # rename the method names for better readability
         for method in summarized_result_df["method"]:
             if method == "reverse_random_forest":
@@ -580,287 +982,85 @@ def extend_figure(summarized_results_list: list[pd.DataFrame], data_display_name
             elif method == "gini_impurity":
                 summarized_result_df.loc[method, "method"] = "gini impurity"
 
-        text_positions = text_positions_dict.get(data_display_name, text_positions_dict["default"])
-        assert len(text_positions) == len(summarized_result_df["method"])
-        assert isinstance(text_positions, list)
         fig.add_trace(
             go.Scatter(
                 x=summarized_result_df["stability"],
                 y=summarized_result_df[performance_metric],
-                error_y=dict(
-                    type='data',
-                    array=summarized_result_df[f"{performance_metric}_std"],
-                    color="lightgrey",
-                ),
-                error_x=dict(
-                    type='data',
-                    array=summarized_result_df["stability_std"],
-                    color="lightgrey",
-                ),
-                mode='markers+text',
+                error_y={
+                    "type": "data",
+                    "array": summarized_result_df[f"{performance_metric}_std"],
+                    "color": "lightgrey",
+                },
+                error_x={
+                    "type": "data",
+                    "array": summarized_result_df["stability_std"],
+                    "color": "lightgrey",
+                },
+                mode="markers+text",
                 text=summarized_result_df["method"],
                 textposition=text_positions,
-                marker=dict(color=summarized_result_df["method"].apply(lambda x: color_map[x])),
+                marker={"color": summarized_result_df["method"].apply(lambda x: color_map[x])},
             ),
-            row=row_number, col=1
+            row=row_number,
+            col=1,
         )
-        row_number += 1
-    # Update the axes and layout
-    fig.update_xaxes(range=[0, 1.001])
-    fig.update_yaxes(range=[0, 1.2])
-    fig.update_layout(showlegend=False, margin=dict(l=60, r=10, t=25, b=50))
-    fig.show()
     return fig
-
-
-
-def plot_average_results(
-    summarized_result_df: pd.DataFrame,
-    save: bool = False,
-    path: str = "",
-    data_display_name: str = "Data",
-):
-    """Plot the average results and the standard deviation for the given result dictionary.
-
-    Args:
-        summarized_result_df: The dataframe containing the evaluated results to plot.
-        save: A boolean indicating whether to save the plot as a pdf. Defaults to False.
-        path: The path to save the plot. Defaults to an empty string.
-        data_display_name: The name of the data to plot. Defaults to "Data".
-    """
-    # extract the standard deviation values for each performance metric
-    column_lists = [
-        [summarized_result_df.loc[idx, column_name] for idx in summarized_result_df.index if "std" in idx]
-        for column_name in summarized_result_df.columns
-    ]
-
-    # delete rows with "_std" from the index
-    summarized_result_df = summarized_result_df.drop(
-        index=[index for index in summarized_result_df.index if "std" in index]
-    )
-
-    # insert std as columns with column_name_std to the dataframe
-    for std_list, column in zip(column_lists, summarized_result_df.columns, strict=True):
-        summarized_result_df.loc[:, f"{column}_std"] = std_list
-
-    summarized_result_df["method"] = summarized_result_df.index
-
-    # rename the method names for better readability
-    for method in summarized_result_df["method"]:
-        if method == "reverse_random_forest":
-            summarized_result_df.loc[method, "method"] = "reverse random forest"
-        elif method == "gini_impurity_default_parameters":
-            summarized_result_df.loc[method, "method"] = "without HPO"
-        elif method == "gini_impurity":
-            summarized_result_df.loc[method, "method"] = "gini impurity"
-
-    color_map = {
-        "reverse random forest": "red",
-        "without HPO": "green",
-        "gini impurity": "green",
-        "permutation": "blue",
-    }
-
-    # set the positions for the text labels
-    text_positions_dict = {
-        # text = gini, without HPO, permutation, reverse random forest
-        "Colon Cancer": ["top center", "bottom right", "bottom left", "bottom right"],
-        "Prostate Cancer": ["top right", "top center", "bottom left", "bottom right"],
-        # text = permutation, gini, without HPO, reverse random forest
-        "Leukemia": ["bottom right", "top center", "bottom left", "bottom center"],
-        "default": ["bottom left", "bottom left", "bottom left", "bottom left"],
-    }
-    text_positions = text_positions_dict.get(data_display_name, text_positions_dict["default"])
-    print(data_display_name)
-    print(text_positions, summarized_result_df["method"])
-    assert len(text_positions) == len(summarized_result_df["method"])
-    assert isinstance(text_positions, list)
-    x_axis_title = "Stability of Feature Selection"
-
-    fig = make_subplots(rows=3, cols=1)
-    for performance_metric in summarized_result_df.columns:
-        # skip the columns without performance metrics
-        if performance_metric in ["number of selected features", "stability", "method"] or "std" in performance_metric:
-            continue
-
-        # if not performance_metric == "Accuracy":
-        #     continue
-
-        # plot scatter plot with error bars
-        # fig = go.Figure()
-        fig.add_trace(
-        # fig.add_trace(
-            go.Scatter(
-                x=summarized_result_df["stability"],
-                y=summarized_result_df[performance_metric],
-                error_y=dict(
-                    type='data',
-                    array=summarized_result_df[f"{performance_metric}_std"],
-                    color="lightgrey",
-                ),
-                error_x=dict(
-                    type='data',
-                    array=summarized_result_df["stability_std"],
-                    color="lightgrey",
-                ),
-                # error_y=dict(type='data', array=summarized_result_df[f"{performance_metric}_std"]),
-                # error_x=dict(type='data', array=summarized_result_df["stability_std"]),
-                mode='markers+text',
-                text=summarized_result_df["method"],
-                textposition=text_positions,
-                marker=dict(color=summarized_result_df["method"].apply(lambda x: color_map[x])),
-            )
-        )
-        # # Add annotations with arrows
-        # for i, method in enumerate(summarized_result_df["method"]):
-        #     if "gini" in method and "Colon" in data_display_name:
-        #         ax = 5
-        #     else:
-        #         ax = 0
-        #     fig.add_annotation(
-        #         x=summarized_result_df["stability"].iloc[i],
-        #         y=summarized_result_df[performance_metric].iloc[i],
-        #         text=method,
-        #         showarrow=False,
-        #         arrowhead=0,
-        #         ax=ax,  # Adjust these values to position the text
-        #         ay=90,  # Adjust these values to position the text
-        #     )
-
-    # Update the axes and layout
-    fig.update_xaxes(range=[0, 1.01])
-    fig.update_yaxes(range=[0, 1.09])
-    fig.update_layout(
-        title=data_display_name,
-        xaxis_title=x_axis_title,
-        yaxis_title=performance_metric,
-        margin=dict(l=10, r=10, t=25, b=10),
-        showlegend=False,
-        template="plotly_white",
-        height=200,
-    )
-
-    # save figure as pdf
-    if save:
-        plot_path = f"{path}/{data_display_name}_{performance_metric}.pdf"
-        pio.write_image(fig, plot_path)
-    fig.show()
-
-        # fig = px.scatter(
-        #     summarized_result_df,
-        #     x="stability",
-        #     y=performance_metric,
-        #     error_y=f"{performance_metric}_std",
-        #     error_x="stability_std",
-        #     hover_data=["method"],
-        #     # text=[
-        #     #     "gini",
-        #     #     "without HPO",
-        #     #     # "shap",
-        #     #     # "gini corrected",
-        #     #     "permutation",
-        #     #     "reverse random forest",
-        #     # ],  # "method",  # Add method name to each data point
-        #     text=summarized_result_df["method"],
-        #     template="plotly_white",
-        #     height=200,
-        #     color="method",
-        # )
-        # fig.update_xaxes(range=[0, 1.01])
-        # fig.update_yaxes(range=[0, 1.09])
-        # fig.update_layout(
-        #     xaxis_title=x_axis_title,
-        #     yaxis_title=performance_metric,
-        #     margin={"l": 10, "r": 10, "t": 10, "b": 10},
-        #     showlegend=True,
-        # )
-        # fig.update_traces(textposition=text_positions)
-        #
-        # # save figure as pdf
-        # if save:
-        #     plot_path = f"{path}/{data_display_name}_{performance_metric}.pdf"
-        #     pio.write_image(fig, plot_path)
-        # fig.show()
-
-        # remove x-axis title
-        # x_axis_title = ""
-
-
-def evaluate_data(
-    base_path: str, list_of_experiments: list[str], seeds: list[int], data_display_name: str, reload_evaluation_results: bool = False
-):
-    """Evaluate the feature selection results of the experiment series of the given data set.
-
-    Args:
-        base_path: The base path to the pickled results files.
-        list_of_experiments: A list of the experiment ids of repeated experiments to evaluate.
-        seeds: A list of random seeds for the random forest classifier to ensure reproducibility.
-        data_display_name: The name of the data set to display.
-        reload_evaluation_results: A boolean indicating whether to reload the evaluation results. Defaults to False.
-
-    Returns:
-        The summarized evaluation results.
-    """
-    if reload_evaluation_results and Path(f"{base_path}/{data_display_name}_evaluation_results.pkl").exists():
-        logging.info(f"Loading evaluation results for {data_display_name}")
-        # try to load the pickled evaluation results
-        with open(f"{base_path}/{data_display_name}_evaluation_results.pkl", "rb") as file:
-            list_of_result_dicts = pickle.load(file)
-
-    else:
-        # evaluate the feature selection results for the given data
-        logging.info(f"Evaluating {data_display_name}")
-        list_of_result_dicts = evaluate_repeated_experiments(base_path, list_of_experiments, seeds)
-        # Pickle the list of result dictionaries
-        try:
-            with open(f"{base_path}/{data_display_name}_evaluation_results.pkl", "wb") as file:
-                pickle.dump(list_of_result_dicts, file)
-        except (OSError, pickle.PicklingError) as e:
-            logging.error(f"Failed to save evaluation results: {e}")
-
-    summarized_evaluation_results = summarize_evaluation_results(list_of_result_dicts)
-    create_latex_table(summarized_evaluation_results, data_display_name)
-
-    # # plot the average results and the standard deviation
-    # if save_plots:
-    #     # path to directory to save the plots
-    #     base_path_to_save_plots = f"{base_path}/images"
-    #     os.makedirs(base_path_to_save_plots, exist_ok=True)
-    # else:
-    #     base_path_to_save_plots = ""
-    #
-    # if "Random" not in data_display_name:
-    #     plot_average_results(summarized_evaluation_results, save_plots, base_path_to_save_plots, data_display_name)
-
-    return summarized_evaluation_results
 
 
 def main():
     """Run the evaluation for the given experiments."""
     # seeds for the random forest classifier for each repeated experiment
-    seeds = [2042, 2043, 2044]
-    # seeds = [2042, 2043]
+    seeds = [2, 424, 20000]
+    # seeds = [2]
 
     # base path to the pickled results files
     base_path = "../../results"
 
     # evaluate the feature selection results for the given data
     experiments_dict = {
-        "Colon Cancer": [
-            "colon_0_shuffle_seed_None_rf",
-            "colon_1_shuffle_seed_None_rf",
-            "colon_2_shuffle_seed_None_rf",
-        ],
-        "Prostate Cancer": [
-            "prostate_0_shuffle_seed_None_rf",
-            "prostate_1_shuffle_seed_None_rf",
-            "prostate_2_shuffle_seed_None_rf",
-        ],
-        "Leukemia": [
-            "leukemia_big_0_shuffle_seed_None_rf",
-            "leukemia_big_1_shuffle_seed_None_rf",
-            "leukemia_big_2_shuffle_seed_None_rf",
-        ],
+        # "Colon Cancer": [
+        #     "colon_0_shuffle_seed_None_rf",
+        #     "colon_1_shuffle_seed_None_rf",
+        #     "colon_2_shuffle_seed_None_rf",
+        # ],
+        # "Prostate Cancer": [
+        #     "prostate_0_shuffle_seed_None_thres_01_ranger",
+        #     "prostate_1_shuffle_seed_None_thres_01_ranger",
+        #     "prostate_2_shuffle_seed_None_thres_01_ranger",
+        # ],
+        # "Leukemia": [
+        #     "leukemia_big_0_shuffle_seed_None_thres_04_ranger",
+        # ],
+        # "Prostate Cancer": [
+        #     "prostate_0_shuffle_seed_None_rf",
+        #     "prostate_1_shuffle_seed_None_rf",
+        #     "prostate_2_shuffle_seed_None_rf",
+        # ],
+        # "Leukemia": [
+        #     "leukemia_big_0_shuffle_seed_None_rf",
+        #     "leukemia_big_1_shuffle_seed_None_rf",
+        #     "leukemia_big_2_shuffle_seed_None_rf",
+        # ],
+        # "Leukemia threshold 0.1": [
+        #     "leukemia_big_0_shuffle_seed_None_thres_01_ranger",
+        #     # "leukemia_big_1_shuffle_seed_None_thres_01_ranger",
+        #     # "leukemia_big_2_shuffle_seed_None_thres_01_ranger",
+        # ],
+        # "Leukemia threshold 0.2": [
+        #     "leukemia_big_0_shuffle_seed_None_rf",
+        #     # "leukemia_big_1_shuffle_seed_None_rf",
+        #     # "leukemia_big_2_shuffle_seed_None_rf",
+        # ],
+        # "Leukemia threshold 0.3": [
+        #     "leukemia_big_0_shuffle_seed_None_thres_03_ranger",
+        #     # "leukemia_big_1_shuffle_seed_None_thres_01_ranger",
+        #     # "leukemia_big_2_shuffle_seed_None_thres_01_ranger",
+        # ],
+        # "Leukemia threshold 0.4": [
+        #     "leukemia_big_0_shuffle_seed_None_thres_04_ranger",
+        #     # "leukemia_big_1_shuffle_seed_None_thres_01_ranger",
+        #     # "leukemia_big_2_shuffle_seed_None_thres_01_ranger",
+        # ],
         "Random Noise Normal": [
             "random_noise_normal_0_shuffle_seed_None_ranger",
             "random_noise_normal_1_shuffle_seed_None_ranger",
@@ -871,73 +1071,40 @@ def main():
             "random_noise_lognormal_1_shuffle_seed_None_ranger",
             "random_noise_lognormal_2_shuffle_seed_None_ranger",
         ],
-        # "Colon Cancer": [
-        #     "colon_0_shuffle_seed_None_2HPreg",
-        #     "colon_1_shuffle_seed_None_2HPreg",
-        #     "colon_2_shuffle_seed_None_2HPreg",
-        # ],
-        # "Prostate Cancer": [
-        #     "prostate_0_shuffle_seed_None_2HPreg",
-        #     "prostate_1_shuffle_seed_None_2HPreg",
-        #     "prostate_2_shuffle_seed_None_2HPreg",
-        # ],
-        # "Leukemia": [
-        #     "leukemia_big_0_shuffle_seed_None_2HPreg",
-        #     "leukemia_big_1_shuffle_seed_None_2HPreg",
-        #     "leukemia_big_2_shuffle_seed_None_2HPreg",
-        # ],
-        # "Random Noise Normal": [
-        #     "random_noise_normal_0_shuffle_seed_None_2HPreg",
-        #     "random_noise_normal_1_shuffle_seed_None_2HPreg",
-        #     "random_noise_normal_2_shuffle_seed_None_2HPreg",
-        # ],
-        # "Random Noise Lognormal": [
-        #     "random_noise_lognormal_0_shuffle_seed_None_2HPreg",
-        #     "random_noise_lognormal_1_shuffle_seed_None_2HPreg",
-        #     "random_noise_lognormal_2_shuffle_seed_None_2HPreg",
-        # ],
-        # "Leukemia": [
-        #     "leukemia_big_0_shuffle_seed_None_3HP",
-        #     "leukemia_big_1_shuffle_seed_None_3HP",
-        #     #"leukemia_big_2_shuffle_seed_None_3HP",
-        # ],
-        # "Colon Cancer": [
-        #     #"colon_0_shuffle_seed_None_3HP",
-        #     "colon_1_shuffle_seed_None_3HP",
-        #     "colon_2_shuffle_seed_None_3HP",
-        # ],
-        # "Prostate Cancer": [
-        #     "prostate_0_shuffle_seed_None_3HP",
-        #     "prostate_1_shuffle_seed_None_3HP",
-        #     "prostate_2_shuffle_seed_None_3HP",
-        # ],
-        # "Random Noise Normal": [
-        #     "random_noise_normal_0_shuffle_seed_None_3HP",
-        #     "random_noise_normal_1_shuffle_seed_None_3HP",
-        #     "random_noise_normal_2_shuffle_seed_None_3HP",
-        # ],
-        # "Random Noise Lognormal": [
-        #     #"random_noise_lognormal_0_shuffle_seed_None_3HP",
-        #     "random_noise_lognormal_1_shuffle_seed_None_3HP",
-        #     "random_noise_lognormal_2_shuffle_seed_None_3HP",
-        # ],
     }
+    # extract all experiments without random noise
+    data_names_list = [data_display_name for data_display_name in experiments_dict if "andom" not in data_display_name]
+
+    # define the performance metric to plot
     performance_metric = "Average Precision Score"
-    #performance_metric = "Accuracy"
-    #performance_metric = "AUC"
-    summarized_evaluation_results_list = []
-    data_display_names_list = []
+
+    # initialize the figure for the feature selection method comparison
+    fig, color_map, text_positions_dict = initialize_figure(data_names_list, performance_metric)
+
+    row_number_in_subplot = 1
     for data_display_name, experiment_id_list in experiments_dict.items():
-        summarized_evaluation_results = evaluate_data(base_path, experiment_id_list, seeds, data_display_name=data_display_name, reload_evaluation_results=False)
-        if "Random" not in data_display_name:
-            summarized_evaluation_results_list.append(summarized_evaluation_results)
-            data_display_names_list.append(data_display_name)
-    fig = extend_figure(summarized_evaluation_results_list, data_display_names_list, performance_metric=performance_metric)
+        summarized_evaluation_results_df = evaluate_data_set(
+            base_path, experiment_id_list, seeds, data_display_name=data_display_name, reload_evaluation_results=False
+        )
+        if data_display_name in data_names_list:
+            # visualize the results
+            fig = visualize_results(
+                summarized_evaluation_results_df,
+                data_display_name,
+                performance_metric,
+                row_number_in_subplot,
+                fig,
+                color_map,
+                text_positions_dict,
+            )
+            row_number_in_subplot += 1
 
-    # save figure
-    # pio.write_image(fig, f"{base_path}/images/{performance_metric}.pdf", width=3508, height=2480)
-    pio.write_image(fig, f"{base_path}/images/{performance_metric}.pdf", width=1000, height=600)
+    fig.show()
 
+    # # save figure
+    # # pio.write_image(fig, f"{base_path}/images/{performance_metric}.pdf", width=3508, height=2480)
+    # pio.write_image(fig, f"{base_path}/images/{performance_metric}.pdf", width=1000, height=600)
+    pio.write_image(fig, f"{base_path}/images/{performance_metric}.pdf", width=800, height=600)
 
 
 if __name__ == "__main__":
