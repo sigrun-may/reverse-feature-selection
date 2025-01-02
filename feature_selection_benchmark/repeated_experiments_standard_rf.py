@@ -29,9 +29,11 @@ def main():
 
     # iterate over all files in the directory
     for file in result_base_path.iterdir():
-        #if "result_dict" not in file.name:
-        if "2HPreg_result_dict" not in file.name:
+        if "random" not in file.name:
             continue
+        # if "result_dict" not in file.name:
+        # if "shuffle_seed_None" not in file.name or "ranger" in file.name:
+        #     continue
 
         # extract the experiment id from the file name
         experiment_id = file.stem.split("_result_dict")[0]
@@ -92,7 +94,7 @@ def main():
         result_dict["standard_random_forest_meta_data"] = meta_data_dict
 
         # save results
-        result_dict_path = Path(f"{result_base_path}/{meta_data_dict['experiment_id']}_ranger_minimized.pkl")
+        result_dict_path = Path(f"{result_base_path}/{meta_data_dict['experiment_id']}_stdrf_result_dict.pkl")
         with open(result_dict_path, "wb") as result_file:
             pickle.dump(result_dict, result_file, protocol=pickle.HIGHEST_PROTOCOL)
 
