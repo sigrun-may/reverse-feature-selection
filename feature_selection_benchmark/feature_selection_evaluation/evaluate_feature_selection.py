@@ -851,9 +851,10 @@ def main():
         fig.show()
 
         # save figure
-        # pio.write_image(fig, f"{base_path}/images/{performance_metric}.pdf", width=3508, height=2480)
-        pio.write_image(fig, f"{base_path}/images/{performance_metric}.pdf", width=1000, height=600)
-        # pio.write_image(fig, f"{base_path}/images/{performance_metric}.pdf", width=800, height=600)
+        # plot dimension for the data set comparison experiment
+        # pio.write_image(fig, f"{base_path}/images/{performance_metric}.pdf", width=1000, height=600)
+        # plot dimension for the correlation threshold parameter experiment
+        pio.write_image(fig, f"{base_path}/images/{performance_metric}.pdf", width=800, height=600)
 
 
 if __name__ == "__main__":
