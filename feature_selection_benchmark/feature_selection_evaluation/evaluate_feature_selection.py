@@ -39,7 +39,7 @@ pio.kaleido.scope.mathjax = None
 logging.basicConfig(level=logging.INFO)
 
 # define number of jobs for parallel processing
-N_JOBS = 4
+N_JOBS = 1
 
 
 def train_and_predict(
@@ -173,7 +173,7 @@ def calculate_performance_metrics_on_shuffled_hold_out_subset(
             (hold_out_shuffle_iteration+10000),
             seed_for_random_forest,
         )
-        for hold_out_shuffle_iteration in range(100)
+        for hold_out_shuffle_iteration in range(1)
     )
 
 
@@ -633,263 +633,6 @@ def initialize_figure(data_names_list: list[str], performance_metric: str) -> tu
     return fig, color_map, text_positions_dict
 
 
-#
-# def extend_figure(
-#     summarized_results_list: list[pd.DataFrame],
-#     data_display_names_list: list[str],
-#     performance_metric: str = "Accuracy",
-# ):
-#     """Extend the figure with the given summarized results.
-#
-#     Args:
-#         summarized_results_list: The list of summarized results.
-#         data_display_names_list: The list of data display names.
-#         performance_metric: The performance metric to display. Defaults to "Accuracy".
-#     """
-#     color_map = {
-#         "reverse random forest": "red",
-#         "without HPO": "black",
-#         "gini impurity": "green",
-#         "permutation": "blue",
-#     }
-#     # set the positions for the text labels
-#     text_positions_dict = {
-#         # text = gini, without HPO, permutation, reverse random forest
-#         "Colon Cancer": ["top center", "bottom right", "bottom right", "bottom right"],
-#         "Prostate Cancer": ["top center", "top left", "bottom center", "top right"],
-#         # text = permutation, gini, without HPO, reverse random forest
-#         "Leukemia": ["top left", "top center", "bottom left", "bottom center"],
-#         "default": ["bottom left", "bottom left", "bottom left", "bottom left"],
-#     }
-#     fig = make_subplots(
-#         rows=3,
-#         cols=1,
-#         shared_xaxes=True,
-#         shared_yaxes=True,
-#         subplot_titles=data_display_names_list,
-#         x_title="Stability of Feature Selection",
-#         y_title=performance_metric,
-#         horizontal_spacing=0,
-#         vertical_spacing=0.03,
-#         # figure=fig
-#     )
-#     # Update the axes and layout
-#     fig.update_xaxes(range=[0, 1.001])
-#     fig.update_yaxes(range=[0, 1.2])
-#     fig.update_layout(showlegend=False, margin={"l": 60, "r": 10, "t": 25, "b": 50})
-#
-#     row_number = 1
-#     for summarized_result_df, data_display_name in zip(summarized_results_list, data_display_names_list, strict=True):
-#         # extract the standard deviation values for each performance metric
-#         column_lists = [
-#             [summarized_result_df.loc[idx, column_name] for idx in summarized_result_df.index if "std" in idx]
-#             for column_name in summarized_result_df.columns
-#         ]
-#
-#         # delete rows with "_std" from the index
-#         summarized_result_df = summarized_result_df.drop(
-#             index=[index for index in summarized_result_df.index if "std" in index]
-#         )
-#
-#         # insert std as columns with column_name_std to the dataframe
-#         for std_list, column in zip(column_lists, summarized_result_df.columns, strict=True):
-#             summarized_result_df.loc[:, f"{column}_std"] = std_list
-#
-#         summarized_result_df["method"] = summarized_result_df.index
-#         # rename the method names for better readability
-#         for method in summarized_result_df["method"]:
-#             if method == "reverse_random_forest":
-#                 summarized_result_df.loc[method, "method"] = "reverse random forest"
-#             elif method == "gini_impurity_default_parameters":
-#                 summarized_result_df.loc[method, "method"] = "without HPO"
-#             elif method == "gini_impurity":
-#                 summarized_result_df.loc[method, "method"] = "gini impurity"
-#
-#         text_positions = text_positions_dict.get(data_display_name, text_positions_dict["default"])
-#         assert len(text_positions) == len(summarized_result_df["method"])
-#         assert isinstance(text_positions, list)
-#         fig.add_trace(
-#             go.Scatter(
-#                 x=summarized_result_df["stability"],
-#                 y=summarized_result_df[performance_metric],
-#                 error_y={
-#                     "type": "data",
-#                     "array": summarized_result_df[f"{performance_metric}_std"],
-#                     "color": "lightgrey",
-#                 },
-#                 error_x={
-#                     "type": "data",
-#                     "array": summarized_result_df["stability_std"],
-#                     "color": "lightgrey",
-#                 },
-#                 mode="markers+text",
-#                 text=summarized_result_df["method"],
-#                 textposition=text_positions,
-#                 marker={"color": summarized_result_df["method"].apply(lambda x: color_map[x])},
-#             ),
-#             row=row_number,
-#             col=1,
-#         )
-#         row_number += 1
-#
-#     fig.show()
-#     return fig
-#
-#
-# def plot_average_results(
-#     summarized_result_df: pd.DataFrame,
-#     save: bool = False,
-#     path: str = "",
-#     data_display_name: str = "Data",
-# ):
-#     """Plot the average results and the standard deviation for the given result dictionary.
-#
-#     Args:
-#         summarized_result_df: The dataframe containing the evaluated results to plot.
-#         save: A boolean indicating whether to save the plot as a pdf. Defaults to False.
-#         path: The path to save the plot. Defaults to an empty string.
-#         data_display_name: The name of the data to plot. Defaults to "Data".
-#     """
-#     # extract the standard deviation values for each performance metric
-#     column_lists = [
-#         [summarized_result_df.loc[idx, column_name] for idx in summarized_result_df.index if "std" in idx]
-#         for column_name in summarized_result_df.columns
-#     ]
-#
-#     # delete rows with "_std" from the index
-#     summarized_result_df = summarized_result_df.drop(
-#         index=[index for index in summarized_result_df.index if "std" in index]
-#     )
-#
-#     # insert std as columns with column_name_std to the dataframe
-#     for std_list, column in zip(column_lists, summarized_result_df.columns, strict=True):
-#         summarized_result_df.loc[:, f"{column}_std"] = std_list
-#
-#     summarized_result_df["method"] = summarized_result_df.index
-#
-#     # rename the method names for better readability
-#     for method in summarized_result_df["method"]:
-#         if method == "reverse_random_forest":
-#             summarized_result_df.loc[method, "method"] = "reverse random forest"
-#         elif method == "gini_impurity_default_parameters":
-#             summarized_result_df.loc[method, "method"] = "without HPO"
-#         elif method == "gini_impurity":
-#             summarized_result_df.loc[method, "method"] = "gini impurity"
-#
-#     color_map = {
-#         "reverse random forest": "red",
-#         "without HPO": "green",
-#         "gini impurity": "green",
-#         "permutation": "blue",
-#     }
-#
-#     # set the positions for the text labels
-#     text_positions_dict = {
-#         # text = gini, without HPO, permutation, reverse random forest
-#         "Colon Cancer": ["top center", "bottom right", "bottom left", "bottom right"],
-#         "Prostate Cancer": ["top right", "top center", "bottom left", "bottom right"],
-#         # text = permutation, gini, without HPO, reverse random forest
-#         "Leukemia": ["bottom right", "top center", "bottom left", "bottom center"],
-#         "default": ["bottom left", "bottom left", "bottom left", "bottom left"],
-#     }
-#     text_positions = text_positions_dict.get(data_display_name, text_positions_dict["default"])
-#     print(data_display_name)
-#     print(text_positions, summarized_result_df["method"])
-#     assert len(text_positions) == len(summarized_result_df["method"])
-#     assert isinstance(text_positions, list)
-#     x_axis_title = "Stability of Feature Selection"
-#
-#     fig = make_subplots(rows=3, cols=1)
-#     for performance_metric in summarized_result_df.columns:
-#         # skip the columns without performance metrics
-#         if performance_metric in ["number of selected features", "stability", "method"] or
-#         "std" in performance_metric:
-#             continue
-#
-#         # if not performance_metric == "Accuracy":
-#         #     continue
-#
-#         # plot scatter plot with error bars
-#         fig.add_trace(
-#             go.Scatter(
-#                 x=summarized_result_df["stability"],
-#                 y=summarized_result_df[performance_metric],
-#                 error_y={
-#                     "type": "data",
-#                     "array": summarized_result_df[f"{performance_metric}_std"],
-#                     "color": "lightgrey",
-#                 },
-#                 error_x={
-#                     "type": "data",
-#                     "array": summarized_result_df["stability_std"],
-#                     "color": "lightgrey",
-#                 },
-#                 mode="markers+text",
-#                 text=summarized_result_df["method"],
-#                 textposition=text_positions,
-#                 marker={"color": summarized_result_df["method"].apply(lambda x: color_map[x])},
-#             )
-#         )
-#
-#     # Update the axes and layout
-#     fig.update_xaxes(range=[0, 1.01])
-#     fig.update_yaxes(range=[0, 1.09])
-#     fig.update_layout(
-#         title=data_display_name,
-#         xaxis_title=x_axis_title,
-#         yaxis_title=performance_metric,
-#         margin={"l": 10, "r": 10, "t": 25, "b": 10},
-#         showlegend=False,
-#         template="plotly_white",
-#         height=200,
-#     )
-#
-#     # save figure as pdf
-#     if save:
-#         plot_path = f"{path}/{data_display_name}_{performance_metric}.pdf"
-#         pio.write_image(fig, plot_path)
-#     fig.show()
-#
-#     # fig = px.scatter(
-#     #     summarized_result_df,
-#     #     x="stability",
-#     #     y=performance_metric,
-#     #     error_y=f"{performance_metric}_std",
-#     #     error_x="stability_std",
-#     #     hover_data=["method"],
-#     #     # text=[
-#     #     #     "gini",
-#     #     #     "without HPO",
-#     #     #     # "shap",
-#     #     #     # "gini corrected",
-#     #     #     "permutation",
-#     #     #     "reverse random forest",
-#     #     # ],  # "method",  # Add method name to each data point
-#     #     text=summarized_result_df["method"],
-#     #     template="plotly_white",
-#     #     height=200,
-#     #     color="method",
-#     # )
-#     # fig.update_xaxes(range=[0, 1.01])
-#     # fig.update_yaxes(range=[0, 1.09])
-#     # fig.update_layout(
-#     #     xaxis_title=x_axis_title,
-#     #     yaxis_title=performance_metric,
-#     #     margin={"l": 10, "r": 10, "t": 10, "b": 10},
-#     #     showlegend=True,
-#     # )
-#     # fig.update_traces(textposition=text_positions)
-#     #
-#     # # save figure as pdf
-#     # if save:
-#     #     plot_path = f"{path}/{data_display_name}_{performance_metric}.pdf"
-#     #     pio.write_image(fig, plot_path)
-#     # fig.show()
-#
-#     # remove x-axis title
-#     # x_axis_title = ""
-
-
 def visualize_results(
     summarized_evaluation_results_df: pd.DataFrame,
     data_display_name: str,
@@ -1018,11 +761,11 @@ def main():
 
     # evaluate the feature selection results for the given data
     experiments_dict = {
-        # "Colon Cancer": [
-        #     "colon_0_shuffle_seed_None_rf",
-        #     "colon_1_shuffle_seed_None_rf",
-        #     "colon_2_shuffle_seed_None_rf",
-        # ],
+        "Colon Cancer": [
+            "colon_0_shuffle_seed_None_rf",
+            "colon_1_shuffle_seed_None_rf",
+            "colon_2_shuffle_seed_None_rf",
+        ],
         # "Prostate Cancer": [
         #     "prostate_0_shuffle_seed_None_thres_01_ranger",
         #     "prostate_1_shuffle_seed_None_thres_01_ranger",
@@ -1031,16 +774,16 @@ def main():
         # "Leukemia": [
         #     "leukemia_big_0_shuffle_seed_None_thres_04_ranger",
         # ],
-        # "Prostate Cancer": [
-        #     "prostate_0_shuffle_seed_None_rf",
-        #     "prostate_1_shuffle_seed_None_rf",
-        #     "prostate_2_shuffle_seed_None_rf",
-        # ],
-        # "Leukemia": [
-        #     "leukemia_big_0_shuffle_seed_None_rf",
-        #     "leukemia_big_1_shuffle_seed_None_rf",
-        #     "leukemia_big_2_shuffle_seed_None_rf",
-        # ],
+        "Prostate Cancer": [
+            "prostate_0_shuffle_seed_None_rf",
+            "prostate_1_shuffle_seed_None_rf",
+            "prostate_2_shuffle_seed_None_rf",
+        ],
+        "Leukemia": [
+            "leukemia_big_0_shuffle_seed_None_rf",
+            "leukemia_big_1_shuffle_seed_None_rf",
+            "leukemia_big_2_shuffle_seed_None_rf",
+        ],
         # "Leukemia threshold 0.1": [
         #     "leukemia_big_0_shuffle_seed_None_thres_01_ranger",
         #     # "leukemia_big_1_shuffle_seed_None_thres_01_ranger",
@@ -1061,16 +804,16 @@ def main():
         #     # "leukemia_big_1_shuffle_seed_None_thres_01_ranger",
         #     # "leukemia_big_2_shuffle_seed_None_thres_01_ranger",
         # ],
-        "Random Noise Normal": [
-            "random_noise_normal_0_shuffle_seed_None_ranger",
-            "random_noise_normal_1_shuffle_seed_None_ranger",
-            "random_noise_normal_2_shuffle_seed_None_ranger",
-        ],
-        "Random Noise Lognormal": [
-            "random_noise_lognormal_0_shuffle_seed_None_ranger",
-            "random_noise_lognormal_1_shuffle_seed_None_ranger",
-            "random_noise_lognormal_2_shuffle_seed_None_ranger",
-        ],
+        # "Random Noise Normal": [
+        #     "random_noise_normal_0_shuffle_seed_None_ranger",
+        #     "random_noise_normal_1_shuffle_seed_None_ranger",
+        #     "random_noise_normal_2_shuffle_seed_None_ranger",
+        # ],
+        # "Random Noise Lognormal": [
+        #     "random_noise_lognormal_0_shuffle_seed_None_ranger",
+        #     "random_noise_lognormal_1_shuffle_seed_None_ranger",
+        #     "random_noise_lognormal_2_shuffle_seed_None_ranger",
+        # ],
     }
     # extract all experiments without random noise
     data_names_list = [data_display_name for data_display_name in experiments_dict if "andom" not in data_display_name]
@@ -1084,7 +827,7 @@ def main():
     row_number_in_subplot = 1
     for data_display_name, experiment_id_list in experiments_dict.items():
         summarized_evaluation_results_df = evaluate_data_set(
-            base_path, experiment_id_list, seeds, data_display_name=data_display_name, reload_evaluation_results=False
+            base_path, experiment_id_list, seeds, data_display_name=data_display_name, reload_evaluation_results=True
         )
         if data_display_name in data_names_list:
             # visualize the results
@@ -1103,8 +846,8 @@ def main():
 
     # # save figure
     # # pio.write_image(fig, f"{base_path}/images/{performance_metric}.pdf", width=3508, height=2480)
-    # pio.write_image(fig, f"{base_path}/images/{performance_metric}.pdf", width=1000, height=600)
-    pio.write_image(fig, f"{base_path}/images/{performance_metric}.pdf", width=800, height=600)
+    pio.write_image(fig, f"{base_path}/images/{performance_metric}.pdf", width=1000, height=600)
+    # pio.write_image(fig, f"{base_path}/images/{performance_metric}.pdf", width=800, height=600)
 
 
 if __name__ == "__main__":
