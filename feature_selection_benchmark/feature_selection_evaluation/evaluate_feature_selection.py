@@ -713,7 +713,7 @@ def visualize_results(
                 # set size corresponding to the number of selected features
                 marker_size=summarized_result_df["number of selected features"],
                 # add text as element to legend
-                name=summarized_result_df["method"].to_numpy[0],
+                name=summarized_result_df["method"].to_numpy()[0],
                 # marker={"color": summarized_result_df["method"].apply(lambda x: color_map[x])},
             ),
         )
