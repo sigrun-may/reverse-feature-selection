@@ -81,6 +81,7 @@ def main():
         if "random_noise" in file.name:
             meta_data_dict["data_shape_random_noise"] = (62, 2000)
             # The path to the directory where generated random noise is stored.
+            # meta_data_dict["path_for_random_noise"] = "../data/random_noise"
             meta_data_dict["path_for_random_noise"] = f"{result_base_path}/random_noise"
 
         # load data
