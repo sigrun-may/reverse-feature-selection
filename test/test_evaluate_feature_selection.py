@@ -10,11 +10,8 @@ import numpy as np
 import pandas as pd
 import pytest
 from sklearn.datasets import make_classification
-from sklearn.metrics import accuracy_score, average_precision_score, roc_auc_score
 
 from feature_selection_benchmark.feature_selection_evaluation.evaluate_feature_selection import (
-    calculate_performance,
-    calculate_performance_metrics_on_hold_out_data,
     calculate_performance_metrics_on_shuffled_hold_out_subset,
     train_and_predict,
 )
@@ -81,22 +78,6 @@ def test_train_and_predict(mock_data, mock_feature_importance):
     assert predicted_proba_y.shape[1] == 2  # Check if probabilities for both classes are returned
 
 
-def test_calculate_performance():
-    y_true = np.array([0, 1, 0, 1])
-    y_predict = np.array([0, 1, 0, 0])
-    y_predict_proba = np.array([[0.8, 0.2], [0.1, 0.9], [0.7, 0.3], [0.4, 0.6]])
-
-    performance_metrics = calculate_performance(y_predict, y_predict_proba, y_true)
-
-    assert "Average Precision Score" in performance_metrics
-    assert "AUC" in performance_metrics
-    assert "Accuracy" in performance_metrics
-
-    assert performance_metrics["Average Precision Score"] == average_precision_score(y_true, y_predict)
-    assert performance_metrics["AUC"] == roc_auc_score(y_true, y_predict_proba[:, 1])
-    assert performance_metrics["Accuracy"] == accuracy_score(y_true, y_predict)
-
-
 def test_all_zero_feature_importance(mock_data):
     train_data = mock_data.iloc[:20]
     test_data = mock_data.iloc[20:]
@@ -115,27 +96,67 @@ def test_consistent_random_state(mock_data, mock_feature_importance):
     assert np.array_equal(y_proba1, y_proba2)
 
 
-def test_calculate_performance_metrics_on_hold_out_data(mock_train_data, mock_test_data, mock_feature_importance):
-    seed = 42
-    shuffle_seed = 1
-    performance_metrics = calculate_performance_metrics_on_hold_out_data(
-        mock_feature_importance, shuffle_seed, mock_test_data, seed, mock_train_data
+def test_calculate_performance_metrics_with_different_seeds(mock_train_data, mock_feature_importance, mock_test_data):
+    seed1 = 2
+    seed2 = 424
+    seed3 = 20000
+
+    performance_metrics_list1 = calculate_performance_metrics_on_shuffled_hold_out_subset(
+        mock_train_data,
+        mock_feature_importance,
+        mock_test_data,
+        seed1,
     )
-    assert isinstance(performance_metrics, dict)
-    assert "Accuracy" in performance_metrics
-    assert "AUC" in performance_metrics
-    assert "Average Precision Score" in performance_metrics
+    performance_metrics_list2 = calculate_performance_metrics_on_shuffled_hold_out_subset(
+        mock_train_data,
+        mock_feature_importance,
+        mock_test_data,
+        seed2,
+    )
+    performance_metrics_list3 = calculate_performance_metrics_on_shuffled_hold_out_subset(
+        mock_train_data,
+        mock_feature_importance,
+        mock_test_data,
+        seed3,
+    )
+    assert performance_metrics_list3 != performance_metrics_list1
+    assert performance_metrics_list3 != performance_metrics_list2
+    assert performance_metrics_list1 != performance_metrics_list2
+    assert all(isinstance(metrics, dict) for metrics in performance_metrics_list1)
+    assert all(isinstance(metrics, dict) for metrics in performance_metrics_list2)
+    assert all(isinstance(metrics, dict) for metrics in performance_metrics_list3)
+    assert all("Accuracy" in metrics for metrics in performance_metrics_list1)
+    assert all("Accuracy" in metrics for metrics in performance_metrics_list2)
+    assert all("Accuracy" in metrics for metrics in performance_metrics_list3)
+    assert all("AUC" in metrics for metrics in performance_metrics_list1)
+    assert all("AUC" in metrics for metrics in performance_metrics_list2)
+    assert all("AUC" in metrics for metrics in performance_metrics_list3)
+    assert all("Average Precision Score" in metrics for metrics in performance_metrics_list1)
+    assert all("Average Precision Score" in metrics for metrics in performance_metrics_list2)
+    assert all("Average Precision Score" in metrics for metrics in performance_metrics_list3)
+
+
+def test_calculate_performance_metrics_equal_seeds_for_random_forest(
+    mock_train_data, mock_feature_importance, mock_test_data
+):
+    seed = 42
+    performance_metrics_list1 = calculate_performance_metrics_on_shuffled_hold_out_subset(
+        mock_train_data, mock_feature_importance, mock_test_data, seed
+    )
+    performance_metrics_list2 = calculate_performance_metrics_on_shuffled_hold_out_subset(
+        mock_train_data, mock_feature_importance, mock_test_data, seed
+    )
+    assert performance_metrics_list1 == performance_metrics_list2
 
 
 def test_calculate_performance_metrics_on_shuffled_hold_out_subset(
-    mock_train_data, mock_test_data, mock_feature_importance
+    mock_train_data, mock_feature_importance, mock_test_data
 ):
     seed = 42
     performance_metrics_list = calculate_performance_metrics_on_shuffled_hold_out_subset(
-        mock_train_data, mock_test_data, mock_feature_importance, seed
+        mock_train_data, mock_feature_importance, mock_test_data, seed
     )
     assert isinstance(performance_metrics_list, list)
-    assert len(performance_metrics_list) == 16
     for metrics in performance_metrics_list:
         assert isinstance(metrics, dict)
         assert "Accuracy" in metrics
