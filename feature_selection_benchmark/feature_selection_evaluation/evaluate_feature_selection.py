@@ -39,7 +39,7 @@ pio.kaleido.scope.mathjax = None
 logging.basicConfig(level=logging.INFO)
 
 # define number of jobs for parallel processing
-N_JOBS = 1
+N_JOBS = 4
 
 
 def train_and_predict(
@@ -173,7 +173,7 @@ def calculate_performance_metrics_on_shuffled_hold_out_subset(
             (hold_out_shuffle_iteration+10000),
             seed_for_random_forest,
         )
-        for hold_out_shuffle_iteration in range(1)
+        for hold_out_shuffle_iteration in range(100)
     )
 
 
@@ -564,8 +564,13 @@ def initialize_figure(data_names_list: list[str], performance_metric: str) -> tu
             "Average Precision Score", "Cohen's Kappa", "Precision", "Sensitivity", "Specificity".
 
     Returns:
-        The initialized figure, color map, and text positions dictionary.
+        The initialized figure, color map, and text positions dictionary. If no data names are provided the function
+            returns None, None, None.
     """
+    # check if any data to plot is provided
+    if len(data_names_list) == 0:
+        return None, None, None
+
     # check if data_names_list contains repetitions of the same data set with a different correlation threshold
     if "thres" in data_names_list[0]:
         # intialize the figure with the given data name
@@ -761,11 +766,11 @@ def main():
 
     # evaluate the feature selection results for the given data
     experiments_dict = {
-        "Colon Cancer": [
-            "colon_0_shuffle_seed_None_rf",
-            "colon_1_shuffle_seed_None_rf",
-            "colon_2_shuffle_seed_None_rf",
-        ],
+        # "Colon Cancer": [
+        #     "colon_0_shuffle_seed_None_rf",
+        #     "colon_1_shuffle_seed_None_rf",
+        #     "colon_2_shuffle_seed_None_rf",
+        # ],
         # "Prostate Cancer": [
         #     "prostate_0_shuffle_seed_None_thres_01_ranger",
         #     "prostate_1_shuffle_seed_None_thres_01_ranger",
@@ -774,36 +779,36 @@ def main():
         # "Leukemia": [
         #     "leukemia_big_0_shuffle_seed_None_thres_04_ranger",
         # ],
-        "Prostate Cancer": [
-            "prostate_0_shuffle_seed_None_rf",
-            "prostate_1_shuffle_seed_None_rf",
-            "prostate_2_shuffle_seed_None_rf",
-        ],
-        "Leukemia": [
-            "leukemia_big_0_shuffle_seed_None_rf",
-            "leukemia_big_1_shuffle_seed_None_rf",
-            "leukemia_big_2_shuffle_seed_None_rf",
-        ],
-        # "Leukemia threshold 0.1": [
-        #     "leukemia_big_0_shuffle_seed_None_thres_01_ranger",
-        #     # "leukemia_big_1_shuffle_seed_None_thres_01_ranger",
-        #     # "leukemia_big_2_shuffle_seed_None_thres_01_ranger",
+        # "Prostate Cancer": [
+        #     "prostate_0_shuffle_seed_None_rf",
+        #     "prostate_1_shuffle_seed_None_rf",
+        #     "prostate_2_shuffle_seed_None_rf",
         # ],
-        # "Leukemia threshold 0.2": [
+        # "Leukemia": [
         #     "leukemia_big_0_shuffle_seed_None_rf",
-        #     # "leukemia_big_1_shuffle_seed_None_rf",
-        #     # "leukemia_big_2_shuffle_seed_None_rf",
+        #     "leukemia_big_1_shuffle_seed_None_rf",
+        #     "leukemia_big_2_shuffle_seed_None_rf",
         # ],
-        # "Leukemia threshold 0.3": [
-        #     "leukemia_big_0_shuffle_seed_None_thres_03_ranger",
-        #     # "leukemia_big_1_shuffle_seed_None_thres_01_ranger",
-        #     # "leukemia_big_2_shuffle_seed_None_thres_01_ranger",
-        # ],
-        # "Leukemia threshold 0.4": [
-        #     "leukemia_big_0_shuffle_seed_None_thres_04_ranger",
-        #     # "leukemia_big_1_shuffle_seed_None_thres_01_ranger",
-        #     # "leukemia_big_2_shuffle_seed_None_thres_01_ranger",
-        # ],
+        "Leukemia threshold 0.1": [
+            "leukemia_big_0_shuffle_seed_None_thres_01_ranger",
+            # "leukemia_big_1_shuffle_seed_None_thres_01_ranger",
+            # "leukemia_big_2_shuffle_seed_None_thres_01_ranger",
+        ],
+        "Leukemia threshold 0.2": [
+            "leukemia_big_0_shuffle_seed_None_rf",
+            # "leukemia_big_1_shuffle_seed_None_rf",
+            # "leukemia_big_2_shuffle_seed_None_rf",
+        ],
+        "Leukemia threshold 0.3": [
+            "leukemia_big_0_shuffle_seed_None_thres_03_ranger",
+            # "leukemia_big_1_shuffle_seed_None_thres_01_ranger",
+            # "leukemia_big_2_shuffle_seed_None_thres_01_ranger",
+        ],
+        "Leukemia threshold 0.4": [
+            "leukemia_big_0_shuffle_seed_None_thres_04_ranger",
+            # "leukemia_big_1_shuffle_seed_None_thres_01_ranger",
+            # "leukemia_big_2_shuffle_seed_None_thres_01_ranger",
+        ],
         # "Random Noise Normal": [
         #     "random_noise_normal_0_shuffle_seed_None_ranger",
         #     "random_noise_normal_1_shuffle_seed_None_ranger",
@@ -815,7 +820,7 @@ def main():
         #     "random_noise_lognormal_2_shuffle_seed_None_ranger",
         # ],
     }
-    # extract all experiments without random noise
+    # extract all experiments without random noise for plotting the performance metric
     data_names_list = [data_display_name for data_display_name in experiments_dict if "andom" not in data_display_name]
 
     # define the performance metric to plot
@@ -827,7 +832,7 @@ def main():
     row_number_in_subplot = 1
     for data_display_name, experiment_id_list in experiments_dict.items():
         summarized_evaluation_results_df = evaluate_data_set(
-            base_path, experiment_id_list, seeds, data_display_name=data_display_name, reload_evaluation_results=True
+            base_path, experiment_id_list, seeds, data_display_name=data_display_name, reload_evaluation_results=False
         )
         if data_display_name in data_names_list:
             # visualize the results
@@ -842,12 +847,13 @@ def main():
             )
             row_number_in_subplot += 1
 
-    fig.show()
+    if fig is not None:
+        fig.show()
 
-    # # save figure
-    # # pio.write_image(fig, f"{base_path}/images/{performance_metric}.pdf", width=3508, height=2480)
-    pio.write_image(fig, f"{base_path}/images/{performance_metric}.pdf", width=1000, height=600)
-    # pio.write_image(fig, f"{base_path}/images/{performance_metric}.pdf", width=800, height=600)
+        # save figure
+        # pio.write_image(fig, f"{base_path}/images/{performance_metric}.pdf", width=3508, height=2480)
+        pio.write_image(fig, f"{base_path}/images/{performance_metric}.pdf", width=1000, height=600)
+        # pio.write_image(fig, f"{base_path}/images/{performance_metric}.pdf", width=800, height=600)
 
 
 if __name__ == "__main__":
