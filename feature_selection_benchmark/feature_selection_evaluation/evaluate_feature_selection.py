@@ -758,8 +758,8 @@ def visualize_results(
 def main():
     """Run the evaluation for the given experiments."""
     # seeds for the random forest classifier for each repeated experiment
-    seeds = [2, 424, 20000]
-    # seeds = [2]
+    # seeds = [2, 424, 20000]
+    seeds = [2]
 
     # base path to the pickled results files
     base_path = "../../results"
