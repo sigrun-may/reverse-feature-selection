@@ -1,7 +1,9 @@
 results
+random_noise_data
 .idea
 data
 archive
 .mypy_cache
 .pytest_cache
+.ruff_cache
 test

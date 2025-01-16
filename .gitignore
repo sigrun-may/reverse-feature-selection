@@ -1,5 +1,6 @@
 # own changes
 .idea/
+.ruff_cache/
 data/
 pickled_files/
 results/
