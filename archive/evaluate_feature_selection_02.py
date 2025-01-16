@@ -30,7 +30,7 @@ from sklearn.metrics import (
     roc_curve,
 )
 
-from feature_selection_benchmark.data_loader_tools import load_train_test_data_for_standardized_sample_size
+from feature_selection_benchmark.data_loader_tools import load_train_holdout_data_for_balanced_train_sample_size
 from feature_selection_benchmark.feature_selection_evaluation import stability_estimator
 
 logging.basicConfig(level=logging.INFO)
@@ -108,7 +108,7 @@ def calculate_performance_metrics(
     if not isinstance(feature_importance_matrix, np.ndarray) or feature_importance_matrix.ndim != 2:
         raise ValueError("feature_importance_matrix must be a 2D numpy array.")
     if not isinstance(experiment_data_df, pd.DataFrame):
-        raise ValueError("experiment_data_df must be a pandas DataFrame.")
+        raise ValueError("experiment_input_data_df must be a pandas DataFrame.")
     if hold_out_data_df is not None and not isinstance(hold_out_data_df, pd.DataFrame):
         raise ValueError("hold_out_data_df must be a pandas DataFrame or None.")
     assert feature_importance_matrix.shape[0] == experiment_data_df.shape[0], feature_importance_matrix.shape[0]
@@ -756,7 +756,7 @@ list_of_experiments = [
 ]
 data_name = "leukemia_big"
 
-hold_out_df, input_df = load_train_test_data_for_standardized_sample_size(data_name)
+hold_out_df, input_df = load_train_holdout_data_for_balanced_train_sample_size(data_name)
 data_name = f"{data_name.capitalize()} Cancer" if data_name != "leukemia_big" else "Leukemia"
 
 plot_average_results(

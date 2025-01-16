@@ -28,8 +28,8 @@ from sklearn.metrics import (
 )
 
 from feature_selection_benchmark.data_loader_tools import (
-    load_train_test_data_for_standardized_sample_size,
-    standardize_sample_size_of_hold_out_data_single_df,
+    load_train_holdout_data_for_balanced_train_sample_size,
+    balance_sample_size_of_hold_out_data_single_df,
 )
 from feature_selection_benchmark.feature_selection_evaluation import stability_estimator
 
@@ -129,7 +129,7 @@ def calculate_performance_metrics_on_hold_out_data(
     Returns:
         The performance metrics for the given hold-out test data.
     """
-    standardized_hold_out_test_data_df = standardize_sample_size_of_hold_out_data_single_df(
+    standardized_hold_out_test_data_df = balance_sample_size_of_hold_out_data_single_df(
         hold_out_test_data_df, shuffle_seed=shuffle_seed_hold_out_data
     )
     y_predict, y_predict_proba, y_true = train_and_predict(
@@ -244,7 +244,7 @@ def evaluate_experiment(
     input_result_dict["evaluation"] = {}
 
     # load the experiment data and the hold-out test data
-    experiment_data_df, hold_out_test_data_df = load_train_test_data_for_standardized_sample_size(
+    experiment_data_df, hold_out_test_data_df = load_train_holdout_data_for_balanced_train_sample_size(
         input_result_dict["reverse_random_forest_meta_data"]
     )
     # evaluate the feature selection results for the different standard random forest methods
