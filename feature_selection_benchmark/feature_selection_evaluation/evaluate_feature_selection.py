@@ -28,8 +28,8 @@ from sklearn.metrics import (
 )
 
 from feature_selection_benchmark.data_loader_tools import (
-    load_train_test_data_for_standardized_sample_size,
-    standardize_sample_size_of_hold_out_data_single_df,
+    balance_sample_size_of_hold_out_data_single_df,
+    load_train_holdout_data_for_balanced_train_sample_size,
 )
 from feature_selection_benchmark.feature_selection_evaluation import stability_estimator
 
@@ -104,8 +104,7 @@ def calculate_performance_metrics(
         train_data_df: The training data.
         feature_subset_selection: The selected feature subset. Must be array_like for numpy.
         hold_out_test_data_df: The hold-out test data.
-        shuffle_seed_hold_out_data: The random seed for shuffling the hold-out test data. Corresponds to the integer
-            of the number of hold-out test data shuffles starting with zero.
+        shuffle_seed_hold_out_data: The random seed for shuffling the hold-out test data.
         seed_for_random_forest: The random seed for reproducibility of the random forest.
 
     Returns:
@@ -123,12 +122,12 @@ def calculate_performance_metrics(
     assert train_data_df.index.is_unique, "Indices are not unique."
     assert hold_out_test_data_df.index.is_unique, "Indices are not unique."
 
-    standardized_hold_out_test_data_df = standardize_sample_size_of_hold_out_data_single_df(
-        hold_out_test_data_df, shuffle_seed=shuffle_seed_hold_out_data
+    balanced_hold_out_test_data_df = balance_sample_size_of_hold_out_data_single_df(
+        hold_out_test_data_df, shuffle_seed=shuffle_seed_hold_out_data, number_of_balanced_samples=14
     )
     y_predict, y_predict_proba, y_true = train_and_predict(
         train_data_df,
-        standardized_hold_out_test_data_df,
+        balanced_hold_out_test_data_df,
         feature_subset_selection,
         seed_for_random_forest,
     )
@@ -167,11 +166,11 @@ def calculate_performance_metrics_on_shuffled_hold_out_subset(
     # parallelize iterations of shuffling the hold out test data with joblib
     return joblib.Parallel(n_jobs=N_JOBS)(
         joblib.delayed(calculate_performance_metrics)(
-            train_data_df,
-            feature_subset_selection,
-            hold_out_test_data_df,
-            (hold_out_shuffle_iteration+10000),
-            seed_for_random_forest,
+            train_data_df=train_data_df,
+            feature_subset_selection=feature_subset_selection,
+            hold_out_test_data_df=hold_out_test_data_df,
+            shuffle_seed_hold_out_data=(hold_out_shuffle_iteration + 10000),
+            seed_for_random_forest=seed_for_random_forest,
         )
         for hold_out_shuffle_iteration in range(100)
     )
@@ -179,7 +178,7 @@ def calculate_performance_metrics_on_shuffled_hold_out_subset(
 
 def evaluate_feature_selection(
     loo_cv_iteration_list: list,
-    experiment_data_df: pd.DataFrame,
+    experiment_input_data_df: pd.DataFrame,
     hold_out_test_data_df: pd.DataFrame,
     seed_for_random_forest: int,
     feature_selection_method_key: str,
@@ -188,7 +187,7 @@ def evaluate_feature_selection(
 
     Args:
         loo_cv_iteration_list: List of leave-one-out cross-validation iterations.
-        experiment_data_df: The experiment data containing the features and labels.
+        experiment_input_data_df: The experiment data containing the features and labels.
         hold_out_test_data_df: The hold-out data set as test data.
         seed_for_random_forest: The random seed for reproducibility.
         feature_selection_method_key: The key to access feature importance in the iteration results.
@@ -204,6 +203,8 @@ def evaluate_feature_selection(
     performance_metrics_list = []
     for loo_idx, cv_iteration_result in enumerate(loo_cv_iteration_list):
         feature_importances = cv_iteration_result[feature_selection_method_key]
+        # check type of feature_importances
+        assert isinstance(feature_importances, np.ndarray) or isinstance(feature_importances, pd.Series)
         if np.count_nonzero(feature_importances) == 0:
             flip = True
             logging.warning(
@@ -213,8 +214,8 @@ def evaluate_feature_selection(
             continue
 
         feature_importance_matrix[loo_idx] = feature_importances
-        train_data_df = experiment_data_df.drop(index=loo_idx)
-        assert train_data_df.shape[0] == experiment_data_df.shape[0] - 1
+        train_data_df = experiment_input_data_df.drop(index=loo_idx)
+        assert train_data_df.shape[0] == experiment_input_data_df.shape[0] - 1
 
         performance_metrics_list.extend(
             calculate_performance_metrics_on_shuffled_hold_out_subset(
@@ -250,21 +251,22 @@ def evaluate_benchmark_experiment(
     # initialize the evaluation results
     input_result_dict["evaluation"] = {}
 
-    # load the experiment data and the hold-out test data
-    experiment_data_df, hold_out_test_data_df = load_train_test_data_for_standardized_sample_size(
+    # load the original experiment input data and the hold-out test data
+    experiment_input_data_df, hold_out_test_data_df = load_train_holdout_data_for_balanced_train_sample_size(
         input_result_dict["reverse_random_forest_meta_data"]
     )
     # evaluate the feature selection results for the different standard random forest methods
     loo_cv_iteration_list = input_result_dict["standard_random_forest"]
-    assert len(loo_cv_iteration_list) == experiment_data_df.shape[0], len(loo_cv_iteration_list)
+    assert len(loo_cv_iteration_list) == experiment_input_data_df.shape[0], len(loo_cv_iteration_list)
 
     for importance_calculation_method in loo_cv_iteration_list[0]:
+        # exclude best score and best hyperparameters from training
         if "score" in importance_calculation_method or "best" in importance_calculation_method:
             continue
 
         input_result_dict["evaluation"][importance_calculation_method] = evaluate_feature_selection(
             loo_cv_iteration_list,
-            experiment_data_df,
+            experiment_input_data_df,
             hold_out_test_data_df,
             seed_random_forest,
             importance_calculation_method,
@@ -272,11 +274,11 @@ def evaluate_benchmark_experiment(
 
     # evaluate the feature selection results for the reverse random forest method
     loo_cv_iteration_list = input_result_dict["reverse_random_forest"]
-    assert len(loo_cv_iteration_list) == experiment_data_df.shape[0], len(loo_cv_iteration_list)
+    assert len(loo_cv_iteration_list) == experiment_input_data_df.shape[0], len(loo_cv_iteration_list)
 
     input_result_dict["evaluation"]["reverse_random_forest"] = evaluate_feature_selection(
         loo_cv_iteration_list,
-        experiment_data_df,
+        experiment_input_data_df,
         hold_out_test_data_df,
         seed_random_forest,
         "feature_subset_selection",
@@ -308,7 +310,7 @@ def evaluate_repeated_benchmark_experiments(
         Evaluation results for each feature selection method.
     """
     # Initialize lists to store the random seeds to ensure the uniqueness of each random seed
-    random_states_rf = []
+    random_seeds_standard_rf = []
     random_seeds_reverse_rf = []
 
     list_of_result_dicts = []
@@ -323,8 +325,8 @@ def evaluate_repeated_benchmark_experiments(
         with open(file_path, "rb") as file:
             result_dict = pickle.load(file)
 
-        # collect the random states for the standard random forest from the metadata
-        random_states_rf.append(result_dict["standard_random_forest_meta_data"]["random_state"])
+        # collect the random seeds for the standard random forest from the metadata
+        random_seeds_standard_rf.append(result_dict["standard_random_forest_meta_data"]["random_state"])
         if "reverse_random_forest_meta_data" in result_dict:
             # collect the random seeds for the reverse random forest from the metadata
             random_seeds_reverse_rf.append(result_dict["reverse_random_forest_meta_data"]["random_seeds"])
@@ -339,8 +341,8 @@ def evaluate_repeated_benchmark_experiments(
         evaluate_benchmark_experiment(result_dict, seed)
         list_of_result_dicts.append(result_dict)
 
-    assert len(random_states_rf) == len(repeated_experiments), "Seeds are missing."
-    assert len(set(random_states_rf)) == len(repeated_experiments), "Seeds have duplicates."
+    assert len(random_seeds_standard_rf) == len(repeated_experiments), "Seeds are missing."
+    assert len(set(random_seeds_standard_rf)) == len(repeated_experiments), "Seeds have duplicates."
     check_random_seeds_equality(random_seeds_reverse_rf, repeated_experiments)
     return list_of_result_dicts
 
@@ -364,14 +366,15 @@ def evaluate_data_set(
     Returns:
         The summarized evaluation results.
     """
+    # reload the evaluation results if the flag is set
     if reload_evaluation_results and Path(f"{base_path}/{data_display_name}_evaluation_results.pkl").exists():
         logging.info(f"Loading evaluation results for {data_display_name}")
         # load the pickled evaluation results
         with open(f"{base_path}/{data_display_name}_evaluation_results.pkl", "rb") as file:
             list_of_result_dicts = pickle.load(file)
 
+    # evaluate the feature selection results for the given data
     else:
-        # evaluate the feature selection results for the given data
         logging.info(f"Evaluating {data_display_name}")
         list_of_result_dicts = evaluate_repeated_benchmark_experiments(base_path, list_of_experiments, seeds)
 
@@ -497,6 +500,7 @@ def create_latex_table(summarized_evaluation_results_df: pd.DataFrame, data_disp
         df_for_latex[column_name] = df_for_latex[column_name].apply(lambda x: f"{x:.3f}")
 
         for index_name in df_for_latex.index:
+            # select the mean only
             if "std" not in index_name:
                 # insert latex code and append std to mean values
                 df_for_latex.loc[index_name, column_name] = (
@@ -522,6 +526,8 @@ def create_latex_table(summarized_evaluation_results_df: pd.DataFrame, data_disp
     # print the dataframe as latex table
     performance_metrics_list = []
 
+    # select the classification performance metrics for the latex table
+    # and exclude the number of selected features and stability
     for metric in df_for_latex.columns:
         if metric in ["number of selected features", "stability"]:
             continue
@@ -602,6 +608,7 @@ def initialize_figure(data_names_list: list[str], performance_metric: str) -> tu
         # }
         color_map = text_positions_dict = None
 
+    # the data names list contains the same data set with different feature selection methods
     else:
         # set the colors for the different methods
         color_map = {
@@ -638,7 +645,7 @@ def initialize_figure(data_names_list: list[str], performance_metric: str) -> tu
     return fig, color_map, text_positions_dict
 
 
-def visualize_results(
+def add_trace_to_figure(
     summarized_evaluation_results_df: pd.DataFrame,
     data_display_name: str,
     performance_metric: str,
@@ -758,24 +765,24 @@ def visualize_results(
 def main():
     """Run the evaluation for the given experiments."""
     # seeds for the random forest classifier for each repeated experiment
-    # seeds = [2, 424, 20000]
-    seeds = [2]
+    seeds = [2, 424, 20000]
+    # seeds = [2]
 
     # base path to the pickled results files
     base_path = "../../results"
 
     # evaluate the feature selection results for the given data
     experiments_dict = {
-        # "Colon Cancer": [
-        #     "colon_0_shuffle_seed_None_rf",
-        #     "colon_1_shuffle_seed_None_rf",
-        #     "colon_2_shuffle_seed_None_rf",
-        # ],
-        # "Prostate Cancer": [
-        #     "prostate_0_shuffle_seed_None_thres_01_ranger",
-        #     "prostate_1_shuffle_seed_None_thres_01_ranger",
-        #     "prostate_2_shuffle_seed_None_thres_01_ranger",
-        # ],
+        "Colon Cancer": [
+            "colon_0_shuffle_seed_None_rf",
+            "colon_1_shuffle_seed_None_rf",
+            "colon_2_shuffle_seed_None_rf",
+        ],
+        "Prostate Cancer": [
+            "prostate_0_shuffle_seed_None_thres_01_ranger",
+            "prostate_1_shuffle_seed_None_thres_01_ranger",
+            "prostate_2_shuffle_seed_None_thres_01_ranger",
+        ],
         # "Leukemia": [
         #     "leukemia_big_0_shuffle_seed_None_thres_04_ranger",
         # ],
@@ -784,31 +791,31 @@ def main():
         #     "prostate_1_shuffle_seed_None_rf",
         #     "prostate_2_shuffle_seed_None_rf",
         # ],
-        # "Leukemia": [
-        #     "leukemia_big_0_shuffle_seed_None_rf",
-        #     "leukemia_big_1_shuffle_seed_None_rf",
-        #     "leukemia_big_2_shuffle_seed_None_rf",
-        # ],
-        "Leukemia threshold 0.1": [
-            "leukemia_big_0_shuffle_seed_None_thres_01_ranger",
-            # "leukemia_big_1_shuffle_seed_None_thres_01_ranger",
-            # "leukemia_big_2_shuffle_seed_None_thres_01_ranger",
-        ],
-        "Leukemia threshold 0.2": [
+        "Leukemia": [
             "leukemia_big_0_shuffle_seed_None_rf",
-            # "leukemia_big_1_shuffle_seed_None_rf",
-            # "leukemia_big_2_shuffle_seed_None_rf",
+            "leukemia_big_1_shuffle_seed_None_rf",
+            "leukemia_big_2_shuffle_seed_None_rf",
         ],
-        "Leukemia threshold 0.3": [
-            "leukemia_big_0_shuffle_seed_None_thres_03_ranger",
-            # "leukemia_big_1_shuffle_seed_None_thres_01_ranger",
-            # "leukemia_big_2_shuffle_seed_None_thres_01_ranger",
-        ],
-        "Leukemia threshold 0.4": [
-            "leukemia_big_0_shuffle_seed_None_thres_04_ranger",
-            # "leukemia_big_1_shuffle_seed_None_thres_01_ranger",
-            # "leukemia_big_2_shuffle_seed_None_thres_01_ranger",
-        ],
+        # "Leukemia threshold 0.1": [
+        #     "leukemia_big_0_shuffle_seed_None_thres_01_ranger",
+        #     # "leukemia_big_1_shuffle_seed_None_thres_01_ranger",
+        #     # "leukemia_big_2_shuffle_seed_None_thres_01_ranger",
+        # ],
+        # "Leukemia threshold 0.2": [
+        #     "leukemia_big_0_shuffle_seed_None_rf",
+        #     # "leukemia_big_1_shuffle_seed_None_rf",
+        #     # "leukemia_big_2_shuffle_seed_None_rf",
+        # ],
+        # "Leukemia threshold 0.3": [
+        #     "leukemia_big_0_shuffle_seed_None_thres_03_ranger",
+        #     # "leukemia_big_1_shuffle_seed_None_thres_01_ranger",
+        #     # "leukemia_big_2_shuffle_seed_None_thres_01_ranger",
+        # ],
+        # "Leukemia threshold 0.4": [
+        #     "leukemia_big_0_shuffle_seed_None_thres_04_ranger",
+        #     # "leukemia_big_1_shuffle_seed_None_thres_01_ranger",
+        #     # "leukemia_big_2_shuffle_seed_None_thres_01_ranger",
+        # ],
         # "Random Noise Normal": [
         #     "random_noise_normal_0_shuffle_seed_None_ranger",
         #     "random_noise_normal_1_shuffle_seed_None_ranger",
@@ -824,6 +831,8 @@ def main():
     data_names_list = [data_display_name for data_display_name in experiments_dict if "andom" not in data_display_name]
 
     # define the performance metric to plot
+    # possible values are "Accuracy", "AUC", "Average Precision Score", "Cohen's Kappa", "Precision", "Sensitivity" and
+    # "Specificity"
     performance_metric = "Average Precision Score"
 
     # initialize the figure for the feature selection method comparison
@@ -835,8 +844,7 @@ def main():
             base_path, experiment_id_list, seeds, data_display_name=data_display_name, reload_evaluation_results=False
         )
         if data_display_name in data_names_list:
-            # visualize the results
-            fig = visualize_results(
+            fig = add_trace_to_figure(
                 summarized_evaluation_results_df,
                 data_display_name,
                 performance_metric,
