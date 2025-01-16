@@ -7,7 +7,7 @@
 """Main test script for cacluating a grid of repeated feature selection experiments for reverse feature selection."""
 
 
-from feature_selection_benchmark.repeated_experiments_reverse_rf import define_random_seeds, main
+from feature_selection_benchmark.repeated_experiments_reverse_rf import define_random_seeds
 
 
 def test_define_random_seeds():
