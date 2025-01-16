@@ -4,7 +4,7 @@ test := test
 
 check:
 	poetry run black $(src) $(other) $(test) --check --diff
-	poetry run mypy --install-types --non-interactive $(src) $(other) $(test)
+	poetry run mypy --install-types --non-interactive --check-untyped-defs $(src) $(other) $(test)
 	poetry run ruff check $(src) $(other) $(test)
 	poetry run mdformat --check --number .
 	poetry run make -C docs clean doctest
