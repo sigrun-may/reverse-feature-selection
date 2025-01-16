@@ -31,6 +31,18 @@ def balance_sample_size_of_hold_out_data_single_df(
         number_of_balanced_samples % 2 == 0
     ), f"Number of balanced samples is not an even number: {number_of_balanced_samples}"
 
+    # check if number_of_balanced_samples is smaller than the number of samples in the hold out data
+    assert number_of_balanced_samples <= hold_out_data_df.shape[0], (
+        f"Number of balanced samples {number_of_balanced_samples} is smaller than the number of samples "
+        f"in the hold out data {hold_out_data_df.shape[0]}."
+    )
+
+    # check if number_of_balanced_samples/2 is smaller than the number of samples for each class
+    assert number_of_balanced_samples / 2 <= hold_out_data_df["label"].value_counts().min(), (
+        f"Number of balanced samples {number_of_balanced_samples / 2} for each class is smaller than the number of samples "
+        f"for each class in the hold out data {hold_out_data_df['label'].value_counts().min()}."
+    )
+
     balanced_hold_out_test_data_df, balanced_hold_out_test_label_series = balance_sample_size_of_hold_out_data(
         hold_out_data_df, shuffle_seed
     )
@@ -190,7 +202,7 @@ def load_train_holdout_data_for_balanced_train_sample_size(
     assert "shuffle_seed" in meta_data_dict, "Shuffle seed is missing in meta_data_dict."
 
     # load data from mltb2.data
-    if "data_name" in ["colon", "prostate", "leukemia_big"]:
+    if meta_data_dict["data_name"] in ["colon", "prostate", "leukemia_big"]:
         # generate function from string
         load_data_function = globals()[f"load_{meta_data_dict['data_name']}"]
 
@@ -198,29 +210,29 @@ def load_train_holdout_data_for_balanced_train_sample_size(
         label_series, data_df = load_data_function()
 
     # load generated random noise data
-    elif "random_noise" in meta_data_dict["data_name"] and "path_for_random_noise" in meta_data_dict:
+    elif "random_noise" in meta_data_dict["data_name"]:
+        assert "path_for_random_noise" in meta_data_dict
         # try to load random noise data if it exists
         data_df_path = Path(meta_data_dict["path_for_random_noise"])
         if data_df_path.exists():
-            data_df = pd.read_csv(data_df_path)
+            complete_data_df = pd.read_csv(data_df_path)
+            label_series = complete_data_df["label"]
+            data_df = complete_data_df.drop(columns=["label"])
         else:
             raise FileNotFoundError(f"Data file {data_df_path} not found.")
     elif "path_to_local_dataset" in meta_data_dict:
         # try to load the local data if it exists
         data_df_path = Path(meta_data_dict["path_to_local_dataset"])
         if data_df_path.exists():
-            data_df = pd.read_csv(data_df_path)
+            complete_data_df = pd.read_csv(data_df_path)
+            label_series = complete_data_df["label"]
+            data_df = complete_data_df.drop(columns=["label"])
         else:
             raise FileNotFoundError(f"Data file {data_df_path} not found.")
     else:
         raise ValueError(
             f"Data name {meta_data_dict['data_name']} not found or path to dataset is missing in meta_data_dict."
         )
-
-    # check if the data is already balanced
-    if data_df["label"].value_counts().tolist() == [15, 15]:
-        empty_df = pd.DataFrame()
-        return data_df, empty_df
 
     # shuffle data before selecting samples, if shuffle_seed is set
     if meta_data_dict["shuffle_seed"] is not None:
@@ -253,12 +265,6 @@ def load_train_holdout_data_for_balanced_train_sample_size(
 
     hold_out_data_df = convert_to_single_df(hold_out_data_df, y_test)
     train_data_df = convert_to_single_df(train_data_df, y_train)
-    assert hold_out_data_df.columns[0] == "label"
-    assert train_data_df.columns[0] == "label"
-    assert train_data_df["label"].value_counts().tolist() == [
-        15,
-        15,
-    ], f"{train_data_df['label'].value_counts().tolist()}"
     assert train_data_df.shape[1] == hold_out_data_df.shape[1] == data_df.shape[1] + 1  # label column
     assert train_data_df.shape[0] + hold_out_data_df.shape[0] == data_df.shape[0]
 
