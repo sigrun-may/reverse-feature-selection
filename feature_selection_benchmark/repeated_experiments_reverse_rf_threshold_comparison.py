@@ -14,7 +14,7 @@ from pathlib import Path
 import git
 
 from feature_selection_benchmark import cross_validation
-from feature_selection_benchmark.data_loader_tools import load_data_df
+from feature_selection_benchmark.data_loader_tools import load_train_holdout_data_for_balanced_train_sample_size
 from reverse_feature_selection.reverse_rf_random import select_feature_subset
 
 
@@ -95,7 +95,6 @@ def main():
     # valid data names for the data loader are "colon", "prostate" or "leukemia_big"
     # data_names = ["colon", "prostate", "leukemia_big"]
     data_names = ["leukemia_big"]
-    # data_names = ["random_noise_lognormal", "random_noise_normal"]
     for data_name in data_names:
         # repeat the experiment three times with different random seeds
         for i, list_of_random_seeds in enumerate(define_random_seeds()):
@@ -106,25 +105,15 @@ def main():
                 "git_commit_hash": git.Repo(search_parent_directories=True).head.object.hexsha,
                 "experiment_id": experiment_id,
                 "data_name": data_name,
-                "n_cpus": multiprocessing.cpu_count(),  # number of available CPUs
-                # "train_correlation_threshold": 0.1,
-                # "train_correlation_threshold": 0.2,
-                # "train_correlation_threshold": 0.3,
+                "n_cpus": multiprocessing.cpu_count(),
                 "train_correlation_threshold": 0.4,
-                # random seeds for reproducibility of reverse random forest
                 "random_seeds": list_of_random_seeds,
                 "shuffle_seed": shuffle_seed,
+                "description": f"{data_name} dataset.",
             }
-            if "random" in data_name:
-                meta_data_dict["description"] = "Random noise dataset for testing purposes."
-                meta_data_dict["data_shape_random_noise"] = (62, 2000)
-                # The path to the directory where generated random noise is stored.
-                meta_data_dict["path_for_random_noise"] = f"{result_base_path}/random_noise"
-            else:
-                meta_data_dict["description"] = f"{data_name} dataset."
 
-            # load data
-            data_df = load_data_df(meta_data_dict)
+            # load data for the experiment with balanced train sample size
+            data_df, _ = load_train_holdout_data_for_balanced_train_sample_size(meta_data_dict)
             print("number of samples", data_df.shape[0], "number of features", data_df.shape[1] - 1)
 
             # calculate raw feature subset data for reverse random forest
