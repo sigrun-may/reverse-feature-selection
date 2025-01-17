@@ -204,7 +204,7 @@ def evaluate_feature_selection(
     for loo_idx, cv_iteration_result in enumerate(loo_cv_iteration_list):
         feature_importances = cv_iteration_result[feature_selection_method_key]
         # check type of feature_importances
-        assert isinstance(feature_importances, np.ndarray) or isinstance(feature_importances, pd.Series)
+        assert isinstance(feature_importances, (np.ndarray | pd.Series))
         if np.count_nonzero(feature_importances) == 0:
             flip = True
             logging.warning(
