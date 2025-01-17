@@ -13,8 +13,6 @@ import sys
 from pathlib import Path
 
 import git
-
-# from standard_rf import calculate_feature_importance
 from ranger_rf import calculate_feature_importance
 
 from feature_selection_benchmark import cross_validation
@@ -29,10 +27,14 @@ def main():
 
     # iterate over all files in the directory
     for file in result_base_path.iterdir():
-        # exclude files that are not related to the random noise data set
-        # or the ranger random forest
-        if "random" in file.name or "rf" not in file.name:
+        # # exclude files that are not related to the random noise data set
+        # # or the ranger random forest
+        # if "random" in file.name or "rf" not in file.name:
+        #     continue
+
+        if "random" not in file.name and "shuffle_seed_None" not in file.name:
             continue
+        print("file", file.name)
 
         # extract the experiment id from the file name
         experiment_id = file.stem.split("_result_dict")[0]
@@ -79,10 +81,15 @@ def main():
             "max_trees_random_forest": 2000,
         }
         if "random_noise" in file.name:
-            meta_data_dict["data_shape_random_noise"] = (62, 2000)
-            # The path to the directory where generated random noise is stored.
-            # meta_data_dict["path_for_random_noise"] = "../data/random_noise"
-            meta_data_dict["path_for_random_noise"] = f"{result_base_path}/random_noise"
+            # meta_data_dict["data_shape_random_noise"] = (62, 2000)
+            # # The path to the directory where generated random noise is stored.
+            # meta_data_dict["path_for_random_noise"] = f"{result_base_path}/random_noise"
+            meta_data_dict["data_shape_random_noise"] = result_dict["reverse_random_forest_meta_data"][
+                "data_shape_random_noise"
+            ]
+            meta_data_dict["path_for_random_noise"] = result_dict["reverse_random_forest_meta_data"][
+                "path_for_random_noise"
+            ]
 
         # load data for the experiment with balanced train sample size
         data_df, _ = load_train_holdout_data_for_balanced_train_sample_size(meta_data_dict)
@@ -100,7 +107,7 @@ def main():
         result_dict["standard_random_forest_meta_data"] = meta_data_dict
 
         # save results
-        result_dict_path = Path(f"{result_base_path}/{meta_data_dict['experiment_id']}_ranger_result_dict.pkl")
+        result_dict_path = Path(f"{result_base_path}/{meta_data_dict['experiment_id']}_stdrf_result_dict.pkl")
         with open(result_dict_path, "wb") as result_file:
             pickle.dump(result_dict, result_file, protocol=pickle.HIGHEST_PROTOCOL)
 

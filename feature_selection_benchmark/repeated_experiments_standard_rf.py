@@ -29,11 +29,12 @@ def main():
 
     # iterate over all files in the directory
     for file in result_base_path.iterdir():
-        if "random" not in file.name:
+        if "random" not in file.name and "shuffle_seed_None" not in file.name:
             continue
         # if "result_dict" not in file.name:
         # if "shuffle_seed_None" not in file.name or "ranger" in file.name:
         #     continue
+        print("file", file.name)
 
         # extract the experiment id from the file name
         experiment_id = file.stem.split("_result_dict")[0]
@@ -56,6 +57,7 @@ def main():
 
         # load previous result for the given experiment
         result_dict_path = Path(f"{result_base_path}/{experiment_id}_result_dict.pkl")
+        print(result_dict_path)
         if result_dict_path.exists():
             with open(result_dict_path, "rb") as result_file:
                 result_dict = pickle.load(result_file)
@@ -80,8 +82,16 @@ def main():
             "max_trees_random_forest": 2000,
         }
         if "random_noise" in file.name:
-            meta_data_dict["data_shape_random_noise"] = (62, 2000)
-            meta_data_dict["path_for_random_noise"] = "../data/random_noise"
+            meta_data_dict["data_shape_random_noise"] = result_dict["reverse_random_forest_meta_data"][
+                "data_shape_random_noise"
+            ]
+            meta_data_dict["path_for_random_noise"] = result_dict["reverse_random_forest_meta_data"][
+                "path_for_random_noise"
+            ]
+
+        # if "random_noise" in file.name:
+        #     meta_data_dict["data_shape_random_noise"] = (62, 2000)
+        #     meta_data_dict["path_for_random_noise"] = "../data/random_noise"
 
         # load data for the experiment with balanced train sample size
         data_df, _ = load_train_holdout_data_for_balanced_train_sample_size(meta_data_dict)
