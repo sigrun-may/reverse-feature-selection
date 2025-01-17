@@ -24,18 +24,15 @@ def cleanup_generated_files():
     yield
     # Code to run after each test
     for file in os.listdir("."):
-        if file.startswith("empty") or file.startswith("single_class"):
+        if file.startswith(("empty", "single_class")):
             os.remove(file)
 
 
 def test_balance_sample_size_of_hold_out_data_single_df_empty():
     hold_out_data_df = pd.DataFrame()
-    try:
-        balanced_df = balance_sample_size_of_hold_out_data_single_df(
-            hold_out_data_df, shuffle_seed=42, number_of_balanced_samples=14
-        )
-    except AssertionError as e:
-        assert str(e) == "Number of balanced samples 14 is smaller than the number of samples in the hold out data 0."
+    with pytest.raises(AssertionError) as e:
+        balance_sample_size_of_hold_out_data_single_df(hold_out_data_df, shuffle_seed=42, number_of_balanced_samples=14)
+    assert str(e.value) == "Number of balanced samples 14 is smaller than the number of samples in the hold out data 0."
 
 
 def test_balance_sample_size_of_hold_out_data_single_df():
@@ -139,6 +136,7 @@ def test_shuffle_fixed_seed():
 
 def test_load_train_holdout_data_for_balanced_train_sample_size_colon():
     from feature_selection_benchmark.data_loader_tools import load_train_holdout_data_for_balanced_train_sample_size
+
     train_data_df, hold_out_data_df = load_train_holdout_data_for_balanced_train_sample_size(
         {
             "data_name": "colon",
@@ -165,7 +163,7 @@ def test_load_train_holdout_data_for_balanced_train_sample_size_prostate():
     train_data_df, hold_out_data_df = load_train_holdout_data_for_balanced_train_sample_size(meta_data_dict)
     assert hold_out_data_df.columns[0] == "label"
     assert train_data_df.columns[0] == "label"
-    assert train_data_df["label"].value_counts().tolist() == [15,15]
+    assert train_data_df["label"].value_counts().tolist() == [15, 15]
 
     assert train_data_df.shape[1] == hold_out_data_df.shape[1]  # label column
     assert train_data_df.shape[0] + hold_out_data_df.shape[0] == 102
@@ -184,7 +182,9 @@ def test_load_train_holdout_data_for_balanced_train_sample_size_leukemia_big():
     assert train_data_df["label"].value_counts().tolist() == [15, 15]
 
     assert train_data_df.shape[1] == hold_out_data_df.shape[1]  # label column
-    assert train_data_df.shape[0] + hold_out_data_df.shape[0] == 72, f"{train_data_df.shape[0] + hold_out_data_df.shape[0]}"
+    assert (
+        train_data_df.shape[0] + hold_out_data_df.shape[0] == 72
+    ), f"{train_data_df.shape[0] + hold_out_data_df.shape[0]}"
 
 
 def test_load_train_holdout_data_for_balanced_train_sample_size_invalid_data_name():
@@ -194,10 +194,9 @@ def test_load_train_holdout_data_for_balanced_train_sample_size_invalid_data_nam
         "data_name": "invalid_data_name",
         "shuffle_seed": 42,
     }
-    try:
+    with pytest.raises(ValueError) as e:
         load_train_holdout_data_for_balanced_train_sample_size(meta_data_dict)
-    except ValueError as e:
-        assert str(e) == "Data name invalid_data_name not found or path to dataset is missing in meta_data_dict."
+    assert str(e.value) == "Data name invalid_data_name not found or path to dataset is missing in meta_data_dict."
 
 
 def test_load_train_holdout_data_for_balanced_train_sample_size_missing_data_name():
@@ -206,43 +205,27 @@ def test_load_train_holdout_data_for_balanced_train_sample_size_missing_data_nam
     meta_data_dict = {
         "shuffle_seed": 42,
     }
-    try:
+    with pytest.raises(AssertionError) as e:
         load_train_holdout_data_for_balanced_train_sample_size(meta_data_dict)
-    except AssertionError as e:
-        assert str(e) == "Data name is missing in meta_data_dict."
-
-
-def test_load_train_holdout_data_for_balanced_train_sample_size_empty_data():
-    from feature_selection_benchmark.data_loader_tools import load_train_holdout_data_for_balanced_train_sample_size
-
-    meta_data_dict = {
-        "data_name": "colon",
-        "shuffle_seed": None,
-    }
-    # Mocking an empty dataset
-    pd.DataFrame().to_csv("empty_colon.csv")
-    meta_data_dict["path_to_local_dataset"] = "empty_colon.csv"
-    try:
-        load_train_holdout_data_for_balanced_train_sample_size(meta_data_dict)
-    except ValueError as e:
-        assert str(e) == "Data name colon not found or path to dataset is missing in meta_data_dict."
+    assert str(e.value) == "Data name is missing in meta_data_dict."
 
 
 def test_load_train_holdout_data_for_balanced_train_sample_size_single_class():
     from feature_selection_benchmark.data_loader_tools import load_train_holdout_data_for_balanced_train_sample_size
 
     meta_data_dict = {
-        "data_name": "colon",
+        "data_name": "single_class_test",
         "shuffle_seed": None,
     }
     # Mocking a dataset with a single class
     data = pd.DataFrame({"label": [0] * 30})
-    data.to_csv("single_class_colon.csv", index=False)
-    meta_data_dict["path_to_local_dataset"] = "single_class_colon.csv"
-    try:
+    # insert random data
+    data = pd.concat([data, pd.DataFrame(rng.standard_normal((30, 2000)))], axis=1)
+    data.to_csv("single_class_test.csv", index=False)
+    meta_data_dict["path_to_local_dataset"] = "single_class_test.csv"
+    with pytest.raises(AssertionError) as e:
         load_train_holdout_data_for_balanced_train_sample_size(meta_data_dict)
-    except ValueError as e:
-        assert str(e) == "Data name colon not found or path to dataset is missing in meta_data_dict."
+    assert str(e.value) == "Class label 1 not found in label series."
 
 
 def test_load_train_holdout_data_for_balanced_train_sample_size_no_shuffle_seed():
@@ -251,10 +234,9 @@ def test_load_train_holdout_data_for_balanced_train_sample_size_no_shuffle_seed(
     meta_data_dict = {
         "data_name": "colon",
     }
-    try:
+    with pytest.raises(AssertionError) as e:
         load_train_holdout_data_for_balanced_train_sample_size(meta_data_dict)
-    except AssertionError as e:
-        assert str(e) == "Shuffle seed is missing in meta_data_dict."
+    assert str(e.value) == "Shuffle seed is missing in meta_data_dict."
 
 
 def test_load_train_holdout_data_for_balanced_train_sample_size_invalid_shuffle_seed():
@@ -264,8 +246,8 @@ def test_load_train_holdout_data_for_balanced_train_sample_size_invalid_shuffle_
         "data_name": "colon",
         "shuffle_seed": "invalid_seed",
     }
-    try:
+    with pytest.raises(ValueError) as e:
         load_train_holdout_data_for_balanced_train_sample_size(meta_data_dict)
-    except ValueError as e:
-        assert str(e) == 'random_state must be an integer, array-like, a BitGenerator, Generator, a numpy RandomState, or None'
-
+    assert str(e.value) == (
+        "random_state must be an integer, array-like, a BitGenerator, Generator, a numpy RandomState, or None"
+    )

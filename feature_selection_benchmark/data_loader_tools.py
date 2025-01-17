@@ -39,8 +39,8 @@ def balance_sample_size_of_hold_out_data_single_df(
 
     # check if number_of_balanced_samples/2 is smaller than the number of samples for each class
     assert number_of_balanced_samples / 2 <= hold_out_data_df["label"].value_counts().min(), (
-        f"Number of balanced samples {number_of_balanced_samples / 2} for each class is smaller than the number of samples "
-        f"for each class in the hold out data {hold_out_data_df['label'].value_counts().min()}."
+        f"Number of balanced samples {number_of_balanced_samples / 2} for each class is smaller than the number of "
+        f"samples for each class in the hold out data {hold_out_data_df['label'].value_counts().min()}."
     )
 
     balanced_hold_out_test_data_df, balanced_hold_out_test_label_series = balance_sample_size_of_hold_out_data(
@@ -210,7 +210,7 @@ def load_train_holdout_data_for_balanced_train_sample_size(
         label_series, data_df = load_data_function()
 
     # load generated random noise data
-    elif "random_noise" in meta_data_dict["data_name"]:
+    elif "random" in meta_data_dict["data_name"]:
         assert "path_for_random_noise" in meta_data_dict
         # try to load random noise data if it exists
         data_df_path = Path(meta_data_dict["path_for_random_noise"])
@@ -220,6 +220,8 @@ def load_train_holdout_data_for_balanced_train_sample_size(
             data_df = complete_data_df.drop(columns=["label"])
         else:
             raise FileNotFoundError(f"Data file {data_df_path} not found.")
+
+    # load local data
     elif "path_to_local_dataset" in meta_data_dict:
         # try to load the local data if it exists
         data_df_path = Path(meta_data_dict["path_to_local_dataset"])
@@ -233,6 +235,9 @@ def load_train_holdout_data_for_balanced_train_sample_size(
         raise ValueError(
             f"Data name {meta_data_dict['data_name']} not found or path to dataset is missing in meta_data_dict."
         )
+
+    # check if data_df is not empty
+    assert not data_df.empty, "Data frame is empty."
 
     # shuffle data before selecting samples, if shuffle_seed is set
     if meta_data_dict["shuffle_seed"] is not None:
@@ -256,11 +261,9 @@ def load_train_holdout_data_for_balanced_train_sample_size(
     assert len(y_test) == hold_out_data_df.shape[0]
     assert hold_out_data_df.shape[1] == data_df.shape[1]
 
-    assert len(train_indices) == 30
     train_data_df = data_df.iloc[train_indices]
     y_train = label_series.iloc[train_indices]
-    assert train_data_df.shape[0] == 30
-    assert len(y_train) == 30
+    assert train_data_df.shape[0] == len(train_indices) == len(y_train) == 30
     assert train_data_df.shape[1] == data_df.shape[1]
 
     hold_out_data_df = convert_to_single_df(hold_out_data_df, y_test)
