@@ -31,8 +31,8 @@ def main():
         # # or the ranger random forest
         # if "random" in file.name or "rf" not in file.name:
         #     continue
-
-        if "random" not in file.name and "shuffle_seed_None" not in file.name:
+        if not ("random" in file.name and "shuffle_seed_None" in file.name):
+            print("continue: ", file.name)
             continue
         print("file", file.name)
 
@@ -70,7 +70,6 @@ def main():
             "git_commit_hash": git.Repo(search_parent_directories=True).head.object.hexsha,
             "experiment_id": experiment_id,
             "data_name": data_name,
-            "description": result_dict["reverse_random_forest_meta_data"]["description"],
             # seed to shuffle the indices of the samples of the data set:
             "shuffle_seed": result_dict["reverse_random_forest_meta_data"]["shuffle_seed"],
             "n_cpus": multiprocessing.cpu_count(),  # number of available CPUs
@@ -87,9 +86,10 @@ def main():
             meta_data_dict["data_shape_random_noise"] = result_dict["reverse_random_forest_meta_data"][
                 "data_shape_random_noise"
             ]
-            meta_data_dict["path_for_random_noise"] = result_dict["reverse_random_forest_meta_data"][
-                "path_for_random_noise"
-            ]
+            if "lognormal" in file.name:
+                meta_data_dict["path_for_random_noise"] = f"{result_base_path}/random_noise_data/random_noise_lognormal_30_2000.csv"
+            elif "lognormal" not in file.name:
+                meta_data_dict["path_for_random_noise"] = f"{result_base_path}/random_noise_data/random_noise_normal_30_2000.csv"
 
         # load data for the experiment with balanced train sample size
         data_df, _ = load_train_holdout_data_for_balanced_train_sample_size(meta_data_dict)
