@@ -1,4 +1,4 @@
-# reverse_feature_selection
+# Reverse feature selection for high-dimensioal data with tiny sample size [Sphinx-Doc](https://sigrun-may.github.io/reverse-feature-selection/)
 
 ## Overview
 
@@ -38,6 +38,7 @@ and returns a DataFrame with the selected features. The input DataFrame should h
 - The function uses a threshold to remove features that are highly correlated with other features.
 
 ```python
+# variables list_of_random_seeds, data_pandas_dataframe, array_of_train_indices must be defined additionally
 from reverse_feature_selection.reverse_rf_random import select_feature_subset
 
 # Example metadata
