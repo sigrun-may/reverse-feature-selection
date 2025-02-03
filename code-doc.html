@@ -1,0 +1,158 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Code Documentation &mdash; reverse_feature_selection  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="_static/css/custom.css" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="_static/copybutton.js?v=f281be69"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="reverse_feature_selection documentation" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            reverse_feature_selection
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Code Documentation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#select-feature-subset"><code class="xref py py-func docutils literal notranslate"><span class="pre">select_feature_subset()</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#reverse_feature_selection.reverse_rf_random.select_feature_subset"><code class="docutils literal notranslate"><span class="pre">select_feature_subset()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/sigrun-may/reverse_feature_selection/blob/main/LICENSE">License</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/sigrun-may/reverse_feature_selection">GitHub Repository</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">reverse_feature_selection</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Code Documentation</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/sigrun-may/artificial-data-generator/blob/main/docs/source/code-doc.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="code-documentation">
+<h1>Code Documentation<a class="headerlink" href="#code-documentation" title="Link to this heading"></a></h1>
+<section id="select-feature-subset">
+<h2><a class="reference internal" href="#reverse_feature_selection.reverse_rf_random.select_feature_subset" title="reverse_feature_selection.reverse_rf_random.select_feature_subset"><code class="xref py py-func docutils literal notranslate"><span class="pre">select_feature_subset()</span></code></a><a class="headerlink" href="#select-feature-subset" title="Link to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="reverse_feature_selection.reverse_rf_random.select_feature_subset">
+<span class="sig-prename descclassname"><span class="pre">reverse_feature_selection.reverse_rf_random.</span></span><span class="sig-name descname"><span class="pre">select_feature_subset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">train_indices</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">meta_data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/reverse_feature_selection/reverse_rf_random.html#select_feature_subset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#reverse_feature_selection.reverse_rf_random.select_feature_subset" title="Link to this definition"></a></dt>
+<dd><p>Selects a subset of features based on the mean out-of-bag (OOB) errors for random forest regressors.</p>
+<p>Calculate the mean out-of-bag (OOB) errors for random forest regressors with different random seeds
+for training data including the label and without the label for each feature. It then selects a subset of features
+based on the Mann-Whitney U test which determines whether there is a significant difference between the
+two error distributions. The test is configured for the hypothesis that the distribution of
+labeled_error_distribution is shifted to the left of the unlabeled_error_distribution.
+The Mann-Whitney U test is used to calculate the p-value based on the Out-of-Bag (OOB) scores of the labeled
+and unlabeled error distributions. The p-value is a measure of the probability that an observed difference
+could have occurred just by random chance. The smaller the p-value, the greater the statistical evidence
+to reject the null hypothesis (conclude that both error distributions differ).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data_df</strong> (<em>DataFrame</em>) – The training data. The first column must contain the label and the remaining columns the features.
+The label column must be named “label”.</p></li>
+<li><p><strong>train_indices</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.2)"><em>ndarray</em></a>) – Indices for the training split.</p></li>
+<li><p><strong>meta_data</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><em>dict</em></a>) – The metadata related to the dataset and experiment.
+The required keys are: “n_cpus”, “random_seeds” and “train_correlation_threshold”. Number of available CPUs
+as integer and a list of random seeds for reproducibility of the repeated reverse random forest.
+The correlation threshold for removing correlated features is a float between 0 and 1. The threshold is used
+to remove features correlated to the target feature. The target feature is the feature for which the
+feature subset is selected. The higher the threshold, the more features are removed.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A DataFrame containing raw data with lists of OOB scores for repeated analyzes of labeled and unlabeled data,
+p_values and fraction differences based on means and medians of the distributions. The feature_subset_selection
+column contains the fraction difference based on the mean of the distributions, where the p_value is smaller or
+equal to 0.05. Those features are selected for the feature subset.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><em>DataFrame</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="reverse_feature_selection documentation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Sigrun May.</p>
+  </div>
+
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
