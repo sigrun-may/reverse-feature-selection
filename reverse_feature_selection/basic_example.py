@@ -7,8 +7,8 @@
 """Basic example of how to use the reverse feature selection algorithm.
 
 This is a basic example of how to use the reverse feature selection algorithm. The example generates a synthetic dataset
-with 100 irrelevant features and two relevant features. The relevant features have an increased effect size compared to
-the irrelevant features. The algorithm selects the relevant features and prints the names of the selected features.
+with 100 irrelevant features and two relevant features. The relevant features have an increased effect size. The
+algorithm selects the relevant features and prints the names of the selected features.
 """
 import numpy as np
 import pandas as pd
