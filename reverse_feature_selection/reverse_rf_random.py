@@ -101,11 +101,15 @@ def select_feature_subset(data_df: pd.DataFrame, train_indices: np.ndarray, meta
     to reject the null hypothesis (conclude that both error distributions differ).
 
     Args:
-        data_df: The training data.
+        data_df: The training data. The first column must contain the label and the remaining columns the features.
+            The label column must be named "label".
         train_indices: Indices for the training split.
         meta_data: The metadata related to the dataset and experiment.
-            The required keys are: "n_cpus" and "random_seeds". Number of available CPUs as integer and a list of
-            random seeds for reproducibility of the repeated reverse random forest.
+            The required keys are: "n_cpus", "random_seeds" and "train_correlation_threshold". Number of available CPUs
+            as integer and a list of random seeds for reproducibility of the repeated reverse random forest.
+            The correlation threshold for removing correlated features is a float between 0 and 1. The threshold is used
+            to remove features correlated to the target feature. The target feature is the feature for which the
+            feature subset is selected. The higher the threshold, the more features are removed.
 
     Returns:
         A DataFrame containing raw data with lists of OOB scores for repeated analyzes of labeled and unlabeled data,
@@ -113,13 +117,18 @@ def select_feature_subset(data_df: pd.DataFrame, train_indices: np.ndarray, meta
         column contains the fraction difference based on the mean of the distributions, where the p_value is smaller or
         equal to 0.05. Those features are selected for the feature subset.
     """
-    # assert "n_cpus" in meta_data, "Number of available CPUs not found in meta_data."
-    # assert "random_seeds" in meta_data, "Random seeds not found in meta_data."
-    # assert isinstance(meta_data["n_cpus"], int), "Number of available CPUs is not an integer."
-    # assert isinstance(meta_data["random_seeds"], list), "Random seeds are not a list."
-    # assert all(
-    #     isinstance(seed_random_forest, int) for seed_random_forest in meta_data["random_seeds"]
-    # ), "Random seeds are not integers."
+    assert "n_cpus" in meta_data, "Number of available CPUs not found in meta_data."
+    assert "random_seeds" in meta_data, "Random seeds not found in meta_data."
+    assert isinstance(meta_data["n_cpus"], int), "Number of available CPUs is not an integer."
+    assert isinstance(meta_data["random_seeds"], list), "Random seeds are not a list."
+    assert all(
+        isinstance(seed_random_forest, int) for seed_random_forest in meta_data["random_seeds"]
+    ), "Random seeds are not integers."
+    assert "train_correlation_threshold" in meta_data, "Correlation threshold not found in meta_data."
+    assert isinstance(meta_data["train_correlation_threshold"], float), "Correlation threshold is not a float."
+    assert 0 <= meta_data["train_correlation_threshold"] <= 1, "Correlation threshold is not between 0 and 1."
+    assert "label" in data_df.columns, "Label column not found in the training data."
+    assert data_df.shape[1] > 1, "No features found in the training data."
 
     # check if feature importance calculation is possible
     if data_df.shape[1] < 2:
