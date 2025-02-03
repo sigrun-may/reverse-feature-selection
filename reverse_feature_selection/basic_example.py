@@ -39,46 +39,15 @@ data_df.insert(0, "label", label)
 # Select indices of 29 samples simulating leave-one-out cross-validation
 train_indices = rng.choice(data_df.index, size=29, replace=False)
 
-# generate 30 random seeds of type int with great variety
-seeds = [
-    29,
-    10,
-    17,
-    42,
-    213,
-    34,
-    1,
-    5,
-    19,
-    3,
-    23,
-    9,
-    7,
-    123,
-    234,
-    345,
-    456,
-    567,
-    678,
-    789,
-    890,
-    15,
-    333,
-    37,
-    45,
-    56,
-    67,
-    78,
-    89,
-    90,
-]
+# generate random seeds of type int with great variety
+seeds = [29, 10, 17, 42, 213, 34, 1, 5, 19, 3, 23, 9, 7, 123, 234, 345, 456, 567, 678, 789, 890, 15, 333, 37, 45, 56]
 
 # Example metadata
 meta_data = {
     "n_cpus": 4,
     "random_seeds": seeds,
     # train correlation threshold defines the features correlated to the target to be removed from the training data
-    "train_correlation_threshold": 0.3,
+    "train_correlation_threshold": 0.7,
 }
 
 # Select feature subset
