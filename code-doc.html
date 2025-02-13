@@ -47,10 +47,13 @@
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul class="current">
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Code Documentation</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#select-feature-subset"><code class="xref py py-func docutils literal notranslate"><span class="pre">select_feature_subset()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#select-feature-subset"><code class="xref py py-func docutils literal notranslate"><span class="pre">select_feature_subset()</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#reverse_feature_selection.reverse_random_forests.select_feature_subset"><code class="docutils literal notranslate"><span class="pre">select_feature_subset()</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference external" href="https://github.com/sigrun-may/reverse_feature_selection/blob/main/LICENSE">License</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/sigrun-may/reverse-feature-selection/blob/main/LICENSE">License</a></li>
 <li class="toctree-l1"><a class="reference external" href="https://github.com/sigrun-may/reverse-feature-selection">GitHub Repository</a></li>
 </ul>
 
@@ -81,7 +84,46 @@
   <section id="code-documentation">
 <h1>Code Documentation<a class="headerlink" href="#code-documentation" title="Link to this heading"></a></h1>
 <section id="select-feature-subset">
-<h2><code class="xref py py-func docutils literal notranslate"><span class="pre">select_feature_subset()</span></code><a class="headerlink" href="#select-feature-subset" title="Link to this heading"></a></h2>
+<h2><a class="reference internal" href="#reverse_feature_selection.reverse_random_forests.select_feature_subset" title="reverse_feature_selection.reverse_random_forests.select_feature_subset"><code class="xref py py-func docutils literal notranslate"><span class="pre">select_feature_subset()</span></code></a><a class="headerlink" href="#select-feature-subset" title="Link to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="reverse_feature_selection.reverse_random_forests.select_feature_subset">
+<span class="sig-prename descclassname"><span class="pre">reverse_feature_selection.reverse_random_forests.</span></span><span class="sig-name descname"><span class="pre">select_feature_subset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">train_indices</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">meta_data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/reverse_feature_selection/reverse_random_forests.html#select_feature_subset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#reverse_feature_selection.reverse_random_forests.select_feature_subset" title="Link to this definition"></a></dt>
+<dd><p>Selects a subset of features based on the mean out-of-bag (OOB) errors for random forest regressors.</p>
+<p>Calculate the mean out-of-bag (OOB) errors for random forest regressors with different random seeds
+for training data including the label and without the label for each feature. It then selects a subset of features
+based on the Mann-Whitney U test which determines whether there is a significant difference between the
+two error distributions. The test is configured for the hypothesis that the distribution of
+labeled_error_distribution is shifted to the left of the unlabeled_error_distribution.
+The Mann-Whitney U test is used to calculate the p-value based on the Out-of-Bag (OOB) scores of the labeled
+and unlabeled error distributions. The p-value is a measure of the probability that an observed difference
+could have occurred just by random chance. The smaller the p-value, the greater the statistical evidence
+to reject the null hypothesis (conclude that both error distributions differ).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data_df</strong> (<em>DataFrame</em>) – The training data. The first column must contain the label and the remaining columns the features.
+The label column must be named “label”.</p></li>
+<li><p><strong>train_indices</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.2)"><em>ndarray</em></a>) – Indices for the training split.</p></li>
+<li><p><strong>meta_data</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><em>dict</em></a>) – The metadata related to the dataset and experiment.
+The required keys are: “n_cpus”, “random_seeds” and “train_correlation_threshold”. Number of available CPUs
+as integer and a list of random seeds for reproducibility of the repeated reverse random forest.
+The correlation threshold for removing correlated features is a float between 0 and 1. The threshold is used
+to remove features correlated to the target feature. The target feature is the feature for which the
+feature subset is selected. The higher the threshold, the more features are removed.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A DataFrame containing raw data with lists of OOB scores for repeated analyzes of labeled and unlabeled data,
+p_values and fraction differences based on means and medians of the distributions. The feature_subset_selection
+column contains the fraction difference based on the mean of the distributions, where the p_value is smaller or
+equal to 0.05. Those features are selected for the feature subset.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><em>DataFrame</em></p>
+</dd>
+</dl>
+</dd></dl>
+
 </section>
 </section>
 

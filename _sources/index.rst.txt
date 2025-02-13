@@ -12,7 +12,8 @@ Content
    :glob:
    :maxdepth: 2
 
+
    code-doc
-   License <https://github.com/sigrun-may/reverse_feature_selection/blob/main/LICENSE>
+   License <https://github.com/sigrun-may/reverse-feature-selection/blob/main/LICENSE>
    GitHub Repository <https://github.com/sigrun-may/reverse-feature-selection>
 
