@@ -183,11 +183,13 @@
 <span class="sd">            The label column must be named &quot;label&quot;.</span>
 <span class="sd">        train_indices: Indices for the training split.</span>
 <span class="sd">        meta_data: The metadata related to the dataset and experiment.</span>
-<span class="sd">            The required keys are: &quot;n_cpus&quot;, &quot;random_seeds&quot; and &quot;train_correlation_threshold&quot;. Number of available CPUs</span>
-<span class="sd">            as integer and a list of random seeds for reproducibility of the repeated reverse random forest.</span>
-<span class="sd">            The correlation threshold for removing correlated features is a float between 0 and 1. The threshold is used</span>
-<span class="sd">            to remove features correlated to the target feature. The target feature is the feature for which the</span>
-<span class="sd">            feature subset is selected. The higher the threshold, the more features are removed.</span>
+<span class="sd">            The required keys are: &quot;n_cpus&quot;, &quot;random_seeds&quot; and &quot;train_correlation_threshold&quot;.</span>
+
+<span class="sd">            Number of available CPUs *n_cpus* as integer and a list of random seeds &quot;random_seeds&quot; for reproducibility</span>
+<span class="sd">            of the repeated reverse random forest.</span>
+<span class="sd">            The correlation threshold for removing correlated features &quot;train_correlation_threshold&quot; is a float between</span>
+<span class="sd">            0 and 1. The threshold is used to remove features correlated to the target feature. The higher the</span>
+<span class="sd">            threshold, the more features are removed.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        A DataFrame containing raw data with lists of OOB scores for repeated analyzes of labeled and unlabeled data,</span>
