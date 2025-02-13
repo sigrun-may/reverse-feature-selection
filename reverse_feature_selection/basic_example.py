@@ -13,7 +13,7 @@ algorithm selects the relevant features and prints the names of the selected fea
 import numpy as np
 import pandas as pd
 
-from reverse_feature_selection.reverse_rf_random import select_feature_subset
+from reverse_feature_selection.reverse_random_forests import select_feature_subset
 
 rng = np.random.default_rng()
 

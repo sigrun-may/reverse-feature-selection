@@ -15,7 +15,7 @@ import git
 
 from feature_selection_benchmark import cross_validation
 from feature_selection_benchmark.data_loader_tools import load_train_holdout_data_for_balanced_train_sample_size
-from reverse_feature_selection.reverse_rf_random import select_feature_subset
+from reverse_feature_selection.reverse_random_forests import select_feature_subset
 
 
 def define_random_seeds() -> list:
