@@ -105,11 +105,13 @@ def select_feature_subset(data_df: pd.DataFrame, train_indices: np.ndarray, meta
             The label column must be named "label".
         train_indices: Indices for the training split.
         meta_data: The metadata related to the dataset and experiment.
-            The required keys are: "n_cpus", "random_seeds" and "train_correlation_threshold". Number of available CPUs
-            as integer and a list of random seeds for reproducibility of the repeated reverse random forest.
-            The correlation threshold for removing correlated features is a float between 0 and 1. The threshold is used
-            to remove features correlated to the target feature. The target feature is the feature for which the
-            feature subset is selected. The higher the threshold, the more features are removed.
+            The required keys are: "n_cpus", "random_seeds" and "train_correlation_threshold".
+
+            Number of available CPUs *n_cpus* as integer and a list of random seeds "random_seeds" for reproducibility
+            of the repeated reverse random forest.
+            The correlation threshold for removing correlated features "train_correlation_threshold" is a float between
+            0 and 1. The threshold is used to remove features correlated to the target feature. The higher the
+            threshold, the more features are removed.
 
     Returns:
         A DataFrame containing raw data with lists of OOB scores for repeated analyzes of labeled and unlabeled data,
