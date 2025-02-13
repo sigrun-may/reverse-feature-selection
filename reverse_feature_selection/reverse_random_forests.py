@@ -28,7 +28,7 @@ def calculate_oob_errors(
     corr_matrix_df: pd.DataFrame,
     meta_data: dict,
 ) -> tuple[list | None, list | None, int]:
-    """Calculate out-of-bag (OOB) error for labeled and unlabeled training data.
+    """Calculate out-of-bag (OOB) error for training data first including the label and again excluding the label.
 
     Args:
         target_feature_name: The name of the target feature.
