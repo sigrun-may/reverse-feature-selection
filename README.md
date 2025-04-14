@@ -57,7 +57,7 @@ print(f"Selected features: {result_df[result_df['feature_subset_selection'] > 0]
  - The input should be a pandas DataFrame. The first column must be named 'label' and contain the target variable. 
 All remaining columns are considered input features.
 
-- Training Indices train_indices are a list of row indices indicating which rows are to be used for training.
+- Training indices train_indices are a list of row indices indicating which rows are to be used for training.
 
 The metadata dictionary must include the following keys:
 
