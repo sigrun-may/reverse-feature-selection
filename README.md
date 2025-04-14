@@ -54,7 +54,7 @@ print(f"Selected features: {result_df[result_df['feature_subset_selection'] > 0]
 ```
 
 ### Input Format
- - The input should be a pandas DataFrame. The first column must be named label and contain the target variable. 
+ - The input should be a pandas DataFrame. The first column must be named 'label' and contain the target variable. 
 All remaining columns are considered input features.
 
 - Training Indices train_indices are a list of row indices indicating which rows are to be used for training.
@@ -72,7 +72,7 @@ The metadata dictionary must include the following keys:
 
 ### Output
 
-The function returns a DataFrame with the selected feature subset in the 'feature_subset_selection' column. A numeric 
+The function returns a pandas DataFrame with the selected feature subset in the 'feature_subset_selection' column. A numeric 
 column where a value greater than zero indicates that the feature was selected.
 
 [//]: # (- The first column should contain the labels and should be named 'label'.)
