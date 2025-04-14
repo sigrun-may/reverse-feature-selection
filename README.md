@@ -35,19 +35,10 @@ Here is a [basic example](reverse_feature_selection/basic_example.py) of how to 
 and returns a DataFrame with the selected features. 
 
 ### Input Format
-DataFrame
+ - The input should be a pandas DataFrame. The first column must be named label and contain the target variable. 
+All remaining columns are considered input features.
 
-    The input should be a pandas DataFrame:
-
-        The first column must be named label and contain the target variable.
-
-        All remaining columns are considered input features.
-
-Training Indices
-
-    train_indices:  list of row indices indicating which rows are to be used for training.
-
-Metadata Dictionary
+- Training Indices train_indices are a list of row indices indicating which rows are to be used for training.
 
 The metadata dictionary must include the following keys:
 
@@ -55,9 +46,9 @@ The metadata dictionary must include the following keys:
 
     random_seeds: A list of integers used as random seeds for reproducibility.
 
-    train_correlation_threshold: Float. Threshold to exclude features that are highly correlated with other features.
-                                        Features with an absolute correlation higher than this threshold with each other 
-                                        will not be considered during training.
+    train_correlation_threshold: Float. Threshold to exclude features that are highly correlated with other 
+                                        features. Features with an absolute correlation higher than this 
+                                        threshold with each other will not be considered during training.
 
 
 ### Output
