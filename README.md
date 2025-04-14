@@ -65,9 +65,9 @@ The metadata dictionary must include the following keys:
 
     random_seeds: A list of integers used as random seeds for reproducibility.
 
-    train_correlation_threshold: Float. Threshold to exclude features that are highly correlated with the current 
-                                        target feature. Features with an absolute correlation higher than this 
-                                        threshold will not be considered during training.
+    train_correlation_threshold: Float. Threshold to exclude features that are highly correlated with the 
+                                        current target feature. Features with an absolute correlation 
+                                        higher than this threshold will not be considered during training.
 
 
 ### Output
