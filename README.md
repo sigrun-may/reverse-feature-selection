@@ -34,6 +34,25 @@ selection methods. The package is designed to be used in combination with existi
 Here is a [basic example](reverse_feature_selection/basic_example.py) of how to use the `select_feature_subset` function. The function takes a pandas DataFrame as input
 and returns a DataFrame with the selected features. 
 
+```python
+# variables list_of_random_seeds, data_pandas_dataframe, array_of_train_indices must be defined additionally
+from reverse_feature_selection.reverse_rf_random import select_feature_subset
+
+# Example metadata
+meta_data = {
+    'n_cpus': 4,
+    'random_seeds': list_of_random_seeds,
+    # train correlation threshold defines the features correlated to the target to be removed from the training data
+    'train_correlation_threshold': 0.3,
+}
+
+# Select feature subset
+result_df = select_feature_subset(data_pandas_dataframe, array_of_train_indices, meta_data)
+
+# print names of non-zero features
+print(f"Selected features: {result_df[result_df['feature_subset_selection'] > 0]}")
+```
+
 ### Input Format
  - The input should be a pandas DataFrame. The first column must be named label and contain the target variable. 
 All remaining columns are considered input features.
@@ -78,24 +97,7 @@ column where a value greater than zero indicates that the feature was selected.
 
 [//]: # (- The function uses a threshold to remove features that are highly correlated with other features.)
 
-```python
-# variables list_of_random_seeds, data_pandas_dataframe, array_of_train_indices must be defined additionally
-from reverse_feature_selection.reverse_rf_random import select_feature_subset
 
-# Example metadata
-meta_data = {
-    'n_cpus': 4,
-    'random_seeds': list_of_random_seeds,
-    # train correlation threshold defines the features correlated to the target to be removed from the training data
-    'train_correlation_threshold': 0.3,
-}
-
-# Select feature subset
-result_df = select_feature_subset(data_pandas_dataframe, array_of_train_indices, meta_data)
-
-# print names of non-zero features
-print(f"Selected features: {result_df[result_df['feature_subset_selection'] > 0]}")
-```
 
 ## License
 
