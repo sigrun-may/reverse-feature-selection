@@ -57,20 +57,19 @@ pandas = "*"
 scikit-learn = "*"
 joblib = "*"
 scipy = "*"
-statistics = "*"
-mltb2 = {extras = ["data"], version = "*"}
-GitPython = "*"
-requests = "*"
-bs4 = "*"
+mltb2 = {extras = ["data"], version = "*", optional = true}
+GitPython = {version = "*", optional = true}
+requests = {version = "*", optional = true}
+bs4 = {version = "*", optional = true}
 optuna = {version = "*", optional = true}
 plotly = {version = "*", optional = true}
 rpy2 = {version = "*", optional = true}
 
 [tool.poetry.extras]
-benchmark = ["optuna", "plotly", "rpy2"]
+benchmark = ["optuna", "plotly", "rpy2", "mltb2", "GitPython", "requests", "bs4"]
 
 [tool.poetry.group.lint.dependencies]
-black = "*"
+black = {extras = ["jupyter"], version = "*"}
 ruff = "*"
 mypy = "*"
 mdformat-gfm = "*"
