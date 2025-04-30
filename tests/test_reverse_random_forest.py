@@ -4,7 +4,7 @@
 # This software is distributed under the terms of the MIT license
 # which is available at https://opensource.org/licenses/MIT
 
-"""Main test script for reverse feature selection with random forest."""
+"""Main tests script for reverse feature selection with random forest."""
 
 import numpy as np
 import pandas as pd
@@ -15,7 +15,7 @@ from reverse_feature_selection.reverse_random_forests import calculate_oob_error
 
 
 def load_test_data():
-    """Load test data."""
+    """Load tests data."""
     y, x = load_colon()
     train_df = pd.DataFrame(x)
     train_df.insert(loc=0, column="label", value=y)

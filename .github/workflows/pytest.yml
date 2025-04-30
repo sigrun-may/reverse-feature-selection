@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # only test high and low version numbers
+        # only tests high and low version numbers
         python-version: ["3.10", "3.11", "3.12"]
 
     steps:

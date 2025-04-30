@@ -4,7 +4,7 @@
 # This software is distributed under the terms of the MIT license
 # which is available at https://opensource.org/licenses/MIT
 
-"""Main test script for cacluating a grid of repeated feature selection experiments for reverse feature selection."""
+"""Main tests script for cacluating a grid of repeated feature selection experiments for reverse feature selection."""
 
 
 from feature_selection_benchmark.repeated_experiments_reverse_rf import define_random_seeds

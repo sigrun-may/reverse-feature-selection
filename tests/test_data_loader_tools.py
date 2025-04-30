@@ -20,9 +20,9 @@ rng = np.random.default_rng()
 # cleanup the generated files after testing
 @pytest.fixture(autouse=True)
 def cleanup_generated_files():
-    # Code to run before each test
+    # Code to run before each tests
     yield
-    # Code to run after each test
+    # Code to run after each tests
     for file in os.listdir("."):
         if file.startswith(("empty", "single_class")):
             os.remove(file)

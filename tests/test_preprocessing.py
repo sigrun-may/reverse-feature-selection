@@ -4,7 +4,7 @@
 # This software is distributed under the terms of the MIT license
 # which is available at https://opensource.org/licenses/MIT
 
-"""Preprocessing test script."""
+"""Preprocessing tests script."""
 
 import pandas as pd
 import pytest
