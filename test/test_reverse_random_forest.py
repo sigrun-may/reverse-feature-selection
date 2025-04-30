@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 from mltb2.data import load_colon
 
-from reverse_feature_selection.reverse_rf_random import calculate_oob_errors, select_feature_subset
+from reverse_feature_selection.reverse_random_forests import calculate_oob_errors, select_feature_subset
 
 
 def load_test_data():
@@ -62,7 +62,7 @@ def test_calculate_feature_importance_with_no_features():
     data_df = pd.DataFrame({"label": [1, 0, 1, 0, 1]})
     train_indices = np.array([0, 1, 2])
     meta_data = {"n_cpus": 2, "random_seeds": [0, 1], "train_correlation_threshold": 0.2}
-    with pytest.raises(ValueError):
+    with pytest.raises(AssertionError):
         select_feature_subset(data_df, train_indices, meta_data)
 
 
