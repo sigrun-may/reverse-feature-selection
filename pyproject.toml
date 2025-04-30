@@ -78,6 +78,7 @@ mdformat-footnote = "*"
 
 [tool.poetry.group.test.dependencies]
 pytest = "*"
+mltb2 = {extras = ["data"], version = "*"}
 
 [tool.poetry.group.doc.dependencies]
 sphinx = "*"
