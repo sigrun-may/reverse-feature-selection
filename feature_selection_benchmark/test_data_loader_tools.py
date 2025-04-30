@@ -23,7 +23,7 @@ def cleanup_generated_files():
     # Code to run before each tests
     yield
     # Code to run after each tests
-    for file in os.listdir("."):
+    for file in os.listdir("../tests"):
         if file.startswith(("empty", "single_class")):
             os.remove(file)
 
