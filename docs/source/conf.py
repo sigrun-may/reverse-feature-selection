@@ -26,9 +26,9 @@ from typing import List
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'reverse_feature_selection'
-copyright = '2025, Sigrun May'
-author = 'Sigrun May'
+project = "reverse_feature_selection"
+copyright = "2025, Sigrun May"
+author = "Sigrun May"
 
 
 # -- General configuration ---------------------------------------------------
@@ -140,8 +140,6 @@ napoleon_numpy_docstring = False
 todo_include_todos = True
 
 
-
-
 #
 # # Configuration file for the Sphinx documentation builder.
 # #
@@ -175,4 +173,3 @@ todo_include_todos = True
 #
 # html_theme = 'alabaster'
 # html_static_path = ['_static']
-
