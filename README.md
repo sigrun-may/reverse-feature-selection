@@ -10,7 +10,6 @@
 `reverse_feature_selection` is a Python package designed to help with feature selection in high-dimensional data with
 tiny sample size. It provides tools to identify irrelevant features, improving stability of subsampling-based feature
 selection methods. The package is designed to be used in combination with existing machine learning workflows.
-
  
 [//]: # (## Features)
 
@@ -36,7 +35,8 @@ selection methods. The package is designed to be used in combination with existi
 
 ## Usage
 
-Here is a [basic example](reverse_feature_selection/basic_example.py) of how to use the `select_feature_subset` function. The function takes a pandas DataFrame as input
+Here is a [basic example](https://github.com/sigrun-may/reverse-feature-selection/blob/main/reverse_feature_selection/reverse_feature_selection_example.ipynb) 
+of how to use the `select_feature_subset` function. The function takes a pandas DataFrame as input
 and returns a DataFrame with the selected features. 
 
 ```python
