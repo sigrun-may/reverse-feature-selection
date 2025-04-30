@@ -54,4 +54,5 @@ meta_data = {
 result_df = select_feature_subset(data_df, train_indices, meta_data)
 
 # print names of non-zero features
-print(f"Selected features: {result_df[result_df['feature_subset_selection'] > 0]}")
+print("Selected features:")
+print(result_df[result_df['feature_subset_selection'] > 0]['feature_subset_selection'])
