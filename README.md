@@ -10,28 +10,6 @@
 `reverse_feature_selection` is a Python package designed to help with feature selection in high-dimensional data with
 tiny sample size. It provides tools to identify irrelevant features, improving stability of subsampling-based feature
 selection methods. The package is designed to be used in combination with existing machine learning workflows.
- 
-[//]: # (## Features)
-
-[//]: # ()
-[//]: # (- Automated feature selection)
-
-[//]: # (- Support for various machine learning models)
-
-[//]: # (- Easy integration with existing workflows)
-
-[//]: # ()
-[//]: # (## Installation)
-
-[//]: # ()
-[//]: # (You can install the package using `pip`:)
-
-[//]: # ()
-[//]: # (```sh)
-
-[//]: # (pip install reverse_feature_selection)
-
-[//]: # (```)
 
 ## Usage
 
@@ -81,28 +59,6 @@ train_correlation_threshold: Float. Threshold to exclude features that are highl
 
 The function returns a pandas DataFrame with the selected feature subset in the 'feature_subset_selection' column. A numeric
 column where a value greater than zero indicates that the feature was selected.
-
-[//]: # (- The first column should contain the labels and should be named 'label'.)
-
-[//]: # (- The remaining columns should contain the features.)
-
-[//]: # (- The function also requires a list of indices for the training data and a dictionary with metadata.)
-
-[//]: # (- The metadata should contain the number of CPUs to use, a list of random seeds, and a threshold for the correlation between the features and the target variable.)
-
-[//]: # (- The function returns a DataFrame with the selected features.)
-
-[//]: # (- The selected features are indicated by a value greater than zero in the 'feature_subset_selection' column.)
-
-[//]: # (- The function uses a random forest model to select the features.)
-
-[//]: # (- The function uses a leave-one-out cross-validation approach to select the features.)
-
-[//]: # (- The function uses a random seed to ensure reproducibility.)
-
-[//]: # (- The function uses a threshold to remove features that are highly correlated with the target variable.)
-
-[//]: # (- The function uses a threshold to remove features that are highly correlated with other features.)
 
 ## Licensing
 
