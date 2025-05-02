@@ -107,15 +107,28 @@ The indices are used to select the training data from the data_df DataFrame.</p>
 <li><p><strong>label_column_name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>) – The name of the label column in the training data. Default is “label”.</p></li>
 <li><p><strong>meta_data</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><em>dict</em></a><em> | </em><em>None</em>) – <p>The metadata related to the dataset and experiment. If <cite>meta_data</cite> is <cite>None</cite>, default values for the
 required keys (<cite>“n_cpus”</cite>, <cite>“random_seeds”</cite>, and <cite>“train_correlation_threshold”</cite>) are used.</p>
-<p>#. The number of available CPUs (<cite>“n_cpus”</cite>) is required as an integer and defaults to
-<cite>multiprocessing.cpu_count()</cite>.
-#. A list of random seeds (<cite>“random_seeds”</cite>) is used to generate different error distributions by
-initializing repeated random forests multiple times. Define list of random seeds for reproducibility.
-Default is generating a random list of 30 seeds.
-#. The absolute correlation threshold for removing features from the training data correlated to the target
-feature (<cite>“train_correlation_threshold”</cite>) is a float between 0 and 1. The higher the threshold, the more
+<blockquote>
+<div><ol class="arabic simple">
+<li><dl class="simple">
+<dt>The number of available CPUs (<cite>“n_cpus”</cite>) is required as an integer and defaults to</dt><dd><p><cite>multiprocessing.cpu_count()</cite>.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>A list of random seeds (<cite>“random_seeds”</cite>) is used to generate different error distributions by</dt><dd><p>initializing repeated random forests multiple times. Define list of random seeds for reproducibility.
+Default is generating a random list of 30 seeds.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>The absolute correlation threshold for removing features from the training data correlated to the target</dt><dd><p>feature (<cite>“train_correlation_threshold”</cite>) is a float between 0 and 1. The higher the threshold, the more
 features are deselected. The default value is set to <cite>0.7</cite> and should be adjusted if the results are not
 satisfactory.</p>
+</dd>
+</dl>
+</li>
+</ol>
+</div></blockquote>
 </p></li>
 </ul>
 </dd>
@@ -125,7 +138,8 @@ The feature_subset_selection column contains the fraction difference based on th
 distributions, where the p_value is smaller or equal to 0.05. Features with values greater than 0 in this column
 are selected.</p>
 <p>The remaining columns provide additional information:</p>
-<ul class="simple">
+<blockquote>
+<div><ul class="simple">
 <li><p>”feature_subset_selection_median”: Contains the feature subset based on the median fraction difference.</p></li>
 <li><p>”unlabeled_errors”: Lists the OOB scores for the unlabeled training data.</p></li>
 <li><p>”labeled_errors”: Lists the OOB scores for the labeled training data.</p></li>
@@ -134,6 +148,7 @@ are selected.</p>
 <li><p>”fraction_median”: Shows the fraction difference based on the median of the distributions.</p></li>
 <li><p>”train_features_count”: Indicates the number of uncorrelated features in the training data.</p></li>
 </ul>
+</div></blockquote>
 <p>The index of the DataFrame is the feature names.</p>
 </p>
 </dd>
