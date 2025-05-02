@@ -108,24 +108,15 @@ The indices are used to select the training data from the data_df DataFrame.</p>
 <li><p><strong>meta_data</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><em>dict</em></a><em> | </em><em>None</em>) – <p>The metadata related to the dataset and experiment. If <cite>meta_data</cite> is <cite>None</cite>, default values for the
 required keys (<cite>“n_cpus”</cite>, <cite>“random_seeds”</cite>, and <cite>“train_correlation_threshold”</cite>) are used.</p>
 <ol class="arabic simple">
-<li><dl class="simple">
-<dt><cite>n_cpus</cite>: The number of available CPUs is required as an integer and defaults to</dt><dd><p><cite>multiprocessing.cpu_count()</cite>.</p>
-</dd>
-</dl>
-</li>
-<li><dl class="simple">
-<dt><cite>random_seeds</cite>: A list of different seeds to initalize random forests is used to generate comparable</dt><dd><p>error distributions. Define list of random seeds for reproducibility. Default is generating a random
-list of 30 seeds (int).</p>
-</dd>
-</dl>
-</li>
-<li><dl class="simple">
-<dt><cite>train_correlation_threshold</cite>: The absolute correlation threshold for removing features from the training</dt><dd><p>data correlated to the target feature is a float between 0 and 1. The higher the threshold, the more
+<li><p><cite>n_cpus</cite>: The number of available CPUs is required as an integer and defaults to
+<cite>multiprocessing.cpu_count()</cite>.</p></li>
+<li><p><cite>random_seeds</cite>: A list of different seeds to initalize random forests is used to generate comparable
+error distributions. Define list of random seeds for reproducibility. Default is generating a random
+list of 30 seeds (int).</p></li>
+<li><p><cite>train_correlation_threshold</cite>: The absolute correlation threshold for removing features from the training
+data correlated to the target feature is a float between 0 and 1. The higher the threshold, the more
 features are deselected. The default value is set to <cite>0.7</cite> and should be adjusted if the results are
-not satisfactory.</p>
-</dd>
-</dl>
-</li>
+not satisfactory.</p></li>
 </ol>
 </p></li>
 </ul>
