@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 Documentation for reverse feature selection
-=======================================
+===========================================
 
 Content
 -------
