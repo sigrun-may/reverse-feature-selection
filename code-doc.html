@@ -110,18 +110,18 @@ required keys (<cite>“n_cpus”</cite>, <cite>“random_seeds”</cite>, and <
 <blockquote>
 <div><ol class="arabic simple">
 <li><dl class="simple">
-<dt>The number of available CPUs (<cite>“n_cpus”</cite>) is required as an integer and defaults to</dt><dd><p><cite>multiprocessing.cpu_count()</cite>.</p>
+<dt>The number of available CPUs (<cite>n_cpus</cite>) is required as an integer and defaults to</dt><dd><p><cite>multiprocessing.cpu_count()</cite>.</p>
 </dd>
 </dl>
 </li>
 <li><dl class="simple">
-<dt>A list of random seeds (<cite>“random_seeds”</cite>) is used to generate different error distributions by</dt><dd><p>initializing repeated random forests multiple times. Define list of random seeds for reproducibility.
+<dt>A list of random seeds (<cite>random_seeds</cite>) is used to generate different error distributions by</dt><dd><p>initializing repeated random forests multiple times. Define list of random seeds for reproducibility.
 Default is generating a random list of 30 seeds.</p>
 </dd>
 </dl>
 </li>
 <li><dl class="simple">
-<dt>The absolute correlation threshold for removing features from the training data correlated to the target</dt><dd><p>feature (<cite>“train_correlation_threshold”</cite>) is a float between 0 and 1. The higher the threshold, the more
+<dt>The absolute correlation threshold for removing features from the training data correlated to the target</dt><dd><p>feature (<cite>train_correlation_threshold</cite>) is a float between 0 and 1. The higher the threshold, the more
 features are deselected. The default value is set to <cite>0.7</cite> and should be adjusted if the results are not
 satisfactory.</p>
 </dd>
@@ -138,17 +138,15 @@ The feature_subset_selection column contains the fraction difference based on th
 distributions, where the p_value is smaller or equal to 0.05. Features with values greater than 0 in this column
 are selected.</p>
 <p>The remaining columns provide additional information:</p>
-<blockquote>
-<div><ul class="simple">
-<li><p>”feature_subset_selection_median”: Contains the feature subset based on the median fraction difference.</p></li>
-<li><p>”unlabeled_errors”: Lists the OOB scores for the unlabeled training data.</p></li>
-<li><p>”labeled_errors”: Lists the OOB scores for the labeled training data.</p></li>
-<li><p>”p_value”: Contains the p-values from the Mann-Whitney U test.</p></li>
-<li><p>”fraction_mean”: Shows the fraction difference based on the mean of the distributions.</p></li>
-<li><p>”fraction_median”: Shows the fraction difference based on the median of the distributions.</p></li>
-<li><p>”train_features_count”: Indicates the number of uncorrelated features in the training data.</p></li>
+<ul class="simple">
+<li><p><cite>feature_subset_selection_median</cite>: Contains the feature subset based on the median fraction difference.</p></li>
+<li><p><cite>unlabeled_errors</cite>: Lists the OOB scores for the unlabeled training data.</p></li>
+<li><p><cite>labeled_errors</cite>: Lists the OOB scores for the labeled training data.</p></li>
+<li><p><cite>p_value</cite>: Contains the p-values from the Mann-Whitney U test.</p></li>
+<li><p><cite>fraction_mean</cite>: Shows the fraction difference based on the mean of the distributions.</p></li>
+<li><p><cite>fraction_median</cite>: Shows the fraction difference based on the median of the distributions.</p></li>
+<li><p><cite>train_features_count</cite>: Indicates the number of uncorrelated features in the training data.</p></li>
 </ul>
-</div></blockquote>
 <p>The index of the DataFrame is the feature names.</p>
 </p>
 </dd>
