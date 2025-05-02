@@ -222,13 +222,13 @@ def select_feature_subset(
         meta_data: The metadata related to the dataset and experiment. If `meta_data` is `None`, default values for the
             required keys (`"n_cpus"`, `"random_seeds"`, and `"train_correlation_threshold"`) are used.
 
-                1. The number of available CPUs (`"n_cpus"`) is required as an integer and defaults to
+                1. The number of available CPUs (`n_cpus`) is required as an integer and defaults to
                     `multiprocessing.cpu_count()`.
-                2. A list of random seeds (`"random_seeds"`) is used to generate different error distributions by
+                2. A list of random seeds (`random_seeds`) is used to generate different error distributions by
                     initializing repeated random forests multiple times. Define list of random seeds for reproducibility.
                     Default is generating a random list of 30 seeds.
                 3. The absolute correlation threshold for removing features from the training data correlated to the target
-                    feature (`"train_correlation_threshold"`) is a float between 0 and 1. The higher the threshold, the more
+                    feature (`train_correlation_threshold`) is a float between 0 and 1. The higher the threshold, the more
                     features are deselected. The default value is set to `0.7` and should be adjusted if the results are not
                     satisfactory.
 
@@ -240,13 +240,13 @@ def select_feature_subset(
 
         The remaining columns provide additional information:
 
-            * "feature_subset_selection_median": Contains the feature subset based on the median fraction difference.
-            * "unlabeled_errors": Lists the OOB scores for the unlabeled training data.
-            * "labeled_errors": Lists the OOB scores for the labeled training data.
-            * "p_value": Contains the p-values from the Mann-Whitney U test.
-            * "fraction_mean": Shows the fraction difference based on the mean of the distributions.
-            * "fraction_median": Shows the fraction difference based on the median of the distributions.
-            * "train_features_count": Indicates the number of uncorrelated features in the training data.
+        * `feature_subset_selection_median`: Contains the feature subset based on the median fraction difference.
+        * `unlabeled_errors`: Lists the OOB scores for the unlabeled training data.
+        * `labeled_errors`: Lists the OOB scores for the labeled training data.
+        * `p_value`: Contains the p-values from the Mann-Whitney U test.
+        * `fraction_mean`: Shows the fraction difference based on the mean of the distributions.
+        * `fraction_median`: Shows the fraction difference based on the median of the distributions.
+        * `train_features_count`: Indicates the number of uncorrelated features in the training data.
 
         The index of the DataFrame is the feature names.
 
