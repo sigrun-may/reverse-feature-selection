@@ -222,15 +222,15 @@ def select_feature_subset(
         meta_data: The metadata related to the dataset and experiment. If `meta_data` is `None`, default values for the
             required keys (`"n_cpus"`, `"random_seeds"`, and `"train_correlation_threshold"`) are used.
 
-                1. The number of available CPUs (`n_cpus`) is required as an integer and defaults to
-                    `multiprocessing.cpu_count()`.
-                2. A list of random seeds (`random_seeds`) is used to generate different error distributions by
-                    initializing repeated random forests multiple times. Define list of random seeds for reproducibility.
-                    Default is generating a random list of 30 seeds.
-                3. The absolute correlation threshold for removing features from the training data correlated to the target
-                    feature (`train_correlation_threshold`) is a float between 0 and 1. The higher the threshold, the more
-                    features are deselected. The default value is set to `0.7` and should be adjusted if the results are not
-                    satisfactory.
+            1. `n_cpus`: The number of available CPUs is required as an integer and defaults to
+                `multiprocessing.cpu_count()`.
+            2. `random_seeds`: A list of different seeds to initalize random forests is used to generate comparable
+                error distributions. Define list of random seeds for reproducibility. Default is generating a random
+                list of 30 seeds (int).
+            3. `train_correlation_threshold`: The absolute correlation threshold for removing features from the training
+                data correlated to the target feature is a float between 0 and 1. The higher the threshold, the more
+                features are deselected. The default value is set to `0.7` and should be adjusted if the results are
+                not satisfactory.
 
     Returns:
         A pandas DateFrame with the selected features in the "feature_subset_selection" column.
