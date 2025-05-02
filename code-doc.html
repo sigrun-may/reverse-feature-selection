@@ -47,7 +47,10 @@
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul class="current">
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Code Documentation</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#select-feature-subset"><code class="xref py py-func docutils literal notranslate"><span class="pre">select_feature_subset()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#select-feature-subset"><code class="xref py py-func docutils literal notranslate"><span class="pre">select_feature_subset()</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#reverse_feature_selection.reverse_random_forests.select_feature_subset"><code class="docutils literal notranslate"><span class="pre">select_feature_subset()</span></code></a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference external" href="https://github.com/sigrun-may/reverse-feature-selection/blob/main/LICENSE">License</a></li>
@@ -81,7 +84,70 @@
   <section id="code-documentation">
 <h1>Code Documentation<a class="headerlink" href="#code-documentation" title="Link to this heading"></a></h1>
 <section id="select-feature-subset">
-<h2><code class="xref py py-func docutils literal notranslate"><span class="pre">select_feature_subset()</span></code><a class="headerlink" href="#select-feature-subset" title="Link to this heading"></a></h2>
+<h2><a class="reference internal" href="#reverse_feature_selection.reverse_random_forests.select_feature_subset" title="reverse_feature_selection.reverse_random_forests.select_feature_subset"><code class="xref py py-func docutils literal notranslate"><span class="pre">select_feature_subset()</span></code></a><a class="headerlink" href="#select-feature-subset" title="Link to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="reverse_feature_selection.reverse_random_forests.select_feature_subset">
+<span class="sig-prename descclassname"><span class="pre">reverse_feature_selection.reverse_random_forests.</span></span><span class="sig-name descname"><span class="pre">select_feature_subset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data_df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">train_indices</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label_column_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'label'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">meta_data</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/reverse_feature_selection/reverse_random_forests.html#select_feature_subset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#reverse_feature_selection.reverse_random_forests.select_feature_subset" title="Link to this definition"></a></dt>
+<dd><p>Selects a subset of features based on the mean out-of-bag (OOB) errors for random forests regressors.</p>
+<p>Calculate the mean out-of-bag (OOB) errors for random forests regressors with different random seeds
+for training data including the label and without the label for each feature. It then selects a subset of features
+based on the Mann-Whitney U test which determines whether there is a significant difference between the
+two error distributions. The test is configured for the hypothesis that the distribution of
+labeled_error_distribution is shifted to the left of the unlabeled_error_distribution.
+The Mann-Whitney U test is used to calculate the p-value based on the Out-of-Bag (OOB) scores of the labeled
+and unlabeled error distributions. The p-value is a measure of the probability that an observed difference
+could have occurred just by random chance. The smaller the p-value, the greater the statistical evidence
+to reject the null hypothesis (conclude that both error distributions differ).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data_df</strong> (<em>DataFrame</em>) – The training data. The data must contain the label and features.</p></li>
+<li><p><strong>train_indices</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.2)"><em>ndarray</em></a>) – Indices for the training split.
+The indices are used to select the training data from the data_df DataFrame.</p></li>
+<li><p><strong>label_column_name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>) – The name of the label column in the training data. Default is “label”.</p></li>
+<li><p><strong>meta_data</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><em>dict</em></a><em> | </em><em>None</em>) – The metadata related to the dataset and experiment. If <cite>meta_data</cite> is <cite>None</cite>, default values for the
+required keys (<cite>“n_cpus”</cite>, <cite>“random_seeds”</cite>, and <cite>“train_correlation_threshold”</cite>) are used.
+1. The number of available CPUs (<cite>“n_cpus”</cite>) is required as an integer and defaults to
+<cite>multiprocessing.cpu_count()</cite>.
+2. A list of random seeds (<cite>“random_seeds”</cite>) is used to generate different error distributions by
+initializing repeated random forests multiple times. Define list of random seeds for reproducibility.
+Default is generating a random list of 30 seeds.
+3. The absolute correlation threshold for removing features from the training data correlated to the target
+feature (<cite>“train_correlation_threshold”</cite>) is a float between 0 and 1. The higher the threshold, the more
+features are deselected. The default value is set to <cite>0.7</cite> and should be adjusted if the results are not
+satisfactory.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><p>A pandas DateFrame with the selected features in the “feature_subset_selection” column.
+The feature_subset_selection column contains the fraction difference based on the mean of OOB score
+distributions, where the p_value is smaller or equal to 0.05. Features with values greater than 0 in this column
+are selected.</p>
+<p>The remaining columns provide additional information:
+- “feature_subset_selection_median”: Contains the feature subset based on the median fraction difference.
+- “unlabeled_errors”: Lists the OOB scores for the unlabeled training data.
+- “labeled_errors”: Lists the OOB scores for the labeled training data.
+- “p_value”: Contains the p-values from the Mann-Whitney U test.
+- “fraction_mean”: Shows the fraction difference based on the mean of the distributions.
+- “fraction_median”: Shows the fraction difference based on the median of the distributions.
+- “train_features_count”: Indicates the number of uncorrelated features in the training data.</p>
+<p>The index of the DataFrame is the feature names.</p>
+</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#AssertionError" title="(in Python v3.13)"><strong>AssertionError</strong></a> – If the meta_data dictionary does not contain the required keys or if the values are not of
+    the expected type. Also, if the training data does not contain any features or if the label column is not
+    found in the training data.</p></li>
+<li><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.13)"><strong>ValueError</strong></a> – If no features uncorrelated to the target feature are found.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>DataFrame</em></p>
+</dd>
+</dl>
+</dd></dl>
+
 </section>
 </section>
 
