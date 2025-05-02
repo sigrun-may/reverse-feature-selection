@@ -299,6 +299,7 @@
 <span class="sd">        label_column_name: The name of the label column in the training data. Default is &quot;label&quot;.</span>
 <span class="sd">        meta_data: The metadata related to the dataset and experiment. If `meta_data` is `None`, default values for the</span>
 <span class="sd">            required keys (`&quot;n_cpus&quot;`, `&quot;random_seeds&quot;`, and `&quot;train_correlation_threshold&quot;`) are used.</span>
+
 <span class="sd">            #. The number of available CPUs (`&quot;n_cpus&quot;`) is required as an integer and defaults to</span>
 <span class="sd">            `multiprocessing.cpu_count()`.</span>
 <span class="sd">            #. A list of random seeds (`&quot;random_seeds&quot;`) is used to generate different error distributions by</span>
@@ -316,6 +317,7 @@
 <span class="sd">        are selected.</span>
 
 <span class="sd">        The remaining columns provide additional information:</span>
+
 <span class="sd">        * &quot;feature_subset_selection_median&quot;: Contains the feature subset based on the median fraction difference.</span>
 <span class="sd">        * &quot;unlabeled_errors&quot;: Lists the OOB scores for the unlabeled training data.</span>
 <span class="sd">        * &quot;labeled_errors&quot;: Lists the OOB scores for the labeled training data.</span>
