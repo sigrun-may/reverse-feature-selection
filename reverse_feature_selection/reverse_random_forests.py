@@ -8,6 +8,7 @@
 
 import logging
 import math
+import multiprocessing
 
 import numpy as np
 import pandas as pd
@@ -17,9 +18,52 @@ from sklearn import clone
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error
 
-from reverse_feature_selection import preprocessing
-
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+def remove_features_correlated_to_target_feature(
+    train_df: pd.DataFrame, correlation_matrix_df: pd.DataFrame, target_feature: str, meta_data: dict
+) -> pd.DataFrame:
+    """Remove features from the training data that are correlated to the target feature.
+
+    This function creates a mask for uncorrelated features based on the correlation threshold
+    specified in the metadata. It then uses this mask to select the uncorrelated features from the training data.
+
+    Args:
+        train_df: The training data.
+        correlation_matrix_df: The correlation matrix of the training data.
+        target_feature: The name of the target feature.
+        meta_data: The metadata related to the dataset and experiment. Must contain "train_correlation_threshold" to
+            define the threshold for the absolute correlation to the target feature.
+
+    Returns:
+        The training data including the label with only the features uncorrelated to the target feature remaining.
+
+    Raises:
+        AssertionError: If no features uncorrelated to the target feature are found.
+    """
+    # Create a mask for uncorrelated features based on the correlation threshold
+    uncorrelated_features_mask = (
+        correlation_matrix_df[target_feature]
+        .abs()
+        .le(meta_data["train_correlation_threshold"], axis="index")
+        # For a correlation matrix filled only with the lower half,
+        # the first elements up to the diagonal would have to be read
+        # with axis="index" and the further elements after the diagonal
+        # with axis="column".
+    )
+    # Remove correlated features from the training data
+    uncorrelated_train_df = train_df[train_df.columns[uncorrelated_features_mask]]
+
+    assert len(uncorrelated_train_df.columns) > 1, "No features uncorrelated to the target feature found."
+
+    # insert the 'label' as the first column if it is not already there
+    if uncorrelated_train_df.columns[0] != "label":
+        uncorrelated_train_df.insert(0, "label", train_df["label"])
+
+    # Return the data frame with uncorrelated features
+    return uncorrelated_train_df
 
 
 def calculate_oob_errors(
@@ -37,15 +81,14 @@ def calculate_oob_errors(
         meta_data: The metadata related to the dataset and experiment.
 
     Returns:
-        A tuple containing lists of OOB scores for labeled and unlabeled training data.
+        A tuple containing lists of OOB scores for labeled and unlabeled training data and the number of features in
+        the training data.
     """
     # Prepare training data
     y_train = train_df[target_feature_name].to_numpy()
 
     # Remove features correlated to the target feature
-    x_train = preprocessing.remove_features_correlated_to_target_feature(
-        train_df, corr_matrix_df, target_feature_name, meta_data
-    )
+    x_train = remove_features_correlated_to_target_feature(train_df, corr_matrix_df, target_feature_name, meta_data)
 
     oob_errors_labeled = []
     oob_errors_unlabeled = []
@@ -87,10 +130,81 @@ def calculate_oob_errors(
     return oob_errors_labeled, oob_errors_unlabeled, x_train.shape[1]
 
 
-def select_feature_subset(data_df: pd.DataFrame, train_indices: np.ndarray, meta_data: dict) -> pd.DataFrame:
-    """Selects a subset of features based on the mean out-of-bag (OOB) errors for random forest regressors.
+def validate_and_initialize_meta_data(meta_data: dict | None) -> dict:
+    """Validate and initialize the metadata dictionary.
 
-    Calculate the mean out-of-bag (OOB) errors for random forest regressors with different random seeds
+    This function ensures that the metadata dictionary contains the required keys with valid values.
+    If the metadata is not provided or is missing any required keys, default values are assigned.
+
+    Args:
+        meta_data: The metadata dictionary to validate and initialize. If None, a new dictionary
+            with default values is created.
+
+    Returns:
+        The validated and initialized metadata dictionary.
+
+    Raises:
+        AssertionError: If any of the required keys in the metadata dictionary have invalid types or values.
+
+    Default Values:
+        - "n_cpus": The number of available CPUs (`multiprocessing.cpu_count()`).
+        - "random_seeds": A list of 30 random integers between 1 and 10000.
+        - "train_correlation_threshold": A float value of 0.7, representing the absolute correlation threshold.
+    """
+    # initalize numpy random number generator
+    rng = np.random.default_rng()
+
+    # Set default values if meta_data is not defined
+    if meta_data is None:
+        meta_data = {
+            # Use all available CPUs
+            "n_cpus": multiprocessing.cpu_count(),
+            # Generate a list of 30 random integers to initialize random forests multiple times
+            "random_seeds": rng.integers(1, 10001, size=30).tolist(),
+            # Absolute correlation threshold for removing features correlated to the target feature
+            "train_correlation_threshold": 0.7,
+        }
+        logger.info(
+            f"\nMeta data have been set to the default values of \n"
+            f"1. {meta_data['n_cpus']} CPUs for parallel calculation \n"
+            f"2. 30 random integers as seeds for random forests \n"
+            f"3. 0.7 as absolute correlation threshold for removing features from the training data correlated to the "
+            f"target feature"
+        )
+    # Ensure "n_cpus" is defined, otherwise set to the number of available CPUs
+    if "n_cpus" not in meta_data:
+        meta_data["n_cpus"] = multiprocessing.cpu_count()
+        logger.info(f"Number of CPUs is set to {meta_data['n_cpus']}")
+    # Ensure "random_seeds" is defined, otherwise generate a list of 30 random integers
+    if "random_seeds" not in meta_data:
+        meta_data["random_seeds"] = rng.integers(1, 10001, size=30).tolist()
+        logger.info("Seeds for random forests have been set to the default of 30 random integers")
+    # Ensure "train_correlation_threshold" is defined, otherwise set to 0.7
+    if "train_correlation_threshold" not in meta_data:
+        meta_data["train_correlation_threshold"] = 0.7
+        logger.info("Absolute correlation threshold has been set to the default of 0.7")
+
+    # Validate the types and values of the metadata keys
+    assert isinstance(meta_data["n_cpus"], int), "Number of available CPUs is not an integer."
+    assert isinstance(meta_data["random_seeds"], list), "Random seeds are not a list."
+    assert all(
+        isinstance(seed_random_forest, int) for seed_random_forest in meta_data["random_seeds"]
+    ), "Random seeds are not integers."
+    assert isinstance(meta_data["train_correlation_threshold"], float), "Correlation threshold is not a float."
+    assert 0 <= meta_data["train_correlation_threshold"] <= 1, "Correlation threshold is not between 0 and 1."
+
+    return meta_data
+
+
+def select_feature_subset(
+    data_df: pd.DataFrame,
+    train_indices: np.ndarray,
+    label_column_name: str = "label",
+    meta_data: dict | None = None,
+) -> pd.DataFrame:
+    """Selects a subset of features based on the mean out-of-bag (OOB) errors for random forests regressors.
+
+    Calculate the mean out-of-bag (OOB) errors for random forests regressors with different random seeds
     for training data including the label and without the label for each feature. It then selects a subset of features
     based on the Mann-Whitney U test which determines whether there is a significant difference between the
     two error distributions. The test is configured for the hypothesis that the distribution of
@@ -101,42 +215,59 @@ def select_feature_subset(data_df: pd.DataFrame, train_indices: np.ndarray, meta
     to reject the null hypothesis (conclude that both error distributions differ).
 
     Args:
-        data_df: The training data. The first column must contain the label and the remaining columns the features.
-            The label column must be named "label".
+        data_df: The training data. The data must contain the label and features.
         train_indices: Indices for the training split.
-        meta_data: The metadata related to the dataset and experiment.
-            The required keys are: "n_cpus", "random_seeds" and "train_correlation_threshold".
-
-            Number of available CPUs *n_cpus* as integer and a list of random seeds "random_seeds" for reproducibility
-            of the repeated reverse random forest.
-            The correlation threshold for removing correlated features "train_correlation_threshold" is a float between
-            0 and 1. The threshold is used to remove features correlated to the target feature. The higher the
-            threshold, the more features are removed.
+            The indices are used to select the training data from the data_df DataFrame.
+        label_column_name: The name of the label column in the training data. Default is "label".
+        meta_data: The metadata related to the dataset and experiment. If `meta_data` is `None`, default values for the
+            required keys (`"n_cpus"`, `"random_seeds"`, and `"train_correlation_threshold"`) are used.
+            1. The number of available CPUs (`"n_cpus"`) is required as an integer and defaults to
+            `multiprocessing.cpu_count()`.
+            2. A list of random seeds (`"random_seeds"`) is used to generate different error distributions by
+            initializing repeated random forests multiple times. Define list of random seeds for reproducibility.
+            Default is generating a random list of 30 seeds.
+            3. The absolute correlation threshold for removing features from the training data correlated to the target
+            feature (`"train_correlation_threshold"`) is a float between 0 and 1. The higher the threshold, the more
+            features are deselected. The default value is set to `0.7` and should be adjusted if the results are not
+            satisfactory.
 
     Returns:
-        A DataFrame containing raw data with lists of OOB scores for repeated analyzes of labeled and unlabeled data,
-        p_values and fraction differences based on means and medians of the distributions. The feature_subset_selection
-        column contains the fraction difference based on the mean of the distributions, where the p_value is smaller or
-        equal to 0.05. Those features are selected for the feature subset.
+        A pandas DateFrame with the selected features in the "feature_subset_selection" column.
+        The feature_subset_selection column contains the fraction difference based on the mean of OOB score
+        distributions, where the p_value is smaller or equal to 0.05. Features with values greater than 0 in this column
+        are selected.
+
+        The remaining columns provide additional information:
+        - "feature_subset_selection_median": Contains the feature subset based on the median fraction difference.
+        - "unlabeled_errors": Lists the OOB scores for the unlabeled training data.
+        - "labeled_errors": Lists the OOB scores for the labeled training data.
+        - "p_value": Contains the p-values from the Mann-Whitney U test.
+        - "fraction_mean": Shows the fraction difference based on the mean of the distributions.
+        - "fraction_median": Shows the fraction difference based on the median of the distributions.
+        - "train_features_count": Indicates the number of uncorrelated features in the training data.
+
+        The index of the DataFrame is the feature names.
+
+    Raises:
+        AssertionError: If the meta_data dictionary does not contain the required keys or if the values are not of
+            the expected type. Also, if the training data does not contain any features or if the label column is not
+            found in the training data.
+        ValueError: If no features uncorrelated to the target feature are found.
     """
-    assert "n_cpus" in meta_data, "Number of available CPUs not found in meta_data."
-    assert "random_seeds" in meta_data, "Random seeds not found in meta_data."
-    assert isinstance(meta_data["n_cpus"], int), "Number of available CPUs is not an integer."
-    assert isinstance(meta_data["random_seeds"], list), "Random seeds are not a list."
-    assert all(
-        isinstance(seed_random_forest, int) for seed_random_forest in meta_data["random_seeds"]
-    ), "Random seeds are not integers."
-    assert "train_correlation_threshold" in meta_data, "Correlation threshold not found in meta_data."
-    assert isinstance(meta_data["train_correlation_threshold"], float), "Correlation threshold is not a float."
-    assert 0 <= meta_data["train_correlation_threshold"] <= 1, "Correlation threshold is not between 0 and 1."
+    assert label_column_name in data_df.columns, f"Label column {label_column_name} not found in the training data."
+
+    if label_column_name != "label":
+        # rename label column
+        data_df[label_column_name] = data_df["label"]
     assert "label" in data_df.columns, "Label column not found in the training data."
-    assert data_df.shape[1] > 1, "No features found in the training data."
 
     # check if feature importance calculation is possible
     if data_df.shape[1] < 2:
         raise ValueError("No features found in the training data.")
 
-    # Split the training data into a training and test set
+    meta_data = validate_and_initialize_meta_data(meta_data)
+
+    # Split the data and select the training data
     train_df = data_df.iloc[train_indices, :]
 
     # Calculate the correlation matrix of the training data
