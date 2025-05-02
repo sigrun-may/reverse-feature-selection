@@ -221,6 +221,7 @@ def select_feature_subset(
         label_column_name: The name of the label column in the training data. Default is "label".
         meta_data: The metadata related to the dataset and experiment. If `meta_data` is `None`, default values for the
             required keys (`"n_cpus"`, `"random_seeds"`, and `"train_correlation_threshold"`) are used.
+
             #. The number of available CPUs (`"n_cpus"`) is required as an integer and defaults to
             `multiprocessing.cpu_count()`.
             #. A list of random seeds (`"random_seeds"`) is used to generate different error distributions by
@@ -238,6 +239,7 @@ def select_feature_subset(
         are selected.
 
         The remaining columns provide additional information:
+
         * "feature_subset_selection_median": Contains the feature subset based on the median fraction difference.
         * "unlabeled_errors": Lists the OOB scores for the unlabeled training data.
         * "labeled_errors": Lists the OOB scores for the labeled training data.
