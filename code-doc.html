@@ -107,28 +107,26 @@ The indices are used to select the training data from the data_df DataFrame.</p>
 <li><p><strong>label_column_name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>) – The name of the label column in the training data. Default is “label”.</p></li>
 <li><p><strong>meta_data</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.13)"><em>dict</em></a><em> | </em><em>None</em>) – <p>The metadata related to the dataset and experiment. If <cite>meta_data</cite> is <cite>None</cite>, default values for the
 required keys (<cite>“n_cpus”</cite>, <cite>“random_seeds”</cite>, and <cite>“train_correlation_threshold”</cite>) are used.</p>
-<blockquote>
-<div><ol class="arabic simple">
+<ol class="arabic simple">
 <li><dl class="simple">
-<dt>The number of available CPUs (<cite>n_cpus</cite>) is required as an integer and defaults to</dt><dd><p><cite>multiprocessing.cpu_count()</cite>.</p>
+<dt><cite>n_cpus</cite>: The number of available CPUs is required as an integer and defaults to</dt><dd><p><cite>multiprocessing.cpu_count()</cite>.</p>
 </dd>
 </dl>
 </li>
 <li><dl class="simple">
-<dt>A list of random seeds (<cite>random_seeds</cite>) is used to generate different error distributions by</dt><dd><p>initializing repeated random forests multiple times. Define list of random seeds for reproducibility.
-Default is generating a random list of 30 seeds.</p>
+<dt><cite>random_seeds</cite>: A list of different seeds to initalize random forests is used to generate comparable</dt><dd><p>error distributions. Define list of random seeds for reproducibility. Default is generating a random
+list of 30 seeds (int).</p>
 </dd>
 </dl>
 </li>
 <li><dl class="simple">
-<dt>The absolute correlation threshold for removing features from the training data correlated to the target</dt><dd><p>feature (<cite>train_correlation_threshold</cite>) is a float between 0 and 1. The higher the threshold, the more
-features are deselected. The default value is set to <cite>0.7</cite> and should be adjusted if the results are not
-satisfactory.</p>
+<dt><cite>train_correlation_threshold</cite>: The absolute correlation threshold for removing features from the training</dt><dd><p>data correlated to the target feature is a float between 0 and 1. The higher the threshold, the more
+features are deselected. The default value is set to <cite>0.7</cite> and should be adjusted if the results are
+not satisfactory.</p>
 </dd>
 </dl>
 </li>
 </ol>
-</div></blockquote>
 </p></li>
 </ul>
 </dd>

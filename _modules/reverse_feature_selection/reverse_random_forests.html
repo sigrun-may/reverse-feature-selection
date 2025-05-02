@@ -300,15 +300,15 @@
 <span class="sd">        meta_data: The metadata related to the dataset and experiment. If `meta_data` is `None`, default values for the</span>
 <span class="sd">            required keys (`&quot;n_cpus&quot;`, `&quot;random_seeds&quot;`, and `&quot;train_correlation_threshold&quot;`) are used.</span>
 
-<span class="sd">                1. The number of available CPUs (`n_cpus`) is required as an integer and defaults to</span>
-<span class="sd">                    `multiprocessing.cpu_count()`.</span>
-<span class="sd">                2. A list of random seeds (`random_seeds`) is used to generate different error distributions by</span>
-<span class="sd">                    initializing repeated random forests multiple times. Define list of random seeds for reproducibility.</span>
-<span class="sd">                    Default is generating a random list of 30 seeds.</span>
-<span class="sd">                3. The absolute correlation threshold for removing features from the training data correlated to the target</span>
-<span class="sd">                    feature (`train_correlation_threshold`) is a float between 0 and 1. The higher the threshold, the more</span>
-<span class="sd">                    features are deselected. The default value is set to `0.7` and should be adjusted if the results are not</span>
-<span class="sd">                    satisfactory.</span>
+<span class="sd">            1. `n_cpus`: The number of available CPUs is required as an integer and defaults to</span>
+<span class="sd">                `multiprocessing.cpu_count()`.</span>
+<span class="sd">            2. `random_seeds`: A list of different seeds to initalize random forests is used to generate comparable</span>
+<span class="sd">                error distributions. Define list of random seeds for reproducibility. Default is generating a random</span>
+<span class="sd">                list of 30 seeds (int).</span>
+<span class="sd">            3. `train_correlation_threshold`: The absolute correlation threshold for removing features from the training</span>
+<span class="sd">                data correlated to the target feature is a float between 0 and 1. The higher the threshold, the more</span>
+<span class="sd">                features are deselected. The default value is set to `0.7` and should be adjusted if the results are</span>
+<span class="sd">                not satisfactory.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        A pandas DateFrame with the selected features in the &quot;feature_subset_selection&quot; column.</span>
