@@ -299,12 +299,12 @@
 <span class="sd">        label_column_name: The name of the label column in the training data. Default is &quot;label&quot;.</span>
 <span class="sd">        meta_data: The metadata related to the dataset and experiment. If `meta_data` is `None`, default values for the</span>
 <span class="sd">            required keys (`&quot;n_cpus&quot;`, `&quot;random_seeds&quot;`, and `&quot;train_correlation_threshold&quot;`) are used.</span>
-<span class="sd">            1. The number of available CPUs (`&quot;n_cpus&quot;`) is required as an integer and defaults to</span>
+<span class="sd">            #. The number of available CPUs (`&quot;n_cpus&quot;`) is required as an integer and defaults to</span>
 <span class="sd">            `multiprocessing.cpu_count()`.</span>
-<span class="sd">            2. A list of random seeds (`&quot;random_seeds&quot;`) is used to generate different error distributions by</span>
+<span class="sd">            #. A list of random seeds (`&quot;random_seeds&quot;`) is used to generate different error distributions by</span>
 <span class="sd">            initializing repeated random forests multiple times. Define list of random seeds for reproducibility.</span>
 <span class="sd">            Default is generating a random list of 30 seeds.</span>
-<span class="sd">            3. The absolute correlation threshold for removing features from the training data correlated to the target</span>
+<span class="sd">            #. The absolute correlation threshold for removing features from the training data correlated to the target</span>
 <span class="sd">            feature (`&quot;train_correlation_threshold&quot;`) is a float between 0 and 1. The higher the threshold, the more</span>
 <span class="sd">            features are deselected. The default value is set to `0.7` and should be adjusted if the results are not</span>
 <span class="sd">            satisfactory.</span>
@@ -316,13 +316,13 @@
 <span class="sd">        are selected.</span>
 
 <span class="sd">        The remaining columns provide additional information:</span>
-<span class="sd">        - &quot;feature_subset_selection_median&quot;: Contains the feature subset based on the median fraction difference.</span>
-<span class="sd">        - &quot;unlabeled_errors&quot;: Lists the OOB scores for the unlabeled training data.</span>
-<span class="sd">        - &quot;labeled_errors&quot;: Lists the OOB scores for the labeled training data.</span>
-<span class="sd">        - &quot;p_value&quot;: Contains the p-values from the Mann-Whitney U test.</span>
-<span class="sd">        - &quot;fraction_mean&quot;: Shows the fraction difference based on the mean of the distributions.</span>
-<span class="sd">        - &quot;fraction_median&quot;: Shows the fraction difference based on the median of the distributions.</span>
-<span class="sd">        - &quot;train_features_count&quot;: Indicates the number of uncorrelated features in the training data.</span>
+<span class="sd">        * &quot;feature_subset_selection_median&quot;: Contains the feature subset based on the median fraction difference.</span>
+<span class="sd">        * &quot;unlabeled_errors&quot;: Lists the OOB scores for the unlabeled training data.</span>
+<span class="sd">        * &quot;labeled_errors&quot;: Lists the OOB scores for the labeled training data.</span>
+<span class="sd">        * &quot;p_value&quot;: Contains the p-values from the Mann-Whitney U test.</span>
+<span class="sd">        * &quot;fraction_mean&quot;: Shows the fraction difference based on the mean of the distributions.</span>
+<span class="sd">        * &quot;fraction_median&quot;: Shows the fraction difference based on the median of the distributions.</span>
+<span class="sd">        * &quot;train_features_count&quot;: Indicates the number of uncorrelated features in the training data.</span>
 
 <span class="sd">        The index of the DataFrame is the feature names.</span>
 
