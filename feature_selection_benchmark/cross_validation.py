@@ -33,7 +33,9 @@ def cross_validate(data_df: pd.DataFrame, meta_data: dict, feature_selection_fun
     for fold_index, (train_indices, _) in enumerate(loo.split(data_df)):
         logger.info(f"fold_index {fold_index + 1} of {data_df.shape[0]}")
         # Calculate raw values for calculating feature subsets
-        selected_feature_subset = feature_selection_function(data_df, train_indices, meta_data)
+        selected_feature_subset = feature_selection_function(
+            data_df=data_df, train_indices=train_indices, meta_data=meta_data
+        )
         cv_result_list.append(selected_feature_subset)
     end_time = datetime.datetime.now(tz=datetime.timezone.utc)
     print("Duration of the cross-validation: ", end_time - start_time)

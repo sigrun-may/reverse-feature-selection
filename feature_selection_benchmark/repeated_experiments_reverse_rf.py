@@ -118,7 +118,8 @@ def main():
             meta_data_dict["path_for_random_noise"] = f"random_noise_data/{data_name}_30_2000.csv"
 
             # azure path
-            # meta_data_dict["path_for_random_noise"] = f"{result_base_path}/random_noise_data/{data_name}_(30, 2000).csv"
+            # meta_data_dict["path_for_random_noise"]
+            # = f"{result_base_path}/random_noise_data/{data_name}_(30, 2000).csv"
 
         # load data for the experiment with balanced train sample size
         data_df, _ = load_train_holdout_data_for_balanced_train_sample_size(meta_data_dict)
@@ -137,7 +138,7 @@ def main():
             # calculate raw feature subset data for reverse random forest
             result_dict = {
                 "reverse_random_forest": cross_validation.cross_validate(
-                    data_df, meta_data_dict, select_feature_subset
+                    data_df=data_df, meta_data=meta_data_dict, feature_selection_function=select_feature_subset
                 ),
                 "reverse_random_forest_meta_data": meta_data_dict,
             }
