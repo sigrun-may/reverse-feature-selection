@@ -115,9 +115,10 @@ def main():
             meta_data_dict["data_shape_random_noise"] = (30, 2000)
             # local path
             # meta_data_dict["path_for_random_noise"] = f"../random_noise_data/{data_name}_(30, 2000).csv"
+            meta_data_dict["path_for_random_noise"] = f"random_noise_data/{data_name}_30_2000.csv"
 
             # azure path
-            meta_data_dict["path_for_random_noise"] = f"{result_base_path}/random_noise_data/{data_name}_(30, 2000).csv"
+            # meta_data_dict["path_for_random_noise"] = f"{result_base_path}/random_noise_data/{data_name}_(30, 2000).csv"
 
         # load data for the experiment with balanced train sample size
         data_df, _ = load_train_holdout_data_for_balanced_train_sample_size(meta_data_dict)
