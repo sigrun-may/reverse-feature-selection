@@ -9,6 +9,7 @@
 import multiprocessing
 import pickle
 import sys
+import datetime
 from pathlib import Path
 
 import git
@@ -85,21 +86,34 @@ def define_random_seeds() -> list:
 
 def main():
     """Main function for calculating a grid of repeated feature selection experiments for reverse feature selection."""
-    # parse result path from input
-    result_base_path = Path(sys.argv[1])
-    print("result data_path: ", result_base_path)
-    result_base_path.mkdir(parents=True, exist_ok=True)
-    # print the current working directory
-    print("current working directory: ", Path.cwd())
+    # valid data names for the data loader are "colon", "prostate" or "leukemia_big"
+    # data_names = ["colon", "prostate", "leukemia_big"]
+    # result_folder_name = "repeated_feature_selection_benchmark_cancer"
+
+    # valid data names for the data loader are "random_noise_lognormal" or "random_noise_normal"
+    # data_names = ["random_noise_lognormal", "random_noise_normal"]
+    data_names = ["random_noise_lognormal"]
+    result_folder_name = "repeated_feature_selection_benchmark_random_noise"
 
     # seed to shuffle the indices of the samples of the data set
     shuffle_seed = None
 
-    # valid data names for the data loader are "colon", "prostate" or "leukemia_big"
-    # data_names = ["colon", "prostate", "leukemia_big"]
+    # print the current working directory
+    print("current working directory: ", Path.cwd())
 
-    # valid data names for the data loader are "random_noise_lognormal" or "random_noise_normal"
-    data_names = ["random_noise_lognormal", "random_noise_normal"]
+    # parse result path from input
+    result_base_path = Path(sys.argv[1])
+    print("result data_path: ", result_base_path)
+
+    # create directory for experiment grid
+    result_base_path = Path(f"{result_base_path}/{result_folder_name}_{datetime.datetime.now(tz=datetime.timezone.utc)}")
+    result_base_path.mkdir(parents=True, exist_ok=True)
+
+    # pickle test data
+    test_dict = {"test": test}
+    with open(Path(f"{result_base_path}/delete_me_test_dict.pkl"), "wb") as file:
+        pickle.dump(test_dict, file, protocol=pickle.HIGHEST_PROTOCOL)
+
 
     for data_name in data_names:
         # define meta data for the experiment
@@ -114,7 +128,6 @@ def main():
         if "random" in data_name:
             meta_data_dict["data_shape_random_noise"] = (30, 2000)
             # local path
-            # meta_data_dict["path_for_random_noise"] = f"../random_noise_data/{data_name}_(30, 2000).csv"
             meta_data_dict["path_for_random_noise"] = f"random_noise_data/{data_name}_30_2000.csv"
 
             # azure path
