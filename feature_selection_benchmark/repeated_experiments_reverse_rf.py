@@ -7,6 +7,7 @@
 """Main script for cacluating a grid of repeated feature selection experiments for reverse feature selection."""
 
 import datetime
+import logging
 import multiprocessing
 import pickle
 import sys
@@ -19,6 +20,9 @@ from feature_selection_benchmark.data_loader_tools import (
     load_train_holdout_data_for_balanced_train_sample_size,
 )
 from reverse_feature_selection.reverse_random_forests import select_feature_subset
+
+logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
 
 
 def define_random_seeds() -> list:
@@ -115,12 +119,15 @@ def main():
     with open(Path(f"{result_base_path}/delete_me_test_dict.pkl"), "wb") as file:
         pickle.dump(test_dict, file, protocol=pickle.HIGHEST_PROTOCOL)
 
+    number_of_available_cpus = multiprocessing.cpu_count()
+    n_cpus = 50
+    logger.info(f"Use {n_cpus} of {number_of_available_cpus} available CPUs.")
     for data_name in data_names:
         # define meta data for the experiment
         meta_data_dict = {
             "git_commit_hash": git.Repo(search_parent_directories=True).head.object.hexsha,
             "data_name": data_name,
-            "n_cpus": 50, # multiprocessing.cpu_count(), number of available CPUs
+            "n_cpus": n_cpus,
             "train_correlation_threshold": 0.2,
             # seed to shuffle the samples of the data set
             "shuffle_seed": shuffle_seed,
