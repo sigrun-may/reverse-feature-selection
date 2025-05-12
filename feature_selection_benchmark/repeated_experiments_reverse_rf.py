@@ -110,7 +110,7 @@ def main():
     result_base_path.mkdir(parents=True, exist_ok=True)
 
     # pickle test data
-    test_dict = {"test": test}
+    test_dict = {"test": "test"}
     with open(Path(f"{result_base_path}/delete_me_test_dict.pkl"), "wb") as file:
         pickle.dump(test_dict, file, protocol=pickle.HIGHEST_PROTOCOL)
 
