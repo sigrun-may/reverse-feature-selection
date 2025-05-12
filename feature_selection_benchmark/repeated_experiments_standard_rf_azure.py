@@ -115,10 +115,10 @@ def main():
         # # or the ranger random forest
         # if "random" in file.name or "rf" not in file.name:
         #     continue
-        if not ("random" in file.name and "shuffle_seed_None" in file.name):
-            print("continue: ", file.name)
-            continue
-        print("file", file.name)
+        # if not ("random" in file.name and "shuffle_seed_None" in file.name):
+        #     print("continue: ", file.name)
+        #     continue
+        # print("file", file.name)
 
         analyze_file(file, result_base_path)
 
