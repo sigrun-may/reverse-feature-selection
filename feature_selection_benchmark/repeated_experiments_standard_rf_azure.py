@@ -19,12 +19,13 @@ from feature_selection_benchmark import cross_validation
 from feature_selection_benchmark.data_loader_tools import load_train_holdout_data_for_balanced_train_sample_size
 
 
-def analyze_file(file, result_base_path):
+def analyze_file(file, result_base_path, path_to_random_noise_directory):
     """Analyze the given file and calculate the feature selection experiments for standard random forest.
 
     Args:
         file (Path): The file to analyze.
         result_base_path (Path): The path of the directory to store the results.
+        path_to_random_noise_directory: The path of the directory with the original random noise data.
 
     Raises:
         FileNotFoundError: If the file does not exist.
@@ -77,17 +78,15 @@ def analyze_file(file, result_base_path):
         meta_data_dict["data_shape_random_noise"] = result_dict["reverse_random_forest_meta_data"][
             "data_shape_random_noise"
         ]
-        meta_data_dict["path_for_random_noise"] = result_dict["reverse_random_forest_meta_data"][
-            "path_for_random_noise"
-        ]
-        # if "lognormal" in file.name:
-        #     meta_data_dict["path_for_random_noise"] = (
-        #         f"{result_base_path}/random_noise_data/random_noise_lognormal_30_2000.csv"
-        #     )
-        # elif "lognormal" not in file.name:
-        #     meta_data_dict["path_for_random_noise"] = (
-        #         f"{result_base_path}/random_noise_data/random_noise_normal_30_2000.csv"
-        #     )
+        assert path_to_random_noise_directory is not None
+        if "lognormal" in file.name:
+            meta_data_dict["path_for_random_noise"] = (
+                f"{path_to_random_noise_directory}/random_noise_lognormal_30_2000.csv"
+            )
+        elif "lognormal" not in file.name:
+            meta_data_dict["path_for_random_noise"] = (
+                f"{path_to_random_noise_directory}/random_noise_normal_30_2000.csv"
+            )
     # load data for the experiment with balanced train sample size
     data_df, _ = load_train_holdout_data_for_balanced_train_sample_size(meta_data_dict)
     print("number of samples", data_df.shape[0], "number of features", data_df.shape[1] - 1)
@@ -112,6 +111,13 @@ def main():
     result_base_path = Path(sys.argv[1])
     print("result data_path: ", result_base_path)
 
+    # check if second argument was given
+    if len(sys.argv) > 2:
+        path_to_random_noise_directory = Path(sys.argv[2])
+    else:
+        path_to_random_noise_directory = None
+    print(f"Path to random noise data directory: {path_to_random_noise_directory}"
+
     # iterate over all files in the directory
     for file in result_base_path.iterdir():
         # # exclude files that are not related to the random noise data set
@@ -123,7 +129,7 @@ def main():
         #     continue
         # print("file", file.name)
 
-        analyze_file(file, result_base_path)
+        analyze_file(file, result_base_path, path_to_random_noise_directory)
 
 
 if __name__ == "__main__":
