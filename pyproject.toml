@@ -84,6 +84,9 @@ mltb2 = {extras = ["data"], version = "*"}
 requests = {version = "*"}
 bs4 = {version = "*"}
 GitPython = {version = "*"}
+psutil = {version = "*"}
+py-cpuinfo = {version = "*"}
+
 
 [tool.poetry.group.doc.dependencies]
 sphinx = "*"
