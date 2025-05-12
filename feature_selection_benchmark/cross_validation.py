@@ -8,10 +8,10 @@
 import datetime
 import logging
 from time import perf_counter
-import psutil
-import cpuinfo
 
+import cpuinfo
 import pandas as pd
+import psutil
 from sklearn.model_selection import LeaveOneOut
 
 # Set up logging
@@ -59,7 +59,7 @@ def cross_validate(data_df: pd.DataFrame, meta_data: dict, feature_selection_fun
         "CPU cores (logical):": psutil.cpu_count(logical=True),
         "CPU cores (physical):": psutil.cpu_count(logical=False),
         "CPU usage (%):": psutil.cpu_percent(interval=1),
-        "RAM total (GB):": psutil.virtual_memory().total / (1024**3))
+        "RAM total (GB):": psutil.virtual_memory().total / (1024**3),
         "CPU info": cpuinfo.get_cpu_info(),
     }
     return cv_result_list
