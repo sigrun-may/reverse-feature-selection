@@ -171,13 +171,14 @@ def sklearn_random_forest(data_df: pd.DataFrame, train_indices: np.ndarray, meta
         optuna_objective,
         n_trials=meta_data["n_trials_optuna"],
     )
-    # train random forest with default parameters
-    clf = RandomForestClassifier(
-        oob_score=roc_auc_score, n_jobs=-1, random_state=meta_data["random_state"], class_weight="balanced_subsample"
-    )
-    clf.fit(data_df.iloc[train_indices, 1:], data_df.loc[train_indices, "label"])
-    gini_feature_importances = clf.feature_importances_
-    print("number of selected features (gini default): ", np.sum(gini_feature_importances > 0))
+    # # train random forest with default parameters
+    # clf = RandomForestClassifier(
+    #     oob_score=roc_auc_score, n_jobs=-1, random_state=meta_data["random_state"], class_weight="balanced_subsample"
+    # )
+    # clf.fit(data_df.iloc[train_indices, 1:], data_df.loc[train_indices, "label"])
+    # gini_feature_importances = clf.feature_importances_
+    # print("number of selected features (gini default): ", np.sum(gini_feature_importances > 0))
+    gini_feature_importances = None
 
     # train random forest with optimized parameters
     clf.set_params(**study.best_params)
