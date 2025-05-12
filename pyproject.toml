@@ -64,9 +64,11 @@ bs4 = {version = "*", optional = true}
 optuna = {version = "*", optional = true}
 plotly = {version = "*", optional = true}
 rpy2 = {version = "*", optional = true}
+py-cpuinfo = {version = "*", optional = true}
+psutil = {version = "*", optional = true}
 
 [tool.poetry.extras]
-benchmark = ["optuna", "plotly", "rpy2", "mltb2", "GitPython", "requests", "bs4"]
+benchmark = ["optuna", "plotly", "rpy2", "mltb2", "GitPython", "requests", "bs4", "psutil", "py-cpuinfo"]
 
 [tool.poetry.group.lint.dependencies]
 black = {extras = ["jupyter"], version = "*"}
