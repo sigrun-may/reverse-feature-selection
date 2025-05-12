@@ -114,11 +114,6 @@ def main():
     result_base_path = Path(f"{result_base_path}/{result_folder_name}_{now_str}")
     result_base_path.mkdir(parents=True, exist_ok=True)
 
-    # pickle test data
-    test_dict = {"test": "test"}
-    with open(Path(f"{result_base_path}/delete_me_test_dict.pkl"), "wb") as file:
-        pickle.dump(test_dict, file, protocol=pickle.HIGHEST_PROTOCOL)
-
     number_of_available_cpus = multiprocessing.cpu_count()
     n_cpus = 50
     logger.info(f"Use {n_cpus} of {number_of_available_cpus} available CPUs.")
