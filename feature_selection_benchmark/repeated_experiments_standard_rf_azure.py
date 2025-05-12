@@ -116,7 +116,7 @@ def main():
         path_to_random_noise_directory = Path(sys.argv[2])
     else:
         path_to_random_noise_directory = None
-    print(f"Path to random noise data directory: {path_to_random_noise_directory}"
+    print(f"Path to random noise data directory: {path_to_random_noise_directory}")
 
     # iterate over all files in the directory
     for file in result_base_path.iterdir():
