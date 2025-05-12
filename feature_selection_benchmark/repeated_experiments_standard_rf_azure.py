@@ -77,14 +77,17 @@ def analyze_file(file, result_base_path):
         meta_data_dict["data_shape_random_noise"] = result_dict["reverse_random_forest_meta_data"][
             "data_shape_random_noise"
         ]
-        if "lognormal" in file.name:
-            meta_data_dict["path_for_random_noise"] = (
-                f"{result_base_path}/random_noise_data/random_noise_lognormal_30_2000.csv"
-            )
-        elif "lognormal" not in file.name:
-            meta_data_dict["path_for_random_noise"] = (
-                f"{result_base_path}/random_noise_data/random_noise_normal_30_2000.csv"
-            )
+        meta_data_dict["path_for_random_noise"] = result_dict["reverse_random_forest_meta_data"][
+            "path_for_random_noise"
+        ]
+        # if "lognormal" in file.name:
+        #     meta_data_dict["path_for_random_noise"] = (
+        #         f"{result_base_path}/random_noise_data/random_noise_lognormal_30_2000.csv"
+        #     )
+        # elif "lognormal" not in file.name:
+        #     meta_data_dict["path_for_random_noise"] = (
+        #         f"{result_base_path}/random_noise_data/random_noise_normal_30_2000.csv"
+        #     )
     # load data for the experiment with balanced train sample size
     data_df, _ = load_train_holdout_data_for_balanced_train_sample_size(meta_data_dict)
     print("number of samples", data_df.shape[0], "number of features", data_df.shape[1] - 1)
