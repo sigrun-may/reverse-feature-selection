@@ -6,10 +6,10 @@
 
 """Main script for cacluating a grid of repeated feature selection experiments for reverse feature selection."""
 
+import datetime
 import multiprocessing
 import pickle
 import sys
-import datetime
 from pathlib import Path
 
 import git
@@ -106,14 +106,14 @@ def main():
     print("result data_path: ", result_base_path)
 
     # create directory for experiment grid
-    result_base_path = Path(f"{result_base_path}/{result_folder_name}_{datetime.datetime.now(tz=datetime.timezone.utc)}")
+    now_str = datetime.datetime.now(tz=datetime.timezone.utc).strftime("%Y-%m-%d_%H%M%S.txt")
+    result_base_path = Path(f"{result_base_path}/{result_folder_name}_{now_str}")
     result_base_path.mkdir(parents=True, exist_ok=True)
 
     # pickle test data
     test_dict = {"test": "test"}
     with open(Path(f"{result_base_path}/delete_me_test_dict.pkl"), "wb") as file:
         pickle.dump(test_dict, file, protocol=pickle.HIGHEST_PROTOCOL)
-
 
     for data_name in data_names:
         # define meta data for the experiment
