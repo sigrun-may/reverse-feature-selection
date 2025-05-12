@@ -120,7 +120,7 @@ def main():
         meta_data_dict = {
             "git_commit_hash": git.Repo(search_parent_directories=True).head.object.hexsha,
             "data_name": data_name,
-            "n_cpus": multiprocessing.cpu_count(),  # number of available CPUs
+            "n_cpus": 50, # multiprocessing.cpu_count(), number of available CPUs
             "train_correlation_threshold": 0.2,
             # seed to shuffle the samples of the data set
             "shuffle_seed": shuffle_seed,
