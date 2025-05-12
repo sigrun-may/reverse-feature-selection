@@ -100,7 +100,7 @@ def test_load_train_holdout_data_for_balanced_train_sample_size_random_noise():
     meta_data_dict = {
         "data_name": "random_noise_lognormal",
         "shuffle_seed": 42,
-        "path_for_random_noise": "../random_noise_data/random_noise_lognormal_30_2000.csv",
+        "path_for_random_noise": "../../random_noise_data/random_noise_lognormal_30_2000.csv",
     }
     train_data_df, hold_out_data_df = load_train_holdout_data_for_balanced_train_sample_size(meta_data_dict)
     assert train_data_df.shape[0] == 30
