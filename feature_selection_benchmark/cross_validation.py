@@ -45,14 +45,17 @@ def cross_validate(data_df: pd.DataFrame, meta_data: dict, feature_selection_fun
         wall_times_perf_counter.append(perf_counter() - start_time_perf_counter)
         wall_times.append(datetime.datetime.now(tz=datetime.timezone.utc) - start_time)
         cv_result_list.append(selected_feature_subset)
-    end_time = datetime.datetime.now(tz=datetime.timezone.utc)
-    print("Duration of the cross-validation: ", end_time - start_time)
+    duration = datetime.datetime.now(tz=datetime.timezone.utc) - start_time
+    print("Duration of the cross-validation: ", duration)
 
     # save wall time benchmarks
+    if "cv_duration_list" not in meta_data:
+        meta_data["cv_duration_list"] = []
     if "wall_times_lists" not in meta_data:
         meta_data["wall_times_lists"] = []
     if "perf_counter_wall_times_lists" not in meta_data:
         meta_data["perf_counter_wall_times_lists"] = []
+    meta_data["cv_duration_list"].append(duration)
     meta_data["wall_times_lists"].append(wall_times)
     meta_data["perf_counter_wall_times_lists"].append(wall_times_perf_counter)
     meta_data["hardware"] = {
