@@ -82,7 +82,7 @@ def optimized_ranger_random_forest_importance(
 
 
 def calculate_feature_importance(
-    data_df: pd.DataFrame, train_indices: np.ndarray, meta_data: dict, parallel_methods=True
+    data_df: pd.DataFrame, train_indices: np.ndarray, meta_data: dict, parallel_methods=False
 ) -> dict:
     """Calculate the feature importance with sklearn RandomForestClassifier and Ranger random forests.
 
