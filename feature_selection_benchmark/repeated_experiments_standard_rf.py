@@ -112,10 +112,7 @@ def main():
     print("result data_path: ", result_base_path)
 
     # check if second argument was given
-    if len(sys.argv) > 2:
-        path_to_random_noise_directory = Path(sys.argv[2])
-    else:
-        path_to_random_noise_directory = None
+    path_to_random_noise_directory = Path(sys.argv[2]) if len(sys.argv) > 2 else None
     print(f"Path to random noise data directory: {path_to_random_noise_directory}")
 
     # iterate over all files in the directory
