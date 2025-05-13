@@ -30,39 +30,46 @@ def cross_validate(data_df: pd.DataFrame, meta_data: dict, feature_selection_fun
     Returns:
         Results of the cross-validation.
     """
-    start_time = datetime.datetime.now(tz=datetime.timezone.utc)
-    cv_result_list = []
-    wall_times = []
-    wall_times_perf_counter = []
-    loo = LeaveOneOut()
-    for fold_index, (train_indices, _) in enumerate(loo.split(data_df)):
-        logger.info(f"fold_index {fold_index + 1} of {data_df.shape[0]}")
-        start_time_perf_counter = perf_counter()
-        # Calculate raw values for calculating feature subsets
-        selected_feature_subset = feature_selection_function(
-            data_df=data_df, train_indices=train_indices, meta_data=meta_data
-        )
-        wall_times_perf_counter.append(perf_counter() - start_time_perf_counter)
-        wall_times.append(datetime.datetime.now(tz=datetime.timezone.utc) - start_time)
-        cv_result_list.append(selected_feature_subset)
-    duration = datetime.datetime.now(tz=datetime.timezone.utc) - start_time
-    print("Duration of the cross-validation: ", duration)
-
-    # save wall time benchmarks
-    if "cv_duration_list" not in meta_data:
-        meta_data["cv_duration_list"] = []
-    if "wall_times_lists" not in meta_data:
-        meta_data["wall_times_lists"] = []
-    if "perf_counter_wall_times_lists" not in meta_data:
-        meta_data["perf_counter_wall_times_lists"] = []
-    meta_data["cv_duration_list"].append(duration)
-    meta_data["wall_times_lists"].append(wall_times)
-    meta_data["perf_counter_wall_times_lists"].append(wall_times_perf_counter)
+    # save hardware configuration
     meta_data["hardware"] = {
         "CPU cores (logical):": psutil.cpu_count(logical=True),
         "CPU cores (physical):": psutil.cpu_count(logical=False),
-        "CPU usage (%):": psutil.cpu_percent(interval=1),
         "RAM total (GB):": psutil.virtual_memory().total / (1024**3),
         "CPU info": cpuinfo.get_cpu_info(),
     }
+    # initialize benchmarks
+    benchmark_id = f"benchmark_{meta_data['experiment_id']}"
+    meta_data[benchmark_id] = {}
+
+    start_time_cv = datetime.datetime.now(tz=datetime.timezone.utc)
+    wall_times_list = []
+    perf_counter_wall_times_list = []
+
+    psutil.cpu_percent(interval=None)  # warm up CPU usage
+    cpu_usage_list = []
+
+    cv_result_list = []
+    loo = LeaveOneOut()
+    for fold_index, (train_indices, _) in enumerate(loo.split(data_df)):
+        logger.info(f"fold_index {fold_index + 1} of {data_df.shape[0]}")
+        start_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+        start_perf_counter = perf_counter()
+
+        # Calculate raw values and feature subsets
+        selected_feature_subset = feature_selection_function(
+            data_df=data_df, train_indices=train_indices, meta_data=meta_data
+        )
+
+        perf_counter_wall_times_list.append(perf_counter() - start_perf_counter)
+        wall_times_list.append(datetime.datetime.now(tz=datetime.timezone.utc) - start_datetime)
+        cpu_usage_list.append(psutil.cpu_percent(interval=None))
+        cv_result_list.append(selected_feature_subset)
+
+    duration = datetime.datetime.now(tz=datetime.timezone.utc) - start_time_cv
+    print("Duration of the cross-validation: ", meta_data["cv_duration"])
+
+    meta_data[benchmark_id]["cv_duration"] = duration
+    meta_data[benchmark_id]["wall_times_list"] = wall_times_list
+    meta_data[benchmark_id]["perf_counter_wall_times_list"] = perf_counter_wall_times_list
+    meta_data[benchmark_id]["cpu_usage_list"] = cpu_usage_list
     return cv_result_list
