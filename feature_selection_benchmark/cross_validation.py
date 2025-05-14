@@ -41,17 +41,34 @@ def cross_validate(data_df: pd.DataFrame, meta_data: dict, feature_selection_fun
     benchmark_id = f"benchmark_{meta_data['experiment_id']}"
     meta_data[benchmark_id] = {}
 
+    # restrict process to specific CPU cores
+    proc = psutil.Process()
+
+    # logical cores 0 to 51 (26 physical cores with hyperthreading)
+    all_cores = list(range(52))
+
+    # exclude logical cores 0 and 26 (hyperthreads of the first physical core)
+    used_cores = [core for core in all_cores if core not in (0, 26)]
+    num_cores_used = len(used_cores)
+
+    # apply CPU affinity restriction
+    proc.cpu_affinity(used_cores)
+    print(f"Using logical cores (excluding 0 and 26): {used_cores}")
+
     start_time_cv = datetime.datetime.now(tz=datetime.timezone.utc)
     wall_times_list = []
     perf_counter_wall_times_list = []
 
-    psutil.cpu_percent(interval=None)  # warm up CPU usage
-    cpu_usage_list = []
+    psutil.cpu_percent(interval=None, percpu=True)  # warm up CPU usage
+    cpu_percentage_list = []
+    cpu_util_percent_list = []
+    cpu_time_per_core_list = []
 
     cv_result_list = []
     loo = LeaveOneOut()
     for fold_index, (train_indices, _) in enumerate(loo.split(data_df)):
         logger.info(f"fold_index {fold_index + 1} of {data_df.shape[0]}")
+        cpu_times_before = proc.cpu_times()
         start_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
         start_perf_counter = perf_counter()
 
@@ -59,10 +76,23 @@ def cross_validate(data_df: pd.DataFrame, meta_data: dict, feature_selection_fun
         selected_feature_subset = feature_selection_function(
             data_df=data_df, train_indices=train_indices, meta_data=meta_data
         )
-
-        perf_counter_wall_times_list.append(perf_counter() - start_perf_counter)
+        wall_time = perf_counter() - start_perf_counter
+        perf_counter_wall_times_list.append(wall_time)
         wall_times_list.append(datetime.datetime.now(tz=datetime.timezone.utc) - start_datetime)
-        cpu_usage_list.append(psutil.cpu_percent(interval=None))
+        cpu_times_after = proc.cpu_times()
+        cpu_percentage_list.append(psutil.cpu_percent(interval=None, percpu=True))
+
+        # Calculate CPU time used (user + system time)
+        user_time = cpu_times_after.user - cpu_times_before.user
+        sys_time = cpu_times_after.system - cpu_times_before.system
+        cpu_time_total = user_time + sys_time
+
+        # Compute average CPU utilization during training (0–100%)
+        cpu_util_percent_list.append((cpu_time_total / wall_time) * 100 if wall_time > 0 else 0)
+
+        # Compute average CPU time per used virtual core
+        cpu_time_per_core_list.append(cpu_time_total / num_cores_used if num_cores_used > 0 else 0)
+
         cv_result_list.append(selected_feature_subset)
 
     duration = datetime.datetime.now(tz=datetime.timezone.utc) - start_time_cv
@@ -70,5 +100,5 @@ def cross_validate(data_df: pd.DataFrame, meta_data: dict, feature_selection_fun
     meta_data[benchmark_id]["cv_duration"] = duration
     meta_data[benchmark_id]["wall_times_list"] = wall_times_list
     meta_data[benchmark_id]["perf_counter_wall_times_list"] = perf_counter_wall_times_list
-    meta_data[benchmark_id]["cpu_usage_list"] = cpu_usage_list
+    meta_data[benchmark_id]["cpu_usage_list"] = cpu_percentage_list
     return cv_result_list
