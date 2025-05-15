@@ -12,6 +12,7 @@ import multiprocessing
 import pickle
 import sys
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import git
 
@@ -111,7 +112,7 @@ def main():
     print("result data_path: ", result_base_path)
 
     # create directory for experiment grid
-    now_str = datetime.datetime.now(tz=datetime.timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
+    now_str = datetime.datetime.now(tz=ZoneInfo("Europe/Berlin")).strftime("%Y-%m-%d_%H-%M")
     result_base_path = Path(f"{result_base_path}/{result_folder_name}_{now_str}")
     result_base_path.mkdir(parents=True, exist_ok=True)
 
