@@ -125,9 +125,6 @@ def main():
         #     print("continue: ", file.name)
         #     continue
         # print("file", file.name)
-        if "2" not in file.name:
-            print("continue: ", file.name)
-            continue
 
         analyze_file(file, result_base_path, path_to_random_noise_directory)
 
