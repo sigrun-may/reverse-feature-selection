@@ -93,8 +93,8 @@ def main():
     """Main function for calculating a grid of repeated feature selection experiments for reverse feature selection."""
     # valid data names for the data loader are "colon", "prostate" or "leukemia_big"
     # data_names = ["colon", "prostate", "leukemia_big"]
-    data_names = ["colon"]
-    result_folder_name = "repeated_feature_selection_benchmark_cancer"
+    data_names = ["leukemia_big"]
+    result_folder_name = "repeated_feature_selection_benchmark_cancer_leukemia"
 
     # valid data names for the data loader are "random_noise_lognormal" or "random_noise_normal"
     # data_names = ["random_noise_lognormal", "random_noise_normal"]
