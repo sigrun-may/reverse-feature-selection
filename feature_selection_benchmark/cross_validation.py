@@ -53,7 +53,8 @@ def cross_validate(data_df: pd.DataFrame, meta_data: dict, feature_selection_fun
 
     # apply CPU affinity restriction
     proc.cpu_affinity(used_cores)
-    print(f"Using logical cores (excluding 0 and 26): {used_cores}")
+    logger.info(f"Using logical cores (excluding 0 and 26): {used_cores}")
+    logger.info(f"Number of parallel jobs defined in meta data: {meta_data['n_cpus']}")
 
     start_time_cv = datetime.datetime.now(tz=datetime.timezone.utc)
     wall_times_list = []
@@ -96,7 +97,7 @@ def cross_validate(data_df: pd.DataFrame, meta_data: dict, feature_selection_fun
         cv_result_list.append(selected_feature_subset)
 
     duration = datetime.datetime.now(tz=datetime.timezone.utc) - start_time_cv
-    print("Duration of the cross-validation: ", duration)
+    logger.info("Duration of the cross-validation: ", duration)
     meta_data[benchmark_id]["cv_duration"] = duration
     meta_data[benchmark_id]["wall_times_list"] = wall_times_list
     meta_data[benchmark_id]["perf_counter_wall_times_list"] = perf_counter_wall_times_list
