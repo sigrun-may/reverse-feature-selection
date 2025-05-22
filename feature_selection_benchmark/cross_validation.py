@@ -87,7 +87,7 @@ def cross_validate(data_df: pd.DataFrame, meta_data: dict, feature_selection_fun
         sys_time = cpu_times_after.system - cpu_times_before.system
         cpu_time_total = user_time + sys_time
 
-        # Compute average CPU utilization during training (0–100%)
+        # Compute average CPU utilization during training (0-100%)
         cpu_util_percent_list.append((cpu_time_total / wall_time) * 100 if wall_time > 0 else 0)
 
         # Compute average CPU time per used virtual core
