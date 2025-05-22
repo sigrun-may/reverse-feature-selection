@@ -7,7 +7,6 @@
 """Main script for cacluating baseline feature selection experiments for standard random forest."""
 
 
-import multiprocessing
 import pickle
 import sys
 from pathlib import Path
