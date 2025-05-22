@@ -142,7 +142,7 @@ def sklearn_random_forest(data_df: pd.DataFrame, train_indices: np.ndarray, meta
             min_impurity_decrease=trial.suggest_float("min_impurity_decrease", 0.001, 0.99),
             random_state=meta_data["random_state"],
             class_weight="balanced_subsample",
-            n_jobs=-1,
+            n_jobs=meta_data["n_cpus"],
         )
         rf_clf.fit(data_df.iloc[train_indices, 1:], data_df.loc[train_indices, "label"])
         score = rf_clf.oob_score_

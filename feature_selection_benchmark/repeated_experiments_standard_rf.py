@@ -64,7 +64,7 @@ def analyze_file(file, result_base_path, path_to_random_noise_directory):
         "data_name": data_name,
         # seed to shuffle the indices of the samples of the data set:
         "shuffle_seed": result_dict["reverse_random_forest_meta_data"]["shuffle_seed"],
-        "n_cpus": multiprocessing.cpu_count(),  # number of available CPUs
+        "n_cpus": result_dict["reverse_random_forest_meta_data"]["n_cpus"],
         # random seed for reproducibility of random forest:
         "random_state": result_dict["reverse_random_forest_meta_data"]["random_seeds"][0],
         "verbose_optuna": True,
