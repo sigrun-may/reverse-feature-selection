@@ -93,7 +93,7 @@ def calculate_feature_importance(
         data_df: The training data.
         train_indices: The indices of the training split.
         meta_data: The metadata related to the dataset and experiment.
-        parallel_methods: Whether to run the calculation of different feature seleciton methods in parallel.
+        parallel_methods: Whether to run the calculation of different feature selection methods in parallel.
 
     Returns:
         The feature importances, the permutation importance, the out-of-bag (OOB) score
@@ -173,7 +173,7 @@ def sklearn_random_forest(data_df: pd.DataFrame, train_indices: np.ndarray, meta
     )
     # train random forest with default parameters
     clf = RandomForestClassifier(
-        oob_score=roc_auc_score, n_jobs=-1, random_state=meta_data["random_state"], class_weight="balanced_subsample"
+        oob_score=roc_auc_score, n_jobs=meta_data["n_cpus"], random_state=meta_data["random_state"], class_weight="balanced_subsample"
     )
     # clf.fit(data_df.iloc[train_indices, 1:], data_df.loc[train_indices, "label"])
     # gini_feature_importances = clf.feature_importances_
