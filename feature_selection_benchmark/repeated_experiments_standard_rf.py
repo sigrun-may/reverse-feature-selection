@@ -68,6 +68,7 @@ def analyze_file(file, result_base_path, path_to_random_noise_directory):
         "random_state": result_dict["reverse_random_forest_meta_data"]["random_seeds"][0],
         "verbose_optuna": True,
         "n_trials_optuna": 50,
+        "prune": False,
         "max_trees_random_forest": 2000,
     }
     if "random_noise" in file.name:

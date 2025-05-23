@@ -148,9 +148,8 @@ def sklearn_random_forest(data_df: pd.DataFrame, train_indices: np.ndarray, meta
         score = rf_clf.oob_score_
 
         # stop HPO if OOB score (AUC) is already 1.0
-        if math.isclose(score, 1.0, rel_tol=1e-5):
-            # trial.study.stop()
-            print("!!!!!!!!!!!!!!!!!!!!!!!!! study would stop")
+        if meta_data["prune"] and math.isclose(score, 1.0, rel_tol=1e-5):
+            trial.study.stop()
         return score
 
     study = optuna.create_study(
