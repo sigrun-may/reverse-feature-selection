@@ -39,16 +39,12 @@ def optimized_ranger_random_forest_importance(
     def optuna_objective(trial):
         params = {
             "max_depth": trial.suggest_int("max_depth", 1, 15),
-            "num_trees": trial.suggest_int("num_trees", 20, meta_data["max_trees_random_forest"]),
-            "mtry": trial.suggest_int("mtry", 1, data_df.shape[1] - 1),
+            "num_trees": trial.suggest_int("num_trees", 500, meta_data["max_trees_random_forest"]),
+            "mtry": trial.suggest_int("mtry", (0.3 * data_df.shape[1] - 1), data_df.shape[1] - 1),
             "regularization_factor": trial.suggest_float("regularization_factor", 0.001, 0.99),
             "seed": meta_data["random_state"],
         }
         oob, _ = ranger_random_forest(data_df, train_indices, params)
-
-        # stop HPO if OOB score (proportion of misclassified observations) is already 0.0
-        if math.isclose(oob, 0.0, rel_tol=1e-5):
-            trial.study.stop()
         return oob
 
     study = optuna.create_study(
@@ -135,8 +131,8 @@ def sklearn_random_forest(data_df: pd.DataFrame, train_indices: np.ndarray, meta
         rf_clf = RandomForestClassifier(
             oob_score=roc_auc_score,
             max_depth=trial.suggest_int("max_depth", 1, 15),
-            n_estimators=trial.suggest_int("n_estimators", 20, meta_data["max_trees_random_forest"]),
-            max_features=trial.suggest_int("max_features", 1, data_df.shape[1] - 1),
+            n_estimators=trial.suggest_int("n_estimators", 500, meta_data["max_trees_random_forest"]),
+            max_features=trial.suggest_int("max_features", (0.3 * data_df.shape[1] - 1), data_df.shape[1] - 1),
             min_samples_leaf=trial.suggest_int("min_samples_leaf", 2, math.floor(len(train_indices) / 2)),
             min_samples_split=trial.suggest_int("min_samples_split", 2, 5),
             min_impurity_decrease=trial.suggest_float("min_impurity_decrease", 0.001, 0.99),
@@ -146,10 +142,6 @@ def sklearn_random_forest(data_df: pd.DataFrame, train_indices: np.ndarray, meta
         )
         rf_clf.fit(data_df.iloc[train_indices, 1:], data_df.loc[train_indices, "label"])
         score = rf_clf.oob_score_
-
-        # stop HPO if OOB score (AUC) is already 1.0
-        if meta_data["prune"] and math.isclose(score, 1.0, rel_tol=1e-5):
-            trial.study.stop()
         return score
 
     study = optuna.create_study(
