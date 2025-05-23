@@ -67,8 +67,7 @@ def analyze_file(file, result_base_path, path_to_random_noise_directory):
         # random seed for reproducibility of random forest:
         "random_state": result_dict["reverse_random_forest_meta_data"]["random_seeds"][0],
         "verbose_optuna": True,
-        "n_trials_optuna": 50,
-        "prune": False,
+        "n_trials_optuna": 80,
         "max_trees_random_forest": 2000,
     }
     if "random_noise" in file.name:
@@ -100,7 +99,7 @@ def analyze_file(file, result_base_path, path_to_random_noise_directory):
     )
     result_dict["standard_random_forest_meta_data"] = meta_data_dict
     # save results
-    result_dict_path = Path(f"{result_base_path}/{meta_data_dict['experiment_id']}_stdrf_result_dict.pkl")
+    result_dict_path = Path(f"{result_base_path}/{meta_data_dict['experiment_id']}_rf_result_dict.pkl")
     with open(result_dict_path, "wb") as result_file:
         pickle.dump(result_dict, result_file, protocol=pickle.HIGHEST_PROTOCOL)
 
@@ -125,11 +124,6 @@ def main():
         #     print("continue: ", file.name)
         #     continue
         # print("file", file.name)
-        if "stdrf" in file.name and not "2" in file.name:
-            print("continue: ", file.name)
-            continue
-        else:
-            print("analyze file", file.name)
 
         analyze_file(file, result_base_path, path_to_random_noise_directory)
 
