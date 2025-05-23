@@ -125,6 +125,11 @@ def main():
         #     print("continue: ", file.name)
         #     continue
         # print("file", file.name)
+        if "stdrf" in file.name and not "2" in file.name:
+            print("continue: ", file.name)
+            continue
+        else:
+            print("analyze file", file.name)
 
         analyze_file(file, result_base_path, path_to_random_noise_directory)
 
