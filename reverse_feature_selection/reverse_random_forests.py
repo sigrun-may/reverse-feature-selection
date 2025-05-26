@@ -117,8 +117,7 @@ def calculate_oob_errors(
 
         # If the feature importance of the label feature is zero, it means the label was not considered in the model
         if label_importance_zero:
-            oob_errors_unlabeled = None
-            return oob_errors_labeled, oob_errors_unlabeled, number_of_features_in_training_data
+            return oob_errors_labeled, None, number_of_features_in_training_data
 
         # Store the OOB score for the labeled model
         oob_errors_labeled.append(clf1.oob_score_)
