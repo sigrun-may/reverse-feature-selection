@@ -40,6 +40,8 @@ def test_calculate_oob_errors_with_valid_input():
     )
     assert labeled_errors is not None
     assert unlabeled_errors is not None
+    assert number_of_features_in_training_data > 0
+    assert len(labeled_errors) == len(meta_data["random_seeds"]) == len(unlabeled_errors)
 
 
 def test_calculate_oob_errors_with_invalid_target_feature():
