@@ -20,6 +20,7 @@ from feature_selection_benchmark import cross_validation
 from feature_selection_benchmark.data_loader_tools import (
     load_train_holdout_data_for_balanced_train_sample_size,
 )
+from feature_selection_benchmark.ranger_rf import calculate_feature_importance
 from reverse_feature_selection.reverse_random_forests import select_feature_subset
 
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -93,8 +94,8 @@ def main():
     """Main function for calculating a grid of repeated feature selection experiments for reverse feature selection."""
     # valid data names for the data loader are "colon", "prostate" or "leukemia_big"
     # data_names = ["colon", "prostate", "leukemia_big"]
-    data_names = ["leukemia_big"]
-    result_folder_name = "repeated_feature_selection_benchmark_cancer_leukemia"
+    data_names = ["prostate"]
+    result_folder_name = "repeated_feature_selection_benchmark_cancer_prostate"
 
     # valid data names for the data loader are "random_noise_lognormal" or "random_noise_normal"
     # data_names = ["random_noise_lognormal", "random_noise_normal"]
@@ -161,6 +162,28 @@ def main():
             }
             # save results
             result_dict_path = Path(f"{result_base_path}/{meta_data_dict['experiment_id']}_result_dict.pkl")
+            with open(result_dict_path, "wb") as file:
+                pickle.dump(result_dict, file, protocol=pickle.HIGHEST_PROTOCOL)
+
+            # calculate raw feature subset data for standard random forest
+            result_dict["standard_random_forest_meta_data"] = {
+                "git_commit_hash": git.Repo(search_parent_directories=True).head.object.hexsha,
+                "experiment_id": experiment_id,
+                "data_name": data_name,
+                # seed to shuffle the indices of the samples of the data set:
+                "shuffle_seed": result_dict["reverse_random_forest_meta_data"]["shuffle_seed"],
+                "n_cpus": result_dict["reverse_random_forest_meta_data"]["n_cpus"],
+                # random seed for reproducibility of random forest:
+                "random_state": result_dict["reverse_random_forest_meta_data"]["random_seeds"][0],
+                "verbose_optuna": True,
+                "n_trials_optuna": 80,
+                "max_trees_random_forest": 2000,
+            }
+            result_dict["standard_random_forest"] = cross_validation.cross_validate(
+                data_df, result_dict["standard_random_forest_meta_data"], calculate_feature_importance
+            )
+            # save results
+            result_dict_path = Path(f"{result_base_path}/{meta_data_dict['experiment_id']}_stdrf_result_dict.pkl")
             with open(result_dict_path, "wb") as file:
                 pickle.dump(result_dict, file, protocol=pickle.HIGHEST_PROTOCOL)
 
