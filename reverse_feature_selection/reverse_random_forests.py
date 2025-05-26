@@ -89,6 +89,7 @@ def calculate_oob_errors(
 
     # Remove features correlated to the target feature
     x_train = remove_features_correlated_to_target_feature(train_df, corr_matrix_df, target_feature_name, meta_data)
+    number_of_features_in_training_data = x_train.shape[1]
 
     oob_errors_labeled = []
     oob_errors_unlabeled = []
@@ -116,7 +117,8 @@ def calculate_oob_errors(
 
         # If the feature importance of the label feature is zero, it means the label was not considered in the model
         if label_importance_zero:
-            return None, None, x_train.shape[1]
+            oob_errors_unlabeled = None
+            return oob_errors_labeled, oob_errors_unlabeled, number_of_features_in_training_data
 
         # Store the OOB score for the labeled model
         oob_errors_labeled.append(clf1.oob_score_)
@@ -127,7 +129,7 @@ def calculate_oob_errors(
 
         # Store the OOB score for the unlabeled model
         oob_errors_unlabeled.append(clf2.oob_score_)
-    return oob_errors_labeled, oob_errors_unlabeled, x_train.shape[1]
+    return oob_errors_labeled, oob_errors_unlabeled, number_of_features_in_training_data
 
 
 def validate_and_initialize_meta_data(meta_data: dict | None) -> dict:
@@ -151,7 +153,7 @@ def validate_and_initialize_meta_data(meta_data: dict | None) -> dict:
         - "random_seeds": A list of 30 random integers between 1 and 10000.
         - "train_correlation_threshold": A float value of 0.7, representing the absolute correlation threshold.
     """
-    # initalize numpy random number generator
+    # initialize numpy random number generator
     rng = np.random.default_rng()
 
     # Set default values if meta_data is not defined
@@ -283,6 +285,7 @@ def select_feature_subset(
     p_value_list: list[float | None] = []
     fraction_list_mean: list[float | None] = []
     fraction_list_median: list[float | None] = []
+    calculated_seeds_list: list[int] = []
 
     # Unpack the results from the parallel processing
     labeled_error_distribution_list, unlabeled_error_distribution_list, features_count_in_train_df = zip(
@@ -293,11 +296,15 @@ def select_feature_subset(
     for labeled_error_distribution, unlabeled_error_distribution in zip(
         labeled_error_distribution_list, unlabeled_error_distribution_list, strict=True
     ):
-        if labeled_error_distribution is None or unlabeled_error_distribution is None:
+        if unlabeled_error_distribution is not None:
+            assert len(labeled_error_distribution) == len(unlabeled_error_distribution)
+            calculated_seeds_list.append(len(unlabeled_error_distribution))
+        else:
             # the current target feature was deselected because the feature importance of the label was zero
             p_value_list.append(None)
             fraction_list_mean.append(None)
             fraction_list_median.append(None)
+            calculated_seeds_list.append(len(labeled_error_distribution))
             continue
 
         # calculate p-value based on the OOB scores and the mann-whitney u test
@@ -339,6 +346,7 @@ def select_feature_subset(
         == len(fraction_list_median)
         == len(feature_subset_selection_list)
         == len(feature_subset_selection_list_median)
+        == len(calculated_seeds_list)
         == data_df.shape[1] - 1  # exclude label column
     )
     result_df = pd.DataFrame(index=data_df.columns[1:])
@@ -350,4 +358,5 @@ def select_feature_subset(
     result_df["fraction_mean"] = fraction_list_mean
     result_df["fraction_median"] = fraction_list_median
     result_df["train_features_count"] = np.full(len(feature_subset_selection_list), features_count_in_train_df)
+    result_df["number_of_repeated_trainings"] = calculated_seeds_list
     return result_df
