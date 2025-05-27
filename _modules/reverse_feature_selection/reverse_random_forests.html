@@ -193,8 +193,7 @@
 
         <span class="c1"># If the feature importance of the label feature is zero, it means the label was not considered in the model</span>
         <span class="k">if</span> <span class="n">label_importance_zero</span><span class="p">:</span>
-            <span class="n">oob_errors_unlabeled</span> <span class="o">=</span> <span class="kc">None</span>
-            <span class="k">return</span> <span class="n">oob_errors_labeled</span><span class="p">,</span> <span class="n">oob_errors_unlabeled</span><span class="p">,</span> <span class="n">number_of_features_in_training_data</span>
+            <span class="k">return</span> <span class="n">oob_errors_labeled</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">number_of_features_in_training_data</span>
 
         <span class="c1"># Store the OOB score for the labeled model</span>
         <span class="n">oob_errors_labeled</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">clf1</span><span class="o">.</span><span class="n">oob_score_</span><span class="p">)</span>
