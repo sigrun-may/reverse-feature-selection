@@ -55,7 +55,6 @@ def optimized_ranger_random_forest_importance(
         sampler=TPESampler(
             multivariate=True,
             consider_magic_clip=True,
-            constant_liar=True,
             n_startup_trials=20,  # number of random trials before TPE starts
             seed=48,
         ),
@@ -153,7 +152,6 @@ def sklearn_random_forest(data_df: pd.DataFrame, train_indices: np.ndarray, meta
         sampler=TPESampler(
             multivariate=True,
             consider_magic_clip=True,
-            constant_liar=True,
             n_startup_trials=20,  # number of random trials before TPE starts
             seed=48,
         ),
