@@ -128,7 +128,7 @@ def main():
             "git_commit_hash": git.Repo(search_parent_directories=True).head.object.hexsha,
             "data_name": data_name,
             "n_cpus": n_cpus,
-            "train_correlation_threshold": 0.2,
+            "train_correlation_threshold": 0.3,
             # seed to shuffle the samples of the data set
             "shuffle_seed": shuffle_seed,
         }
