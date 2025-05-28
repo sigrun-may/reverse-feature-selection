@@ -38,8 +38,7 @@ def cross_validate(data_df: pd.DataFrame, meta_data: dict, feature_selection_fun
         "CPU info": cpuinfo.get_cpu_info(),
     }
     # initialize benchmarks
-    benchmark_id = f"benchmark_{meta_data['experiment_id']}"
-    meta_data[benchmark_id] = {}
+    meta_data["benchmark"] = {}
 
     # restrict process to specific CPU cores
     proc = psutil.Process()
@@ -58,7 +57,6 @@ def cross_validate(data_df: pd.DataFrame, meta_data: dict, feature_selection_fun
 
     start_time_cv = datetime.datetime.now(tz=datetime.timezone.utc)
     wall_times_list = []
-    perf_counter_wall_times_list = []
 
     psutil.cpu_percent(interval=None, percpu=True)  # warm up CPU usage
     cpu_percentage_list = []
@@ -70,7 +68,6 @@ def cross_validate(data_df: pd.DataFrame, meta_data: dict, feature_selection_fun
     for fold_index, (train_indices, _) in enumerate(loo.split(data_df)):
         logger.info(f"fold_index {fold_index + 1} of {data_df.shape[0]}")
         cpu_times_before = proc.cpu_times()
-        start_datetime = datetime.datetime.now(tz=datetime.timezone.utc)
         start_perf_counter = perf_counter()
 
         # Calculate raw values and feature subsets
@@ -78,8 +75,7 @@ def cross_validate(data_df: pd.DataFrame, meta_data: dict, feature_selection_fun
             data_df=data_df, train_indices=train_indices, meta_data=meta_data
         )
         wall_time = perf_counter() - start_perf_counter
-        perf_counter_wall_times_list.append(wall_time)
-        wall_times_list.append(datetime.datetime.now(tz=datetime.timezone.utc) - start_datetime)
+        wall_times_list.append(wall_time)
         cpu_times_after = proc.cpu_times()
         cpu_percentage_list.append(psutil.cpu_percent(interval=None, percpu=True))
 
@@ -98,8 +94,9 @@ def cross_validate(data_df: pd.DataFrame, meta_data: dict, feature_selection_fun
 
     duration = datetime.datetime.now(tz=datetime.timezone.utc) - start_time_cv
     logger.info(f"Duration of the cross-validation: {duration}")
-    meta_data[benchmark_id]["cv_duration"] = duration
-    meta_data[benchmark_id]["wall_times_list"] = wall_times_list
-    meta_data[benchmark_id]["perf_counter_wall_times_list"] = perf_counter_wall_times_list
-    meta_data[benchmark_id]["cpu_usage_list"] = cpu_percentage_list
+    meta_data["benchmark"]["cv_duration"] = duration
+    meta_data["benchmark"]["wall_times"] = wall_times_list
+    meta_data["benchmark"]["cpu_usage"] = cpu_percentage_list
+    meta_data["benchmark"]["average_cpu_util_percent"] = cpu_util_percent_list
+    meta_data["benchmark"]["average_cpu_time_per_core"] = cpu_time_per_core_list
     return cv_result_list
