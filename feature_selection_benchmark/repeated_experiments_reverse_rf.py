@@ -106,11 +106,11 @@ def main():
     shuffle_seed = None
 
     # print the current working directory
-    logger.info("current working directory: ", Path.cwd())
+    logger.info(f"current working directory: {Path.cwd()}")
 
     # parse result path from input
     result_base_path = Path(sys.argv[1])
-    logger.info("result data_path: ", result_base_path)
+    logger.info(f"result data_path: {result_base_path}")
 
     number_of_available_cpus = multiprocessing.cpu_count()
     n_cpus = 50
@@ -143,13 +143,13 @@ def main():
         # load data for the experiment with balanced train sample size
         data_df, _ = load_train_holdout_data_for_balanced_train_sample_size(meta_data_dict)
         assert data_df.shape[0] == 30, f"Number of samples is not 30: {data_df.shape[0]}"
-        logger.info("number of samples", data_df.shape[0], "number of features", data_df.shape[1] - 1)
+        logger.info(f"number of samples {data_df.shape[0]}, number of features {data_df.shape[1] - 1}")
 
         # repeat the experiment three times with different random seeds
         for i, list_of_random_seeds in enumerate(define_random_seeds()):
             experiment_id = f"{data_name}_{i}_shuffle_seed_{shuffle_seed}"
             meta_data_dict["experiment_id"] = experiment_id
-            logger.info("experiment_id: ", experiment_id)
+            logger.info(f"experiment_id: {experiment_id}")
 
             # random seeds for reproducibility of reverse random forest
             meta_data_dict["random_seeds"] = list_of_random_seeds
@@ -167,21 +167,20 @@ def main():
                 pickle.dump(result_dict, file, protocol=pickle.HIGHEST_PROTOCOL)
 
             # calculate raw feature subset data for standard random forest
-            result_dict["standard_random_forest_meta_data"] = {
+            meta_data_rf = {
                 "git_commit_hash": git.Repo(search_parent_directories=True).head.object.hexsha,
                 "experiment_id": experiment_id,
                 "data_name": data_name,
-                # seed to shuffle the indices of the samples of the data set:
-                "shuffle_seed": result_dict["reverse_random_forest_meta_data"]["shuffle_seed"],
-                "n_cpus": result_dict["reverse_random_forest_meta_data"]["n_cpus"],
-                # random seed for reproducibility of random forest:
-                "random_state": result_dict["reverse_random_forest_meta_data"]["random_seeds"][0],
+                "shuffle_seed": shuffle_seed,
+                "n_cpus": n_cpus,
+                "random_state": list_of_random_seeds[0],
                 "verbose_optuna": True,
                 "n_trials_optuna": 80,
                 "max_trees_random_forest": 2000,
             }
+            result_dict["standard_random_forest_meta_data"] = meta_data_rf
             result_dict["standard_random_forest"] = cross_validation.cross_validate(
-                data_df, result_dict["standard_random_forest_meta_data"], calculate_feature_importance
+                data_df, meta_data_rf, calculate_feature_importance
             )
             # save results
             result_dict_path = Path(f"{result_base_path}/{meta_data_dict['experiment_id']}_stdrf_result_dict.pkl")
