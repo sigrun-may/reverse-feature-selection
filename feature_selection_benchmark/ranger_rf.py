@@ -42,6 +42,7 @@ def optimized_ranger_random_forest_importance(
             "num_trees": trial.suggest_int("num_trees", 500, meta_data["max_trees_random_forest"]),
             "mtry": trial.suggest_int("mtry", (0.3 * data_df.shape[1] - 1), data_df.shape[1] - 1),
             "regularization_factor": trial.suggest_float("regularization_factor", 0.001, 0.99),
+            "min_node_size": trial.suggest_int("min_node_size", 2, 5),
             "seed": meta_data["random_state"],
         }
         oob, _ = ranger_random_forest(data_df, train_indices, params)
@@ -208,7 +209,14 @@ def ranger_random_forest(data_df: pd.DataFrame, train_indices, hyperparameters: 
     library(ranger)
 
     # train a ranger model with optimized hyperparameters
-    train_ranger <- function(data, label, max_depth, num_trees, mtry, seed_random_forest, regularization_factor){
+    train_ranger <- function(data,
+                            label,
+                            max_depth,
+                            num_trees,
+                            mtry,
+                            seed_random_forest,
+                            regularization_factor,
+                            min_node_size) {
 
       # ensure label is a factor
       data[[label]] <- as.factor(data[[label]])
@@ -219,7 +227,7 @@ def ranger_random_forest(data_df: pd.DataFrame, train_indices, hyperparameters: 
                                  importance = "permutation",
                                  scale.permutation.importance = TRUE,
                                  regularization.factor = regularization_factor,
-                                 min.node.size = 2,
+                                 min.node.size = min_node_size,
                                  sample.fraction = 0.896551724137931, # 26 from 29 samples
                                  mtry = mtry,
                                  max.depth = max_depth,
@@ -256,6 +264,7 @@ def ranger_random_forest(data_df: pd.DataFrame, train_indices, hyperparameters: 
         hyperparameters["mtry"],
         hyperparameters["seed"],
         hyperparameters["regularization_factor"],
+        hyperparameters["min_node_size"],
     )
     # check if the result_vector is an array of floats
     assert isinstance(result_vector, np.ndarray), "Result vector is not a numpy array."
