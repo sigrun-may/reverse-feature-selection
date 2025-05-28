@@ -71,7 +71,7 @@ def calculate_oob_errors(
     train_df: pd.DataFrame,
     corr_matrix_df: pd.DataFrame,
     meta_data: dict,
-) -> tuple[list | None, list | None, int]:
+) -> tuple[list, list | None, int]:
     """Calculate out-of-bag (OOB) error for training data first including the label and again excluding the label.
 
     Args:
@@ -91,7 +91,7 @@ def calculate_oob_errors(
     x_train = remove_features_correlated_to_target_feature(train_df, corr_matrix_df, target_feature_name, meta_data)
     number_of_features_in_training_data = x_train.shape[1]
 
-    oob_errors_labeled = []
+    oob_errors_labeled: list[float] = []
     oob_errors_unlabeled = []
 
     # chose 1/10 of the available CPUs for nested parallel processing
