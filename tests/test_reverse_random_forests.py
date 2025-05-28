@@ -34,14 +34,17 @@ def load_test_data():
 def test_calculate_oob_errors_with_valid_input():
     """Test calculating out-of-bag errors for a valid input."""
     data_df = load_test_data().iloc[:, :50]
-    meta_data = {"n_cpus": 2, "random_seeds": [0, 1], "train_correlation_threshold": 0.2}
+    seeds = [0, 1]
+    meta_data = {"n_cpus": 2, "random_seeds": seeds, "train_correlation_threshold": 0.2}
     labeled_errors, unlabeled_errors, number_of_features_in_training_data = calculate_oob_errors(
         "1", data_df, data_df.corr(method="spearman"), meta_data
     )
     assert labeled_errors is not None
     assert unlabeled_errors is not None
     assert number_of_features_in_training_data > 0
-    assert len(labeled_errors) == len(meta_data["random_seeds"]) == len(unlabeled_errors)
+    assert isinstance(labeled_errors, list)
+    assert isinstance(unlabeled_errors, list)
+    assert len(labeled_errors) == len(seeds) == len(unlabeled_errors)
 
 
 def test_calculate_oob_errors_with_invalid_target_feature():
