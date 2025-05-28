@@ -94,33 +94,35 @@ def main():
     """Main function for calculating a grid of repeated feature selection experiments for reverse feature selection."""
     # valid data names for the data loader are "colon", "prostate" or "leukemia_big"
     # data_names = ["colon", "prostate", "leukemia_big"]
-    data_names = ["prostate"]
-    result_folder_name = "repeated_feature_selection_benchmark_cancer_prostate"
+    # data_names = ["prostate"]
 
     # valid data names for the data loader are "random_noise_lognormal" or "random_noise_normal"
     # data_names = ["random_noise_lognormal", "random_noise_normal"]
     # data_names = ["random_noise_lognormal"]
-    # result_folder_name = "repeated_feature_selection_benchmark_random_noise"
+
+    data_names = ["colon", "prostate", "leukemia_big", "random_noise_lognormal", "random_noise_normal"]
 
     # seed to shuffle the indices of the samples of the data set
     shuffle_seed = None
 
     # print the current working directory
-    print("current working directory: ", Path.cwd())
+    logger.info("current working directory: ", Path.cwd())
 
     # parse result path from input
     result_base_path = Path(sys.argv[1])
-    print("result data_path: ", result_base_path)
-
-    # create directory for experiment grid
-    now_str = datetime.datetime.now(tz=ZoneInfo("Europe/Berlin")).strftime("%Y-%m-%d_%H-%M")
-    result_base_path = Path(f"{result_base_path}/{result_folder_name}_{now_str}")
-    result_base_path.mkdir(parents=True, exist_ok=True)
+    logger.info("result data_path: ", result_base_path)
 
     number_of_available_cpus = multiprocessing.cpu_count()
     n_cpus = 50
     logger.info(f"Use {n_cpus} of {number_of_available_cpus} available CPUs.")
+
     for data_name in data_names:
+        # create directory for repeated experiment
+        now_str = datetime.datetime.now(tz=ZoneInfo("Europe/Berlin")).strftime("%Y-%m-%d_%H-%M")
+        result_folder_name = f"benchmark_{data_name}"
+        result_base_path = Path(f"{result_base_path}/{result_folder_name}_{now_str}")
+        result_base_path.mkdir(parents=True, exist_ok=True)
+
         # define meta data for the experiment
         meta_data_dict = {
             "git_commit_hash": git.Repo(search_parent_directories=True).head.object.hexsha,
@@ -131,7 +133,6 @@ def main():
             "shuffle_seed": shuffle_seed,
         }
         if "random" in data_name:
-            meta_data_dict["data_shape_random_noise"] = (30, 2000)
             # local path
             meta_data_dict["path_for_random_noise"] = f"random_noise_data/{data_name}_30_2000.csv"
 
@@ -142,13 +143,13 @@ def main():
         # load data for the experiment with balanced train sample size
         data_df, _ = load_train_holdout_data_for_balanced_train_sample_size(meta_data_dict)
         assert data_df.shape[0] == 30, f"Number of samples is not 30: {data_df.shape[0]}"
-        print("number of samples", data_df.shape[0], "number of features", data_df.shape[1] - 1)
+        logger.info("number of samples", data_df.shape[0], "number of features", data_df.shape[1] - 1)
 
         # repeat the experiment three times with different random seeds
         for i, list_of_random_seeds in enumerate(define_random_seeds()):
             experiment_id = f"{data_name}_{i}_shuffle_seed_{shuffle_seed}"
             meta_data_dict["experiment_id"] = experiment_id
-            print("experiment_id: ", experiment_id)
+            logger.info("experiment_id: ", experiment_id)
 
             # random seeds for reproducibility of reverse random forest
             meta_data_dict["random_seeds"] = list_of_random_seeds
