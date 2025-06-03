@@ -120,8 +120,8 @@ def main():
         # create directory for repeated experiment
         now_str = datetime.datetime.now(tz=ZoneInfo("Europe/Berlin")).strftime("%Y-%m-%d_%H-%M")
         result_folder_name = f"benchmark_{data_name}"
-        result_base_path = Path(f"{result_base_path}/{result_folder_name}_{now_str}")
-        result_base_path.mkdir(parents=True, exist_ok=True)
+        experiment_path = Path(f"{result_base_path}/{result_folder_name}_{now_str}")
+        experiment_path.mkdir(parents=True, exist_ok=True)
 
         # define meta data for the experiment
         meta_data_dict = {
@@ -162,7 +162,7 @@ def main():
                 "reverse_random_forest_meta_data": meta_data_dict,
             }
             # save results
-            result_dict_path = Path(f"{result_base_path}/{meta_data_dict['experiment_id']}_result_dict.pkl")
+            result_dict_path = Path(f"{experiment_path}/{meta_data_dict['experiment_id']}_result_dict.pkl")
             with open(result_dict_path, "wb") as file:
                 pickle.dump(result_dict, file, protocol=pickle.HIGHEST_PROTOCOL)
 
@@ -183,7 +183,7 @@ def main():
                 data_df, meta_data_rf, calculate_feature_importance
             )
             # save results
-            result_dict_path = Path(f"{result_base_path}/{meta_data_dict['experiment_id']}_stdrf_result_dict.pkl")
+            result_dict_path = Path(f"{experiment_path}/{meta_data_dict['experiment_id']}_stdrf_result_dict.pkl")
             with open(result_dict_path, "wb") as file:
                 pickle.dump(result_dict, file, protocol=pickle.HIGHEST_PROTOCOL)
 
