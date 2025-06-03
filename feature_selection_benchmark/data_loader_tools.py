@@ -168,7 +168,7 @@ def shuffle(data: pd.DataFrame, label: pd.Series, shuffle_seed: int | None = Non
         label_index = label.index
 
         # shuffle data before selecting samples
-        shuffled_data = data.sample(frac=1, random_state=shuffle_seed)
+        shuffled_data = data.sample(frac=1, axis=0, random_state=shuffle_seed)
         shuffled_label = label.loc[shuffled_data.index]
 
         assert shuffled_data.index.equals(shuffled_label.index)

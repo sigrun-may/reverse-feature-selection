@@ -103,7 +103,7 @@ def main():
     data_names = ["colon", "prostate", "leukemia_big", "random_noise_lognormal", "random_noise_normal"]
 
     # seed to shuffle the indices of the samples of the data set
-    shuffle_seed = None
+    shuffle_seed = 13
 
     # print the current working directory
     logger.info(f"current working directory: {Path.cwd()}")
