@@ -5,7 +5,6 @@
 # which is available at https://opensource.org/licenses/MIT
 
 """Standard embedded feature selection with sklearn random forest."""
-import concurrent.futures
 import math
 import warnings
 
@@ -21,7 +20,7 @@ from sklearn.metrics import roc_auc_score
 warnings.filterwarnings("ignore")
 
 
-def optimized_ranger_random_forest_importance(
+def ranger_random_forest(
     data_df: pd.DataFrame, train_indices: np.ndarray, meta_data: dict
 ) -> dict:
     """Calculate importance with the R ranger package with optimized hyperparameters.
@@ -45,7 +44,7 @@ def optimized_ranger_random_forest_importance(
             "min_node_size": trial.suggest_int("min_node_size", 2, 5),
             "seed": meta_data["random_state"],
         }
-        oob, _ = ranger_random_forest(data_df, train_indices, params)
+        oob, _ = train_ranger_random_forests(data_df, train_indices, params)
         return oob
 
     study = optuna.create_study(
@@ -70,49 +69,12 @@ def optimized_ranger_random_forest_importance(
     hyperparameters = study.best_params
     hyperparameters["seed"] = meta_data["random_state"]
 
-    oob_score, feature_importances = ranger_random_forest(data_df, train_indices, hyperparameters)
+    oob_score, feature_importances = train_ranger_random_forests(data_df, train_indices, hyperparameters)
     return {
         "permutation": feature_importances,
         "best_params_ranger_permutation": hyperparameters,
         "oob_score_permutation": oob_score,
     }
-
-
-def calculate_feature_importance(
-    data_df: pd.DataFrame, train_indices: np.ndarray, meta_data: dict, parallel_methods=False
-) -> dict:
-    """Calculate the feature importance with sklearn RandomForestClassifier and Ranger random forests.
-
-    Optimize the hyperparameters of RandomForestClassifier and Ranger, a fast implementation of random forests,
-    using optuna.
-
-    Args:
-        data_df: The training data.
-        train_indices: The indices of the training split.
-        meta_data: The metadata related to the dataset and experiment.
-        parallel_methods: Whether to run the calculation of different feature selection methods in parallel.
-
-    Returns:
-        The feature importances, the permutation importance, the out-of-bag (OOB) score
-        and the best hyperparameter values.
-    """
-    if parallel_methods:
-        # parallelize hyperparameter optimizations
-        with concurrent.futures.ProcessPoolExecutor(max_workers=2) as executor:
-            # Submit methods with their specific arguments
-            future_sklearn = executor.submit(sklearn_random_forest, data_df, train_indices, meta_data)
-            future_permutation = executor.submit(
-                optimized_ranger_random_forest_importance, data_df, train_indices, meta_data
-            )
-            # Collect results as they complete
-            result_dict = {}
-            for future in concurrent.futures.as_completed([future_sklearn, future_permutation]):
-                # merge dictionaries
-                result_dict.update(future.result())
-    else:
-        # serial execution for runtime benchmarking of sklearn random forest only
-        result_dict = sklearn_random_forest(data_df, train_indices, meta_data)
-    return result_dict
 
 
 def sklearn_random_forest(data_df: pd.DataFrame, train_indices: np.ndarray, meta_data: dict):
@@ -170,9 +132,9 @@ def sklearn_random_forest(data_df: pd.DataFrame, train_indices: np.ndarray, meta
         random_state=meta_data["random_state"],
         class_weight="balanced_subsample",
     )
-    # clf.fit(data_df.iloc[train_indices, 1:], data_df.loc[train_indices, "label"])
-    # gini_feature_importances = clf.feature_importances_
-    # print("number of selected features (gini default): ", np.sum(gini_feature_importances > 0))
+    clf.fit(data_df.iloc[train_indices, 1:], data_df.loc[train_indices, "label"])
+    gini_feature_importances = clf.feature_importances_
+    print("number of selected features (gini default): ", np.sum(gini_feature_importances > 0))
     gini_feature_importances = None
 
     # train random forest with optimized parameters
@@ -189,7 +151,7 @@ def sklearn_random_forest(data_df: pd.DataFrame, train_indices: np.ndarray, meta
     }
 
 
-def ranger_random_forest(data_df: pd.DataFrame, train_indices, hyperparameters: dict) -> tuple[float, np.ndarray]:
+def train_ranger_random_forests(data_df: pd.DataFrame, train_indices, hyperparameters: dict) -> tuple[float, np.ndarray]:
     """Calculate permutation importance with R.
 
     Args:

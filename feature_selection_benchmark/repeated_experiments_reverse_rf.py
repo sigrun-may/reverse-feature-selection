@@ -20,7 +20,7 @@ from feature_selection_benchmark import cross_validation
 from feature_selection_benchmark.data_loader_tools import (
     load_train_holdout_data_for_balanced_train_sample_size,
 )
-from feature_selection_benchmark.ranger_rf import calculate_feature_importance
+from feature_selection_benchmark.ranger_rf import sklearn_random_forest, ranger_random_forest
 from reverse_feature_selection.reverse_random_forests import select_feature_subset
 
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -97,10 +97,10 @@ def main():
     # data_names = ["prostate"]
 
     # valid data names for the data loader are "random_noise_lognormal" or "random_noise_normal"
-    # data_names = ["random_noise_lognormal", "random_noise_normal"]
+    data_names = ["random_noise_lognormal", "random_noise_normal"]
     # data_names = ["random_noise_lognormal"]
 
-    data_names = ["colon", "prostate", "leukemia_big", "random_noise_lognormal", "random_noise_normal"]
+    # data_names = ["colon", "prostate", "leukemia_big", "random_noise_lognormal", "random_noise_normal"]
 
     # seed to shuffle the indices of the samples of the data set
     shuffle_seed = 13
@@ -180,7 +180,10 @@ def main():
             }
             result_dict["standard_random_forest_meta_data"] = meta_data_rf
             result_dict["standard_random_forest"] = cross_validation.cross_validate(
-                data_df, meta_data_rf, calculate_feature_importance
+                data_df, meta_data_rf, sklearn_random_forest,
+            )
+            result_dict["ranger_random_forest"] = cross_validation.cross_validate(
+                data_df, meta_data_rf, ranger_random_forest,
             )
             # save results
             result_dict_path = Path(f"{experiment_path}/{meta_data_dict['experiment_id']}_stdrf_result_dict.pkl")
