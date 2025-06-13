@@ -135,7 +135,7 @@ def sklearn_random_forest(data_df: pd.DataFrame, train_indices: np.ndarray, meta
     clf.fit(data_df.iloc[train_indices, 1:], data_df.loc[train_indices, "label"])
     gini_feature_importances = clf.feature_importances_
     duration = datetime.now() - start
-    print.info("number of selected features (gini default): ", np.sum(gini_feature_importances > 0))
+    print("number of selected features (gini default): ", np.sum(gini_feature_importances > 0))
 
     # train random forest with optimized parameters
     clf.set_params(**study.best_params)
