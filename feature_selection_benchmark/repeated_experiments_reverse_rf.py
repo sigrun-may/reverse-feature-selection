@@ -177,7 +177,8 @@ def main():
                 "n_cpus": n_cpus,
                 "random_state": list_of_random_seeds[0],
                 "verbose_optuna": True,
-                "n_trials_optuna": 80,
+                # "n_trials_optuna": 80,
+                "n_trials_optuna": 3,
                 "max_trees_random_forest": 2000,
             }
             result_dict["standard_random_forest_meta_data"] = meta_data_rf
