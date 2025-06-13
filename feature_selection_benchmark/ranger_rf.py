@@ -7,6 +7,7 @@
 """Standard embedded feature selection with sklearn random forest."""
 import math
 import warnings
+from datetime import datetime
 
 import numpy as np
 import optuna
@@ -130,10 +131,11 @@ def sklearn_random_forest(data_df: pd.DataFrame, train_indices: np.ndarray, meta
         random_state=meta_data["random_state"],
         class_weight="balanced_subsample",
     )
+    start = datetime.now()
     clf.fit(data_df.iloc[train_indices, 1:], data_df.loc[train_indices, "label"])
     gini_feature_importances = clf.feature_importances_
-    print("number of selected features (gini default): ", np.sum(gini_feature_importances > 0))
-    gini_feature_importances = None
+    duration = datetime.now() - start
+    print.info("number of selected features (gini default): ", np.sum(gini_feature_importances > 0))
 
     # train random forest with optimized parameters
     clf.set_params(**study.best_params)
@@ -144,6 +146,7 @@ def sklearn_random_forest(data_df: pd.DataFrame, train_indices: np.ndarray, meta
     return {
         "gini_impurity": gini_feature_importances_optimized,
         "gini_impurity_default_parameters": gini_feature_importances,
+        "duration_default_parameters": duration,
         "train_oob_score_sklearn": clf.oob_score_,
         "best_params_sklearn": study.best_params,
     }
