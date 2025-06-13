@@ -87,6 +87,7 @@ def define_random_seeds() -> list:
         print("number of equal elements: ", len(set(equal_elements)), set(equal_elements))
         raise ValueError("Random seeds are not unique.")
 
+    list_of_seeds = [random_seeds_0]
     return list_of_seeds
 
 
@@ -97,8 +98,8 @@ def main():
     # data_names = ["prostate"]
 
     # valid data names for the data loader are "random_noise_lognormal" or "random_noise_normal"
-    data_names = ["random_noise_lognormal", "random_noise_normal"]
-    # data_names = ["random_noise_lognormal"]
+    # data_names = ["random_noise_lognormal", "random_noise_normal"]
+    data_names = ["tiny_test_dataset_random_noise_lognormal"]
 
     # data_names = ["colon", "prostate", "leukemia_big", "random_noise_lognormal", "random_noise_normal"]
 
@@ -134,7 +135,8 @@ def main():
         }
         if "random" in data_name:
             # local path
-            meta_data_dict["path_for_random_noise"] = f"random_noise_data/{data_name}_30_2000.csv"
+            # meta_data_dict["path_for_random_noise"] = f"random_noise_data/{data_name}_30_2000.csv"
+            meta_data_dict["path_for_random_noise"] = f"random_noise_data/{data_name}.csv"
 
             # azure path
             # meta_data_dict["path_for_random_noise"]
