@@ -38,7 +38,7 @@ def cross_validate(data_df: pd.DataFrame, meta_data: dict, feature_selection_fun
         "CPU info": cpuinfo.get_cpu_info(),
     }
     # initialize benchmarks
-    feature_selection_method = feature_selection_function.__class__.__name__
+    feature_selection_method = feature_selection_function.__name__
     meta_data["benchmark"] = {feature_selection_method: {}}
 
     # restrict process to specific CPU cores
