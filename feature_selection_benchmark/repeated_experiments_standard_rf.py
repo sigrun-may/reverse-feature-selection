@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 import git
-from ranger_rf import calculate_feature_importance
+from ranger_rf import sklearn_random_forest, ranger_random_forest
 
 from feature_selection_benchmark import cross_validation
 from feature_selection_benchmark.data_loader_tools import load_train_holdout_data_for_balanced_train_sample_size
@@ -70,8 +70,8 @@ def analyze_file(file, result_base_path, path_to_random_noise_directory):
         "n_trials_optuna": 80,
         "max_trees_random_forest": 2000,
     }
+    # calculate raw feature subset data for standard random forest
     if "random_noise" in file.name:
-        # meta_data_dict["data_shape_random_noise"] = (62, 2000)
         # # The path to the directory where generated random noise is stored.
         # meta_data_dict["path_for_random_noise"] = f"{result_base_path}/random_noise"
         meta_data_dict["data_shape_random_noise"] = result_dict["reverse_random_forest_meta_data"][
@@ -92,10 +92,15 @@ def analyze_file(file, result_base_path, path_to_random_noise_directory):
     # drop old data for standard random forest
     if "standard_random_forest" in result_dict:
         result_dict.pop("standard_random_forest")
+        result_dict.pop("ranger_random_forest")
         result_dict.pop("standard_random_forest_meta_data")
+
     # calculate raw feature subset data for standard random forest
     result_dict["standard_random_forest"] = cross_validation.cross_validate(
-        data_df, meta_data_dict, calculate_feature_importance
+        data_df, meta_data_dict, sklearn_random_forest,
+    )
+    result_dict["ranger_random_forest"] = cross_validation.cross_validate(
+        data_df, meta_data_dict, ranger_random_forest,
     )
     result_dict["standard_random_forest_meta_data"] = meta_data_dict
     # save results
@@ -116,20 +121,6 @@ def main():
 
     # iterate over all files in the directory
     for file in result_base_path.iterdir():
-        # # exclude files that are not related to the random noise data set
-        # # or the ranger random forest
-        # if "random" in file.name or "rf" not in file.name:
-        #     continue
-        # if not ("random" in file.name and "shuffle_seed_None" in file.name):
-        #     print("continue: ", file.name)
-        #     continue
-        # print("file", file.name)
-
-        if "stdrf" in file.name:
-            print("continue: ", file.name)
-            continue
-        print("analyze file", file.name)
-
         analyze_file(file, result_base_path, path_to_random_noise_directory)
 
 
