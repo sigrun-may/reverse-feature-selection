@@ -38,7 +38,8 @@ def cross_validate(data_df: pd.DataFrame, meta_data: dict, feature_selection_fun
         "CPU info": cpuinfo.get_cpu_info(),
     }
     # initialize benchmarks
-    meta_data["benchmark"] = {}
+    feature_selection_method = feature_selection_function.__class__.__name__
+    meta_data["benchmark"] = {feature_selection_method: {}}
 
     # restrict process to specific CPU cores
     proc = psutil.Process()
@@ -94,9 +95,9 @@ def cross_validate(data_df: pd.DataFrame, meta_data: dict, feature_selection_fun
 
     duration = datetime.datetime.now(tz=datetime.timezone.utc) - start_time_cv
     logger.info(f"Duration of the cross-validation: {duration}")
-    meta_data["benchmark"]["cv_duration"] = duration
-    meta_data["benchmark"]["wall_times"] = wall_times_list
-    meta_data["benchmark"]["cpu_usage"] = cpu_percentage_list
-    meta_data["benchmark"]["average_cpu_util_percent"] = cpu_util_percent_list
-    meta_data["benchmark"]["average_cpu_time_per_core"] = cpu_time_per_core_list
+    meta_data["benchmark"][feature_selection_method]["cv_duration"] = duration
+    meta_data["benchmark"][feature_selection_method]["wall_times"] = wall_times_list
+    meta_data["benchmark"][feature_selection_method]["cpu_usage"] = cpu_percentage_list
+    meta_data["benchmark"][feature_selection_method]["average_cpu_util_percent"] = cpu_util_percent_list
+    meta_data["benchmark"][feature_selection_method]["average_cpu_time_per_core"] = cpu_time_per_core_list
     return cv_result_list
