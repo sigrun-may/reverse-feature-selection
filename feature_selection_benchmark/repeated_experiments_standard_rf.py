@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 import git
-from ranger_rf import sklearn_random_forest, ranger_random_forest
+from ranger_rf import ranger_random_forest, sklearn_random_forest
 
 from feature_selection_benchmark import cross_validation
 from feature_selection_benchmark.data_loader_tools import load_train_holdout_data_for_balanced_train_sample_size
@@ -74,9 +74,6 @@ def analyze_file(file, result_base_path, path_to_random_noise_directory):
     if "random_noise" in file.name:
         # # The path to the directory where generated random noise is stored.
         # meta_data_dict["path_for_random_noise"] = f"{result_base_path}/random_noise"
-        meta_data_dict["data_shape_random_noise"] = result_dict["reverse_random_forest_meta_data"][
-            "data_shape_random_noise"
-        ]
         assert path_to_random_noise_directory is not None
         if "lognormal" in file.name:
             meta_data_dict["path_for_random_noise"] = (
@@ -97,10 +94,14 @@ def analyze_file(file, result_base_path, path_to_random_noise_directory):
 
     # calculate raw feature subset data for standard random forest
     result_dict["standard_random_forest"] = cross_validation.cross_validate(
-        data_df, meta_data_dict, sklearn_random_forest,
+        data_df,
+        meta_data_dict,
+        sklearn_random_forest,
     )
     result_dict["ranger_random_forest"] = cross_validation.cross_validate(
-        data_df, meta_data_dict, ranger_random_forest,
+        data_df,
+        meta_data_dict,
+        ranger_random_forest,
     )
     result_dict["standard_random_forest_meta_data"] = meta_data_dict
     # save results
