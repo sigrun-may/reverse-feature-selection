@@ -20,7 +20,7 @@ from feature_selection_benchmark import cross_validation
 from feature_selection_benchmark.data_loader_tools import (
     load_train_holdout_data_for_balanced_train_sample_size,
 )
-from feature_selection_benchmark.ranger_rf import sklearn_random_forest, ranger_random_forest
+from feature_selection_benchmark.ranger_rf import ranger_random_forest, sklearn_random_forest
 from reverse_feature_selection.reverse_random_forests import select_feature_subset
 
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -180,10 +180,14 @@ def main():
             }
             result_dict["standard_random_forest_meta_data"] = meta_data_rf
             result_dict["standard_random_forest"] = cross_validation.cross_validate(
-                data_df, meta_data_rf, sklearn_random_forest,
+                data_df,
+                meta_data_rf,
+                sklearn_random_forest,
             )
             result_dict["ranger_random_forest"] = cross_validation.cross_validate(
-                data_df, meta_data_rf, ranger_random_forest,
+                data_df,
+                meta_data_rf,
+                ranger_random_forest,
             )
             # save results
             result_dict_path = Path(f"{experiment_path}/{meta_data_dict['experiment_id']}_stdrf_result_dict.pkl")

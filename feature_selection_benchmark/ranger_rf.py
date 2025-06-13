@@ -20,9 +20,7 @@ from sklearn.metrics import roc_auc_score
 warnings.filterwarnings("ignore")
 
 
-def ranger_random_forest(
-    data_df: pd.DataFrame, train_indices: np.ndarray, meta_data: dict
-) -> dict:
+def ranger_random_forest(data_df: pd.DataFrame, train_indices: np.ndarray, meta_data: dict) -> dict:
     """Calculate importance with the R ranger package with optimized hyperparameters.
 
     Args:
@@ -151,7 +149,9 @@ def sklearn_random_forest(data_df: pd.DataFrame, train_indices: np.ndarray, meta
     }
 
 
-def train_ranger_random_forests(data_df: pd.DataFrame, train_indices, hyperparameters: dict) -> tuple[float, np.ndarray]:
+def train_ranger_random_forests(
+    data_df: pd.DataFrame, train_indices, hyperparameters: dict
+) -> tuple[float, np.ndarray]:
     """Calculate permutation importance with R.
 
     Args:
