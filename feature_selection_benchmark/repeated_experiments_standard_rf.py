@@ -67,8 +67,10 @@ def analyze_file(file, result_base_path, path_to_random_noise_directory):
         # random seed for reproducibility of random forest:
         "random_state": result_dict["reverse_random_forest_meta_data"]["random_seeds"][0],
         "verbose_optuna": True,
-        "n_trials_optuna": 80,
-        "max_trees_random_forest": 2000,
+        # "n_trials_optuna": 80,
+        "n_trials_optuna": 1,
+        # "max_trees_random_forest": 2000,
+        "max_trees_random_forest": 10,  # for testing purposes, set to 10
     }
     # calculate raw feature subset data for standard random forest
     if "random_noise" in file.name:
