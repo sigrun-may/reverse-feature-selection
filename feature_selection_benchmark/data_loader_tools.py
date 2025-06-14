@@ -82,9 +82,10 @@ def balance_sample_size_of_hold_out_data(
     unlabeled_hold_out_data_df, label_series = shuffle(
         hold_out_data_df.iloc[:, 1:], hold_out_data_df["label"], shuffle_seed
     )
+    labels = label_series.unique()
     number_of_samples = int(number_of_balanced_samples / 2)
-    hold_out_test_indices_0, _ = get_indices_for_selected_and_deselected_samples(label_series, 0, number_of_samples)
-    hold_out_test_indices_1, _ = get_indices_for_selected_and_deselected_samples(label_series, 1, number_of_samples)
+    hold_out_test_indices_0, _ = get_indices_for_selected_and_deselected_samples(label_series, float(labels[0]), number_of_samples)
+    hold_out_test_indices_1, _ = get_indices_for_selected_and_deselected_samples(label_series, float(labels[1]), number_of_samples)
 
     hold_out_test_indices = hold_out_test_indices_0 + hold_out_test_indices_1
     assert len(hold_out_test_indices) == number_of_balanced_samples
@@ -114,7 +115,7 @@ def convert_to_single_df(x, y):
 
 
 def get_indices_for_selected_and_deselected_samples(
-    label_series: pd.Series, class_label:float, number_of_samples: int
+    label_series: pd.Series, class_label: float, number_of_samples: int
 ) -> tuple[list[int], list[int]]:
     """Get selected and deselected indices for a specific class label.
 
@@ -247,8 +248,12 @@ def load_train_holdout_data_for_balanced_train_sample_size(
         data_df, label_series = shuffle(data_df, label_series, meta_data_dict["shuffle_seed"])
 
     labels = label_series.unique()
-    train_indices_0, hold_out_data_indices_0 = get_indices_for_selected_and_deselected_samples(label_series, float(labels[0]), 15)
-    train_indices_1, hold_out_data_indices_1 = get_indices_for_selected_and_deselected_samples(label_series, float(labels[1]), 15)
+    train_indices_0, hold_out_data_indices_0 = get_indices_for_selected_and_deselected_samples(
+        label_series, float(labels[0]), 15
+    )
+    train_indices_1, hold_out_data_indices_1 = get_indices_for_selected_and_deselected_samples(
+        label_series, float(labels[1]), 15
+    )
 
     train_indices = train_indices_0 + train_indices_1
     hold_out_data_indices = hold_out_data_indices_0 + hold_out_data_indices_1
