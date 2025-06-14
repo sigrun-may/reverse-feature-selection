@@ -178,20 +178,22 @@ def main():
                 "random_state": list_of_random_seeds[0],
                 "verbose_optuna": True,
                 # "n_trials_optuna": 80,
-                "n_trials_optuna": 3,
-                "max_trees_random_forest": 2000,
+                "n_trials_optuna": 1,  # for testing purposes, set to 1
+                "max_trees_random_forest": 10,  # for testing purposes, set to 10
+                # "max_trees_random_forest": 2000,
             }
-            result_dict["standard_random_forest_meta_data"] = meta_data_rf
             result_dict["standard_random_forest"] = cross_validation.cross_validate(
                 data_df,
                 meta_data_rf,
                 sklearn_random_forest,
             )
+            result_dict["standard_random_forest_meta_data"] = meta_data_rf
             result_dict["ranger_random_forest"] = cross_validation.cross_validate(
                 data_df,
                 meta_data_rf,
                 ranger_random_forest,
             )
+            result_dict["ranger_random_forest_meta_data"] = meta_data_rf
             # save results
             result_dict_path = Path(f"{experiment_path}/{meta_data_dict['experiment_id']}_stdrf_result_dict.pkl")
             with open(result_dict_path, "wb") as file:
