@@ -178,7 +178,7 @@ def main():
                 "random_state": list_of_random_seeds[0],
                 "verbose_optuna": True,
                 # "n_trials_optuna": 80,
-                "n_trials_optuna": 1,  # for testing purposes, set to 1
+                "n_trials_optuna": 10,  # for testing purposes, set to 1
                 "max_trees_random_forest": 10,  # for testing purposes, set to 10
                 # "max_trees_random_forest": 2000,
             }
