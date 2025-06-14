@@ -37,7 +37,8 @@ def ranger_random_forest(data_df: pd.DataFrame, train_indices: np.ndarray, meta_
     def optuna_objective(trial):
         params = {
             "max_depth": trial.suggest_int("max_depth", 1, 15),
-            "num_trees": trial.suggest_int("num_trees", 500, meta_data["max_trees_random_forest"]),
+            # "num_trees": trial.suggest_int("num_trees", 500, meta_data["max_trees_random_forest"]),
+            "num_trees": trial.suggest_int("num_trees", 1, meta_data["max_trees_random_forest"]),
             "mtry": trial.suggest_int("mtry", (0.3 * data_df.shape[1] - 1), data_df.shape[1] - 1),
             "regularization_factor": trial.suggest_float("regularization_factor", 0.001, 0.99),
             "min_node_size": trial.suggest_int("min_node_size", 2, 5),
@@ -93,7 +94,8 @@ def sklearn_random_forest(data_df: pd.DataFrame, train_indices: np.ndarray, meta
         rf_clf = RandomForestClassifier(
             oob_score=roc_auc_score,
             max_depth=trial.suggest_int("max_depth", 1, 15),
-            n_estimators=trial.suggest_int("n_estimators", 500, meta_data["max_trees_random_forest"]),
+            # n_estimators=trial.suggest_int("n_estimators", 500, meta_data["max_trees_random_forest"]),
+            n_estimators=trial.suggest_int("n_estimators", 1, meta_data["max_trees_random_forest"]),
             max_features=trial.suggest_int("max_features", (0.3 * data_df.shape[1] - 1), data_df.shape[1] - 1),
             min_samples_leaf=trial.suggest_int("min_samples_leaf", 2, math.floor(len(train_indices) / 2)),
             min_samples_split=trial.suggest_int("min_samples_split", 2, 5),
