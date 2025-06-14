@@ -101,12 +101,13 @@ def analyze_file(file, result_base_path, path_to_random_noise_directory):
         sklearn_random_forest,
     )
     result_dict["standard_random_forest_meta_data"] = meta_data_dict
+    ranger_meta_data_dict = meta_data_dict.copy()
     result_dict["ranger_random_forest"] = cross_validation.cross_validate(
         data_df,
-        meta_data_dict,
+        ranger_meta_data_dict,
         ranger_random_forest,
     )
-    result_dict["ranger_random_forest_meta_data"] = meta_data_dict
+    result_dict["ranger_random_forest_meta_data"] = ranger_meta_data_dict
     # save results
     result_dict_path = Path(f"{result_base_path}/{meta_data_dict['experiment_id']}_rf_result_dict.pkl")
     with open(result_dict_path, "wb") as result_file:
