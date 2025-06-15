@@ -93,8 +93,19 @@ def balance_sample_size_of_hold_out_data(
 
     hold_out_test_indices = hold_out_test_indices_0 + hold_out_test_indices_1
     assert len(hold_out_test_indices) == number_of_balanced_samples
+    assert len(hold_out_test_indices) == len(set(hold_out_test_indices)), "Hold out test indices are not unique."
 
-    return unlabeled_hold_out_data_df.iloc[hold_out_test_indices], label_series.iloc[hold_out_test_indices]
+    final_hold_out_data_df = unlabeled_hold_out_data_df.iloc[hold_out_test_indices]
+    final_label_series = label_series.iloc[pd.Index(hold_out_test_indices)]
+
+    assert final_hold_out_data_df.shape[0] == len(
+        hold_out_test_indices
+    ), f"{final_hold_out_data_df.shape[0]} != {len(hold_out_test_indices)}"
+    assert (
+        final_hold_out_data_df.shape[1] == unlabeled_hold_out_data_df.shape[1]
+    ), f"{final_hold_out_data_df.shape[1]} != {unlabeled_hold_out_data_df.shape[1]}"
+    assert len(final_label_series) == len(hold_out_test_indices)
+    return final_hold_out_data_df, final_label_series
 
 
 def convert_to_single_df(x, y):
@@ -109,7 +120,7 @@ def convert_to_single_df(x, y):
     """
     data_df = pd.DataFrame(x)
     # convert integer column names to string
-    data_df.columns = [f"f_{i}" for i in range(data_df.shape[1])]
+    data_df.columns = pd.Index([f"f_{i}" for i in range(data_df.shape[1])])
     data_df.insert(loc=0, column="label", value=y)
 
     # reset index for cross validation splits
