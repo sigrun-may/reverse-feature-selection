@@ -105,10 +105,8 @@ def test_removal_of_correlated_features():
     uncorrelated_features = uncorrelated_train_df.columns[1:]
 
     # Check if the maximum correlation of any uncorrelated feature with the target is within the threshold
-    assert (
-        correlation_matrix_df.loc[target_feature, uncorrelated_features].abs().max()
-        <= meta_data["train_correlation_threshold"]
-    ), f"{meta_data['train_correlation_threshold']}"
+    max_corr = correlation_matrix_df.loc[uncorrelated_features].loc[:, target_feature].abs().max()
+    assert max_corr <= meta_data["train_correlation_threshold"], f"{meta_data['train_correlation_threshold']}"
 
     # Check if all correlation values left, which are not included in the uncorrelated_features are above the threshold
     correlated_features = correlation_matrix_df.columns[
