@@ -87,7 +87,7 @@ def define_random_seeds() -> list:
         print("number of equal elements: ", len(set(equal_elements)), set(equal_elements))
         raise ValueError("Random seeds are not unique.")
 
-    list_of_seeds = [random_seeds_0]
+    list_of_seeds = [random_seeds_0, random_seeds_1]
     return list_of_seeds
 
 
@@ -99,7 +99,7 @@ def main():
     data_names = ["colon", "prostate", "leukemia_big", "random_noise_lognormal", "random_noise_normal"]
 
     # seed to shuffle the indices of the samples of the data set
-    shuffle_seed = 13
+    shuffle_seed = None
 
     # print the current working directory
     logger.info(f"current working directory: {Path.cwd()}")
@@ -112,87 +112,89 @@ def main():
     n_cpus = 50
     logger.info(f"Use {n_cpus} of {number_of_available_cpus} available CPUs.")
 
-    for data_name in data_names:
-        # create directory for repeated experiment
-        now_str = datetime.datetime.now(tz=ZoneInfo("Europe/Berlin")).strftime("%Y-%m-%d_%H-%M")
-        result_folder_name = f"benchmark_{data_name}"
-        experiment_path = Path(f"{result_base_path}/{result_folder_name}_{now_str}")
-        experiment_path.mkdir(parents=True, exist_ok=True)
+    for threshold in [0.2, 0.3, 0.4]:
+        for data_name in data_names:
+            # create directory for repeated experiment
+            now_str = datetime.datetime.now(tz=ZoneInfo("Europe/Berlin")).strftime("%Y-%m-%d_%H-%M")
+            result_folder_name = f"benchmark_{data_name}"
+            experiment_path = Path(f"{result_base_path}/{result_folder_name}_{now_str}")
+            experiment_path.mkdir(parents=True, exist_ok=True)
 
-        # define meta data for the experiment
-        meta_data_dict = {
-            "git_commit_hash": git.Repo(search_parent_directories=True).head.object.hexsha,
-            "data_name": data_name,
-            "n_cpus": n_cpus,
-            "train_correlation_threshold": 0.3,
-            # seed to shuffle the samples of the data set
-            "shuffle_seed": shuffle_seed,
-        }
-        if "random" in data_name:
-            # local path
-            meta_data_dict["path_for_random_noise"] = f"random_noise_data/{data_name}_30_2000.csv"
-            # meta_data_dict["path_for_random_noise"] = f"random_noise_data/{data_name}.csv"
-
-            # azure path
-            # meta_data_dict["path_for_random_noise"]
-            # = f"{result_base_path}/random_noise_data/{data_name}_(30, 2000).csv"
-
-        # load data for the experiment with balanced train sample size
-        data_df, _ = load_train_holdout_data_for_balanced_train_sample_size(meta_data_dict)
-        assert data_df.shape[0] == 30, f"Number of samples is not 30: {data_df.shape[0]}"
-        logger.info(f"number of samples {data_df.shape[0]}, number of features {data_df.shape[1] - 1}")
-
-        # repeat the experiment three times with different random seeds
-        for i, list_of_random_seeds in enumerate(define_random_seeds()):
-            experiment_id = f"{data_name}_{i}_shuffle_seed_{shuffle_seed}"
-            meta_data_dict["experiment_id"] = experiment_id
-            logger.info(f"experiment_id: {experiment_id}")
-
-            # random seeds for reproducibility of reverse random forest
-            meta_data_dict["random_seeds"] = list_of_random_seeds
-
-            # calculate raw feature subset data for reverse random forest
-            result_dict = {
-                "reverse_random_forest": cross_validation.cross_validate(
-                    data_df=data_df, meta_data=meta_data_dict, feature_selection_function=select_feature_subset
-                ),
-                "reverse_random_forest_meta_data": meta_data_dict,
-            }
-            # save results
-            result_dict_path = Path(f"{experiment_path}/{meta_data_dict['experiment_id']}_result_dict.pkl")
-            with open(result_dict_path, "wb") as file:
-                pickle.dump(result_dict, file, protocol=pickle.HIGHEST_PROTOCOL)
-
-            # calculate raw feature subset data for standard random forest
-            meta_data_rf = {
+            # define meta data for the experiment
+            meta_data_dict = {
                 "git_commit_hash": git.Repo(search_parent_directories=True).head.object.hexsha,
-                "experiment_id": experiment_id,
                 "data_name": data_name,
-                "shuffle_seed": shuffle_seed,
                 "n_cpus": n_cpus,
-                "random_state": list_of_random_seeds[0],
-                "verbose_optuna": True,
-                "n_trials_optuna": 80,
-                "max_trees_random_forest": 2000,
+                "train_correlation_threshold": threshold,
+                # seed to shuffle the samples of the data set
+                "shuffle_seed": shuffle_seed,
             }
-            sklearn_meta_data_dict = meta_data_rf.copy()
-            ranger_meta_data_dict = meta_data_rf.copy()
-            result_dict["standard_random_forest"] = cross_validation.cross_validate(
-                data_df,
-                sklearn_meta_data_dict,
-                sklearn_random_forest,
-            )
-            result_dict["standard_random_forest_meta_data"] = sklearn_meta_data_dict
-            result_dict["ranger_random_forest"] = cross_validation.cross_validate(
-                data_df,
-                ranger_meta_data_dict,
-                ranger_random_forest,
-            )
-            result_dict["ranger_random_forest_meta_data"] = ranger_meta_data_dict
-            # save results
-            result_dict_path = Path(f"{experiment_path}/{meta_data_dict['experiment_id']}_stdrf_result_dict.pkl")
-            with open(result_dict_path, "wb") as file:
-                pickle.dump(result_dict, file, protocol=pickle.HIGHEST_PROTOCOL)
+            if "random" in data_name:
+                # local path
+                meta_data_dict["path_for_random_noise"] = f"random_noise_data/{data_name}_30_2000.csv"
+                # meta_data_dict["path_for_random_noise"] = f"random_noise_data/{data_name}.csv"
+
+                # azure path
+                # meta_data_dict["path_for_random_noise"]
+                # = f"{result_base_path}/random_noise_data/{data_name}_(30, 2000).csv"
+
+            # load data for the experiment with balanced train sample size
+            data_df, _ = load_train_holdout_data_for_balanced_train_sample_size(meta_data_dict)
+            assert data_df.shape[0] == 30, f"Number of samples is not 30: {data_df.shape[0]}"
+            logger.info(f"number of samples {data_df.shape[0]}, number of features {data_df.shape[1] - 1}")
+
+            # repeat the experiment three times with different random seeds
+            for i, list_of_random_seeds in enumerate(define_random_seeds()):
+                experiment_id = f"{data_name}_{i}_shuffle_seed_{shuffle_seed}"
+                meta_data_dict["experiment_id"] = experiment_id
+                logger.info(f"experiment_id: {experiment_id}")
+
+                # random seeds for reproducibility of reverse random forest
+                meta_data_dict["random_seeds"] = list_of_random_seeds
+
+                # calculate raw feature subset data for reverse random forest
+                result_dict = {
+                    "reverse_random_forest": cross_validation.cross_validate(
+                        data_df=data_df, meta_data=meta_data_dict, feature_selection_function=select_feature_subset
+                    ),
+                    "reverse_random_forest_meta_data": meta_data_dict,
+                }
+                # save results
+                filename = f"{meta_data_dict['experiment_id']}_threshold_{threshold}_result_dict.pkl"
+                result_dict_path = Path(f"{experiment_path}/{filename}")
+                with open(result_dict_path, "wb") as file:
+                    pickle.dump(result_dict, file, protocol=pickle.HIGHEST_PROTOCOL)
+
+                # calculate raw feature subset data for standard random forest
+                meta_data_rf = {
+                    "git_commit_hash": git.Repo(search_parent_directories=True).head.object.hexsha,
+                    "experiment_id": experiment_id,
+                    "data_name": data_name,
+                    "shuffle_seed": shuffle_seed,
+                    "n_cpus": n_cpus,
+                    "random_state": list_of_random_seeds[0],
+                    "verbose_optuna": True,
+                    "n_trials_optuna": 80,
+                    "max_trees_random_forest": 2000,
+                }
+                sklearn_meta_data_dict = meta_data_rf.copy()
+                ranger_meta_data_dict = meta_data_rf.copy()
+                result_dict["standard_random_forest"] = cross_validation.cross_validate(
+                    data_df,
+                    sklearn_meta_data_dict,
+                    sklearn_random_forest,
+                )
+                result_dict["standard_random_forest_meta_data"] = sklearn_meta_data_dict
+                result_dict["ranger_random_forest"] = cross_validation.cross_validate(
+                    data_df,
+                    ranger_meta_data_dict,
+                    ranger_random_forest,
+                )
+                result_dict["ranger_random_forest_meta_data"] = ranger_meta_data_dict
+                # save results
+                result_dict_path = Path(f"{experiment_path}/std_rf_{filename}")
+                with open(result_dict_path, "wb") as file:
+                    pickle.dump(result_dict, file, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 if __name__ == "__main__":
