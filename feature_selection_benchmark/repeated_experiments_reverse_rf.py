@@ -177,10 +177,8 @@ def main():
                 "n_cpus": n_cpus,
                 "random_state": list_of_random_seeds[0],
                 "verbose_optuna": True,
-                # "n_trials_optuna": 80,
-                "n_trials_optuna": 10,  # for testing purposes, set to 1
-                "max_trees_random_forest": 10,  # for testing purposes, set to 10
-                # "max_trees_random_forest": 2000,
+                "n_trials_optuna": 80,
+                "max_trees_random_forest": 2000,
             }
             sklearn_meta_data_dict = meta_data_rf.copy()
             ranger_meta_data_dict = meta_data_rf.copy()
