@@ -182,18 +182,20 @@ def main():
                 "max_trees_random_forest": 10,  # for testing purposes, set to 10
                 # "max_trees_random_forest": 2000,
             }
+            sklearn_meta_data_dict = meta_data_rf.copy()
+            ranger_meta_data_dict = meta_data_rf.copy()
             result_dict["standard_random_forest"] = cross_validation.cross_validate(
                 data_df,
-                meta_data_rf,
+                sklearn_meta_data_dict,
                 sklearn_random_forest,
             )
-            result_dict["standard_random_forest_meta_data"] = meta_data_rf
+            result_dict["standard_random_forest_meta_data"] = sklearn_meta_data_dict
             result_dict["ranger_random_forest"] = cross_validation.cross_validate(
                 data_df,
-                meta_data_rf.pop("benchmark"),
+                ranger_meta_data_dict,
                 ranger_random_forest,
             )
-            result_dict["ranger_random_forest_meta_data"] = meta_data_rf
+            result_dict["ranger_random_forest_meta_data"] = ranger_meta_data_dict
             # save results
             result_dict_path = Path(f"{experiment_path}/{meta_data_dict['experiment_id']}_stdrf_result_dict.pkl")
             with open(result_dict_path, "wb") as file:
