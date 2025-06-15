@@ -84,8 +84,12 @@ def balance_sample_size_of_hold_out_data(
     )
     labels = label_series.unique()
     number_of_samples = int(number_of_balanced_samples / 2)
-    hold_out_test_indices_0, _ = get_indices_for_selected_and_deselected_samples(label_series, float(labels[0]), number_of_samples)
-    hold_out_test_indices_1, _ = get_indices_for_selected_and_deselected_samples(label_series, float(labels[1]), number_of_samples)
+    hold_out_test_indices_0, _ = get_indices_for_selected_and_deselected_samples(
+        label_series, float(labels[0]), number_of_samples
+    )
+    hold_out_test_indices_1, _ = get_indices_for_selected_and_deselected_samples(
+        label_series, float(labels[1]), number_of_samples
+    )
 
     hold_out_test_indices = hold_out_test_indices_0 + hold_out_test_indices_1
     assert len(hold_out_test_indices) == number_of_balanced_samples
