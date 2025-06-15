@@ -190,7 +190,7 @@ def main():
             result_dict["standard_random_forest_meta_data"] = meta_data_rf
             result_dict["ranger_random_forest"] = cross_validation.cross_validate(
                 data_df,
-                meta_data_rf,
+                meta_data_rf.pop("benchmark"),
                 ranger_random_forest,
             )
             result_dict["ranger_random_forest_meta_data"] = meta_data_rf
