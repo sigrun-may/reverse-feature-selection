@@ -94,14 +94,9 @@ def define_random_seeds() -> list:
 def main():
     """Main function for calculating a grid of repeated feature selection experiments for reverse feature selection."""
     # valid data names for the data loader are "colon", "prostate" or "leukemia_big"
-    # data_names = ["colon", "prostate", "leukemia_big"]
-    # data_names = ["prostate"]
-
-    # valid data names for the data loader are "random_noise_lognormal" or "random_noise_normal"
-    # data_names = ["random_noise_lognormal", "random_noise_normal"]
-    data_names = ["tiny_test_dataset_random_noise_lognormal"]
-
-    # data_names = ["colon", "prostate", "leukemia_big", "random_noise_lognormal", "random_noise_normal"]
+    # valid data names for the artificial noise are "random_noise_lognormal" or "random_noise_normal"
+    # data_names = ["tiny_test_dataset_random_noise_lognormal"] # for testing purposes only
+    data_names = ["colon", "prostate", "leukemia_big", "random_noise_lognormal", "random_noise_normal"]
 
     # seed to shuffle the indices of the samples of the data set
     shuffle_seed = 13
@@ -135,8 +130,8 @@ def main():
         }
         if "random" in data_name:
             # local path
-            # meta_data_dict["path_for_random_noise"] = f"random_noise_data/{data_name}_30_2000.csv"
-            meta_data_dict["path_for_random_noise"] = f"random_noise_data/{data_name}.csv"
+            meta_data_dict["path_for_random_noise"] = f"random_noise_data/{data_name}_30_2000.csv"
+            # meta_data_dict["path_for_random_noise"] = f"random_noise_data/{data_name}.csv"
 
             # azure path
             # meta_data_dict["path_for_random_noise"]
