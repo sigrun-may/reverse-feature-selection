@@ -110,9 +110,7 @@ def test_removal_of_correlated_features():
 
     # Check if all correlation values left, which are not included in the uncorrelated_features are above the threshold
     correlated_features_mask = (
-        correlation_matrix_df[target_feature]
-        .abs()
-        .gt(meta_data["train_correlation_threshold"], axis="index")
+        correlation_matrix_df[target_feature].abs().gt(meta_data["train_correlation_threshold"], axis="index")
     )
     correlated_features_df = train_df[train_df.columns[correlated_features_mask]]
     assert (
