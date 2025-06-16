@@ -288,6 +288,39 @@ def extract_feature_subset_selection_matrices_and_wall_times(result_dict: dict):
             }
 
 
+def calculate_false_discovery_rate(
+    number_of_selected_features_per_fold: np.ndarray, total_number_of_features: int
+) -> list:
+    """Calculate the false discovery rate for the feature selection method.
+
+    The false discovery rate (FDR) is calculated as the ratio of the number of selected features to the total number of
+    features. This metric is useful for evaluating the performance of feature selection methods, especially in
+    high-dimensional datasets where the number of features can be much larger than the number of samples. A lower FDR
+    indicates that the feature selection method is more effective at identifying relevant features while minimizing the
+    inclusion of irrelevant features. This is particularly important in applications such as genomics, where the cost
+    of false discoveries can be high.
+
+    Args:
+        number_of_selected_features_per_fold: A numpy array of shape (number of cross-validation iterations) where
+            each element represents the number of features selected in a specific cross-validation iteration.
+        total_number_of_features: The total number of features in the dataset. This is used to calculate the false
+            discovery rate as the ratio of the number of selected features to the total number of features.
+    Returns:
+        A list of false discovery rates for each cross-validation iteration.
+    """
+    false_discovery_rate = []
+    for number_of_selected_features in number_of_selected_features_per_fold:
+        if number_of_selected_features == 0:
+            # if no features were selected, the false discovery rate is 0
+            false_discovery_rate.append(0.0)
+        else:
+            # calculate the false discovery rate as the ratio of the number of selected features to the total
+            # number of features
+            fdr = number_of_selected_features / total_number_of_features
+            false_discovery_rate.append(fdr)
+    return false_discovery_rate
+
+
 def evaluate_experiment(result_dict: dict, experiment_id: str) -> dict:
     """Evaluate the experiment and extract the feature subset selection matrices.
 
@@ -314,16 +347,22 @@ def evaluate_experiment(result_dict: dict, experiment_id: str) -> dict:
         if len(result_dict["evaluation"][method]["importance_matrix"]) == 0:
             raise ValueError(f"Importance matrix for method {method} is empty.")
 
+        # calculate number of selected features per cv iteration
+        result_dict["evaluation"][method]["number_of_selected_features"] = np.count_nonzero(
+            result_dict["evaluation"][method]["importance_matrix"], axis=1
+        ).tolist()
+
         # if no features were selected, stability cannot be calculated
         if "noise" not in experiment_id.lower():
             # calculate the stability of the feature importance matrix
             result_dict["evaluation"][method]["stability"] = calculate_stability(
                 result_dict["evaluation"][method]["importance_matrix"]
             )
-        # calculate number of selected features per cv iteration
-        result_dict["evaluation"][method]["number_of_selected_features"] = np.count_nonzero(
-            result_dict["evaluation"][method]["importance_matrix"], axis=1
-        ).tolist()
+        else:
+            # calculate the false discovery rate for the feature selection method
+            result_dict["evaluation"][method]["false_discovery_rate"] = calculate_false_discovery_rate(
+                result_dict["evaluation"][method]["number_of_selected_features"], experiment_input_data_df.shape[1] - 1
+            )
 
         # calculate the performance of the feature selection method
         performance_metrics_df = evaluate_performance(
@@ -560,11 +599,11 @@ def evaluate_benchmark_experiment_grid():
     # visualize_runtime_benchmark(benchmark_dict)
 
 
-# # unpickle summary file
-# summary_file_path = Path("results/tiny_test/benchmark_summary.pkl")
-# with open(summary_file_path, "rb") as summary_file:
-#     summary_dict = pickle.load(summary_file)
-# print_results(summary_dict)
-# visualize_runtime_benchmark(summary_dict)
+# unpickle summary file
+summary_file_path = Path("results/tiny_test/benchmark_summary.pkl")
+with open(summary_file_path, "rb") as summary_file:
+    summary_dict = pickle.load(summary_file)
+print_results(summary_dict)
+visualize_runtime_benchmark(summary_dict)
 
-evaluate_benchmark_experiment_grid()
+# evaluate_benchmark_experiment_grid()
