@@ -5,8 +5,8 @@
 # which is available at https://opensource.org/licenses/MIT
 
 """Cross-validation tools."""
-from datetime import datetime, UTC
 import logging
+from datetime import UTC, datetime
 from time import perf_counter
 
 import cpuinfo
