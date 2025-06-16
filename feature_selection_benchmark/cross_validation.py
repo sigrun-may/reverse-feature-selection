@@ -5,7 +5,7 @@
 # which is available at https://opensource.org/licenses/MIT
 
 """Cross-validation tools."""
-import datetime
+from datetime import datetime, UTC
 import logging
 from time import perf_counter
 
@@ -55,7 +55,7 @@ def cross_validate(data_df: pd.DataFrame, meta_data: dict, feature_selection_fun
     logger.info(f"Using logical cores (excluding 0 and 26): {used_cores}")
     logger.info(f"Number of parallel jobs defined in meta data: {meta_data['n_cpus']}")
 
-    start_time_cv = datetime.datetime.now(tz=datetime.timezone.utc)
+    start_time_cv = datetime.now(tz=UTC)
     wall_times_list = []
 
     psutil.cpu_percent(interval=None, percpu=True)  # warm up CPU usage
@@ -92,7 +92,7 @@ def cross_validate(data_df: pd.DataFrame, meta_data: dict, feature_selection_fun
 
         cv_result_list.append(selected_feature_subset)
 
-    duration = datetime.datetime.now(tz=datetime.timezone.utc) - start_time_cv
+    duration = datetime.now(tz=UTC) - start_time_cv
     logger.info(f"Duration of the cross-validation: {duration}")
     meta_data["benchmark"]["cv_duration"] = duration
     meta_data["benchmark"]["wall_times"] = wall_times_list
