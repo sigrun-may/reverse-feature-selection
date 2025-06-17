@@ -46,8 +46,8 @@ build-backend = "poetry.core.masonry.api"
 "Bug Tracker" = "https://github.com/sigrun-may/reverse_feature_selection/issues"
 
 [tool.poetry.dependencies]
-python = "^3.11"
-numpy = "^1"
+python = "^3.12"
+numpy = "*"
 pandas = "*"
 scikit-learn = "*"
 joblib = "*"
@@ -91,11 +91,11 @@ sphinx_copybutton = "*"
 
 [tool.black]
 line-length = 120
-target-version = ["py311"]
+target-version = ["py312"]
 
 [tool.ruff]
 line-length = 120
-target-version = "py311"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["ALL"]
