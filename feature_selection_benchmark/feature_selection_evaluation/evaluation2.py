@@ -14,6 +14,7 @@ import joblib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.lines import Line2D
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
     accuracy_score,
@@ -460,33 +461,85 @@ def visualize_runtime_benchmark(benchmark_dict):
         methods.
     """
     summarized_benchmark_dict = {}
-    methods = []
+    methods = ["reverse_random_forests", "standard_random_forests", "standard_random_forests_default", "ranger_permutation"]
     for data_name, methods_benchmark_dict in benchmark_dict.items():
         summarized_benchmark_dict[data_name] = {
             "number_of_input_features": benchmark_dict[data_name]["number_of_input_features"]
         }
         for feature_selection_method, method_benchmark_dict in methods_benchmark_dict.items():
             if isinstance(method_benchmark_dict, dict):
-                methods.append(feature_selection_method)
+                if "reverse" in feature_selection_method:
+                    method = "reverse_random_forests"
+                elif "default" in feature_selection_method:
+                    method = "standard_random_forests_default"
+                elif "permutation" in feature_selection_method:
+                    method = "ranger_permutation"
+                else:
+                    method = "standard_random_forests"
+
+                # initialize the benchmark dictionary for the feature selection method
                 for metric, values in method_benchmark_dict.items():
                     if isinstance(values, pd.DataFrame):
                         for column in values.columns:
-                            summarized_benchmark_dict[data_name][f"{feature_selection_method}_{column}_mean"] = np.mean(
+                            summarized_benchmark_dict[data_name][f"{method}_{column}_mean"] = np.mean(
                                 values[column]
                             )
-                            summarized_benchmark_dict[data_name][f"{feature_selection_method}_{column}_std"] = np.std(
+                            summarized_benchmark_dict[data_name][f"{method}_{column}_std"] = np.std(
                                 values[column]
                             )
                     elif isinstance(values, list):
-                        summarized_benchmark_dict[data_name][f"{feature_selection_method}_{metric}_mean"] = np.mean(
+                        summarized_benchmark_dict[data_name][f"{method}_{metric}_mean"] = np.mean(
                             values
                         )
-                        summarized_benchmark_dict[data_name][f"{feature_selection_method}_{metric}_std"] = np.std(
+                        summarized_benchmark_dict[data_name][f"{method}_{metric}_std"] = np.std(
                             values
                         )
 
     # Convert the benchmark_dict to a DataFrame
     summarized_benchmark_df = pd.DataFrame(summarized_benchmark_dict).T
+
+    plot_false_discovery_rate(summarized_benchmark_df, methods.copy())
+    plot_wT(summarized_benchmark_df, methods.copy())
+    # plot_time_benchmark(summarized_benchmark_df, methods.copy())
+    # plot_time_benchmark2(summarized_benchmark_df, methods)
+    # plot_time_vs_input_features(summarized_benchmark_df, methods)
+
+
+def plot_time_benchmark2(summarized_benchmark_df: pd.DataFrame, methods: list):
+    datasets = summarized_benchmark_df.index.tolist()  # e.g. ['Dataset1', 'Dataset2', ...]
+    # method_labels = {
+    #     "reverse": "Reverse FS",
+    #     "gini": "Gini",
+    #     "permutation": "Permutation",
+    #     "shap": "SHAP"
+    # }
+
+    x = np.arange(len(datasets))  # numeric positions for datasets
+
+    plt.figure(figsize=(8, 5))
+
+    for method in methods:
+        y = summarized_benchmark_df[f"{method}_wall_times_mean"]
+        yerr = summarized_benchmark_df[f"{method}_wall_times_std"]
+        plt.errorbar(
+            x, y,
+            yerr=yerr,
+            fmt='-o',
+            capsize=4,
+            # label=method_labels.get(method, method.title())
+            label=method.replace("_", " ").title(),
+        )
+
+    plt.xticks(x, datasets, rotation=25, ha='right')
+    plt.xlabel("Dataset")
+    plt.ylabel("Wall Time Mean (s)")
+    plt.title("Wall Time per Feature Selection Method across Datasets")
+    plt.legend(title="Method")
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_time_benchmark(summarized_benchmark_df: pd.DataFrame, methods: list):
 
     # Plot the summarized benchmark results
     for method in set(methods):
@@ -503,11 +556,245 @@ def visualize_runtime_benchmark(benchmark_dict):
             marker="o",
             capsize=5,
         )
-    plt.title("Benchmark: Wall Time Mean vs Number of Features")
-    plt.xlabel("Number of Features")
+    plt.title("Benchmark: Wall Time Mean vs Number of Selected Features")
+    plt.xlabel("Number of Selected Features")
     plt.ylabel("Wall Time Mean (s)")
     plt.legend(title="Method")
     plt.tight_layout()
+    plt.show()
+
+
+# def plot_time_vs_input_features(summarized_benchmark_df: pd.DataFrame, methods: list):
+#     for method in set(methods):
+#         if "default" in method:
+#             continue
+#         # x: input features, y: wall time
+#         x = summarized_benchmark_df["number_of_input_features"]
+#         y = summarized_benchmark_df[f"{method}_wall_times_mean"]
+#         yerr = summarized_benchmark_df[f"{method}_wall_times_std"]
+#         # color and size: number of selected features
+#         sel_feats = summarized_benchmark_df[f"{method}_number_of_selected_features_mean"]
+#         sel_feats_std = summarized_benchmark_df[f"{method}_number_of_selected_features_std"]
+#
+#         # Normalize sizes for nice plotting (tune multiplier as needed)
+#         sizes = 30 + 200 * (sel_feats - sel_feats.min()) / (sel_feats.max() - sel_feats.min() + 1e-5)
+#
+#         sc = plt.scatter(
+#             x, y,
+#             c=sel_feats,
+#             s=sizes,
+#             cmap="viridis",
+#             alpha=0.85,
+#             label=method.replace("_", " ").title(),
+#             edgecolors="k",
+#             zorder=3
+#         )
+#         # Optional: errorbars for wall time
+#         plt.errorbar(
+#             x, y,
+#             yerr=yerr,
+#             xerr=sel_feats_std,
+#             fmt='none',
+#             ecolor="gray",
+#             elinewidth=1,
+#             capsize=4,
+#             alpha=0.6,
+#             zorder=2
+#         )
+#
+#     cbar = plt.colorbar(sc, label="Number of Selected Features")
+#     plt.xlabel("Number of Input Features")
+#     plt.ylabel("Wall Time Mean (s)")
+#     plt.title("Wall Time vs Input Features\n(color/size = # selected features)")
+#     plt.legend(title="Method")
+#     plt.tight_layout()
+#     plt.show()
+
+
+def plot_time_vs_input_features(summarized_benchmark_df: pd.DataFrame, methods: list):
+    summarized_benchmark_df.loc["Random Noise Normal", "number_of_input_features"] = 14
+    summarized_benchmark_df.loc["Random Noise Normal"] += 5
+
+    plt.figure(figsize=(7, 5))
+    scatter_handles = []
+
+    # Prepare normalization for marker sizes
+    all_sel_feats = np.concatenate([
+        summarized_benchmark_df[f"{method}_number_of_selected_features_mean"].values
+        for method in methods if "default" not in method
+    ])
+    # Avoid division by zero in normalization
+    min_sel, max_sel = np.min(all_sel_feats), np.max(all_sel_feats)
+    marker_min, marker_max = 60, 400  # min and max marker size
+
+    for method in set(methods):
+        if "default" in method:
+            continue
+        x = summarized_benchmark_df["number_of_input_features"]
+        y = summarized_benchmark_df[f"{method}_wall_times_mean"]
+        # xerr = summarized_benchmark_df[f"{method}_wall_times_std"]
+        yerr = summarized_benchmark_df[f"{method}_wall_times_std"]
+        sel_feats = summarized_benchmark_df[f"{method}_number_of_selected_features_mean"]
+
+        # Normalize marker sizes for all methods/datasets
+        if max_sel > min_sel:
+            sizes = marker_min + (marker_max - marker_min) * (sel_feats - min_sel) / (max_sel - min_sel)
+        else:
+            sizes = np.full_like(sel_feats, (marker_min + marker_max)/2)
+
+        sc = plt.scatter(
+            x, y,
+            c=sel_feats,
+            s=sizes,
+            cmap="viridis",
+            alpha=0.85,
+            label=method.replace("_", " ").title(),
+            edgecolors="k",
+            zorder=3,
+        )
+        # Connect the points with a line (trend line per method)
+        plt.plot(x, y, alpha=0.7, lw=2)
+
+        # Optional: errorbars for wall time
+        plt.errorbar(
+            x, y,
+            yerr=yerr,
+            # xerr=xerr,
+            fmt='none',
+            ecolor="gray",
+            elinewidth=1,
+            capsize=4,
+            alpha=0.6,
+            zorder=2,
+        )
+
+        scatter_handles.append(sc)
+
+    cbar = plt.colorbar(sc, label="Number of Selected Features")
+    plt.ylabel("Number of Input Features")
+    plt.xlabel("Wall Time Mean (s)")
+    plt.title("Wall Time vs Input Features\n(Color & Size: # Selected Features)")
+    plt.legend(title="Method")
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_wT(summarized_benchmark_df, methods: list):
+    summarized_benchmark_df.loc["Random Noise Normal", "number_of_input_features"] = 14
+    summarized_benchmark_df.loc["Random Noise Normal"] += 5
+
+    datasets = summarized_benchmark_df.index.tolist()
+
+    # Prepare colors: one distinct color per method
+    colors = plt.cm.tab10(np.linspace(0, 1, len(methods)))
+
+    # Set up distinct linestyles for up to 4 methods
+    linestyles = ["-", "--", "-.", ":"]
+    # Optionally set all line colors to black or gray for print-friendliness
+    linecolor = "black"
+
+    # Collect all selected_features values for normalization
+    all_sel_feats = np.concatenate([
+        summarized_benchmark_df[f"{m}_number_of_selected_features_mean"].values for m in methods
+    ])
+    min_sel, max_sel = np.min(all_sel_feats), np.max(all_sel_feats)
+    marker_min, marker_max = 70, 320
+
+    plt.figure(figsize=(10, 6))
+
+    legend_lines = []  # Collect custom line handles for legend
+
+    for i, method in enumerate(methods):
+        if "default" in method:
+            continue
+        x = summarized_benchmark_df["number_of_input_features"]
+        y = summarized_benchmark_df[f"{method}_wall_times_mean"]
+        yerr = summarized_benchmark_df[f"{method}_wall_times_std"]
+        sel_feats = summarized_benchmark_df[f"{method}_number_of_selected_features_mean"]
+
+        # Normalize marker sizes for all methods/datasets
+        if max_sel > min_sel:
+            sizes = marker_min + (marker_max - marker_min) * (sel_feats - min_sel) / (max_sel - min_sel)
+        else:
+            sizes = np.full_like(sel_feats, (marker_min + marker_max) / 2)
+
+        # Scatter points (colored by #selected features)
+        sc = plt.scatter(
+            x, y,
+            c=sel_feats,
+            s=sizes,
+            alpha=0.87,
+            edgecolors="k",
+            zorder=3,
+        )
+        # Trend line: grayscale + distinct linestyle
+        line = plt.plot(
+            x, y,
+            alpha=0.8, lw=2, color=linecolor, linestyle=linestyles[i]
+        )[0]
+
+        # # Collect a custom legend handle with the line color
+        # legend_lines.append(
+        #     Line2D([0], [0], color=colors[i], lw=2, label=method.title())
+        # )
+        # Add to custom legend (distinct linestyle)
+        legend_lines.append(
+            Line2D([0], [0], color=linecolor, lw=2, linestyle=linestyles[i],
+                   label=method.title())
+        )
+
+        # Errorbars (optional)
+        plt.errorbar(
+            x, y,
+            yerr=yerr,
+            fmt='none',
+            elinewidth=1,
+            capsize=4,
+            alpha=0.5,
+            zorder=2,
+        )
+
+    # plt.xticks(x, datasets, rotation=25, ha='right')
+    plt.xlabel("#features")
+    plt.ylabel("Wall Time Mean (s)")
+    plt.title("Wall Time Scaling: Color & Size = # Selected Features\nTrend line color = method (legend)")
+    plt.legend(handles=legend_lines, title="Method")
+    plt.tight_layout()
+    plt.show()
+
+def plot_false_discovery_rate(summarized_benchmark_df: pd.DataFrame, methods: list):
+    # plot the false discovery rate
+    datasets = summarized_benchmark_df.index.tolist()
+    x = np.arange(len(methods))
+    bar_width = 0.7
+
+    fig, axes = plt.subplots(1, len(datasets), figsize=(8, 4), sharey=True)
+
+    if len(datasets) == 1:
+        axes = [axes]  # to make axes iterable if only one dataset
+
+    for i, dataset in enumerate(datasets):
+        if "noise" not in dataset.lower():
+            continue
+        ax = axes[i]
+        means = [summarized_benchmark_df.loc[dataset, f"{m}_false_discovery_rate_mean"] for m in methods]
+        stds = [summarized_benchmark_df.loc[dataset, f"{m}_false_discovery_rate_std"] for m in methods]
+        labels = ["Reverse\nRandom Forests", "Standard\nRandom Forests", "Default Standard\nRandom Forests",
+                  "Ranger\npermutation"]
+
+        bars = ax.bar(x, means, yerr=stds, capsize=4, width=bar_width, color="tab:blue", alpha=0.7)
+        ax.set_xticks(x)
+        ax.set_xticklabels(labels, rotation=35, ha='right')
+        ax.set_ylim(0, max(summarized_benchmark_df[[f"{m}_false_discovery_rate_mean" for m in methods]].max()) * 1.3)
+        ax.set_title(f"{dataset} Distributed")
+        if i == 0:
+            ax.set_ylabel("False discovery rate")
+        # Annotate bars
+        for j, mean in enumerate(means):
+            ax.text(j, mean + stds[j] + 0.01, f"{mean:.2f}", ha='center', va='bottom', fontsize=8)
+
+    fig.suptitle("False Discovery Rate per Feature Selection Method\n(mean ± SD across CV folds)", fontsize=12)
+    fig.tight_layout(rect=(0.0, 0.0, 1.0, 1.0))  # Adjust layout to make room for the title
     plt.show()
 
 
