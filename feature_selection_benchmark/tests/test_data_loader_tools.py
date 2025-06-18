@@ -3,6 +3,8 @@ import os
 import numpy as np
 import pandas as pd
 import pytest
+from feature_selection_benchmark.data_loader_tools import load_train_holdout_data_for_balanced_train_sample_size
+
 
 from feature_selection_benchmark.data_loader_tools import (
     balance_sample_size_of_hold_out_data,
@@ -95,8 +97,6 @@ def test_generate_random_noise_data_with_lognormal_distribution():
 
 
 def test_load_train_holdout_data_for_balanced_train_sample_size_random_noise():
-    from feature_selection_benchmark.data_loader_tools import load_train_holdout_data_for_balanced_train_sample_size
-
     meta_data_dict = {
         "data_name": "random_noise_lognormal",
         "shuffle_seed": 42,
@@ -135,8 +135,6 @@ def test_shuffle_fixed_seed():
 
 
 def test_load_train_holdout_data_for_balanced_train_sample_size_colon():
-    from feature_selection_benchmark.data_loader_tools import load_train_holdout_data_for_balanced_train_sample_size
-
     train_data_df, hold_out_data_df = load_train_holdout_data_for_balanced_train_sample_size(
         {
             "data_name": "colon",
@@ -154,8 +152,6 @@ def test_load_train_holdout_data_for_balanced_train_sample_size_colon():
 
 
 def test_load_train_holdout_data_for_balanced_train_sample_size_prostate():
-    from feature_selection_benchmark.data_loader_tools import load_train_holdout_data_for_balanced_train_sample_size
-
     meta_data_dict = {
         "data_name": "prostate",
         "shuffle_seed": None,
@@ -170,8 +166,6 @@ def test_load_train_holdout_data_for_balanced_train_sample_size_prostate():
 
 
 def test_load_train_holdout_data_for_balanced_train_sample_size_leukemia_big():
-    from feature_selection_benchmark.data_loader_tools import load_train_holdout_data_for_balanced_train_sample_size
-
     meta_data_dict = {
         "data_name": "leukemia_big",
         "shuffle_seed": None,
@@ -188,8 +182,6 @@ def test_load_train_holdout_data_for_balanced_train_sample_size_leukemia_big():
 
 
 def test_load_train_holdout_data_for_balanced_train_sample_size_invalid_data_name():
-    from feature_selection_benchmark.data_loader_tools import load_train_holdout_data_for_balanced_train_sample_size
-
     meta_data_dict = {
         "data_name": "invalid_data_name",
         "shuffle_seed": 42,
@@ -200,8 +192,6 @@ def test_load_train_holdout_data_for_balanced_train_sample_size_invalid_data_nam
 
 
 def test_load_train_holdout_data_for_balanced_train_sample_size_missing_data_name():
-    from feature_selection_benchmark.data_loader_tools import load_train_holdout_data_for_balanced_train_sample_size
-
     meta_data_dict = {
         "shuffle_seed": 42,
     }
@@ -211,8 +201,6 @@ def test_load_train_holdout_data_for_balanced_train_sample_size_missing_data_nam
 
 
 def test_load_train_holdout_data_for_balanced_train_sample_size_single_class():
-    from feature_selection_benchmark.data_loader_tools import load_train_holdout_data_for_balanced_train_sample_size
-
     meta_data_dict = {
         "data_name": "single_class_test",
         "shuffle_seed": None,
@@ -229,8 +217,6 @@ def test_load_train_holdout_data_for_balanced_train_sample_size_single_class():
 
 
 def test_load_train_holdout_data_for_balanced_train_sample_size_no_shuffle_seed():
-    from feature_selection_benchmark.data_loader_tools import load_train_holdout_data_for_balanced_train_sample_size
-
     meta_data_dict = {
         "data_name": "colon",
     }
@@ -240,8 +226,6 @@ def test_load_train_holdout_data_for_balanced_train_sample_size_no_shuffle_seed(
 
 
 def test_load_train_holdout_data_for_balanced_train_sample_size_invalid_shuffle_seed():
-    from feature_selection_benchmark.data_loader_tools import load_train_holdout_data_for_balanced_train_sample_size
-
     meta_data_dict = {
         "data_name": "colon",
         "shuffle_seed": "invalid_seed",
