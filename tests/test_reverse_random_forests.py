@@ -87,8 +87,6 @@ def test_calculate_oob_errors_with_correlated_features_only():
 
 def test_removal_of_correlated_features():
     """Test removal of correlated features."""
-    from mltb2.data import load_colon
-
     y, x = load_colon()
     train_df = pd.DataFrame(x)
     train_df.insert(loc=0, column="label", value=y)
