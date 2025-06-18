@@ -46,7 +46,7 @@ build-backend = "poetry.core.masonry.api"
 "Bug Tracker" = "https://github.com/sigrun-may/reverse_feature_selection/issues"
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = "^3.11"
 numpy = "*"
 pandas = "*"
 scikit-learn = "*"
@@ -58,9 +58,10 @@ requests = {version = "*", optional = true}
 bs4 = {version = "*", optional = true}
 optuna = {version = "*", optional = true}
 plotly = {version = "*", optional = true}
-rpy2 = {version = "*", optional = true}
+rpy2 = {version = "^3.6.1", optional = true}
 py-cpuinfo = {version = "*", optional = true}
 psutil = {version = "*", optional = true}
+notebook = {version = "*", optional = true}
 
 [tool.poetry.extras]
 benchmark = ["optuna", "plotly", "rpy2", "mltb2", "GitPython", "requests", "bs4", "psutil", "py-cpuinfo"]
