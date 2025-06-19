@@ -8,6 +8,7 @@
 import logging
 import os
 import pickle
+import re
 from pathlib import Path
 
 import joblib
@@ -105,7 +106,9 @@ def calculate_performance_metrics(
     Returns:
         The performance metrics for the given hold-out tests data.
     """
-    assert np.count_nonzero(feature_subset_selection) > 0, "No features selected."
+    # check if any features were selected
+    if not np.count_nonzero(feature_subset_selection) > 0:
+        raise ValueError("No features selected. Cannot calculate performance metrics.")
     assert "label" in train_data_df.columns, "Label column is missing."
     assert "label" in hold_out_test_data_df.columns, "Label column is missing."
     assert train_data_df.shape[1] - 1 == feature_subset_selection.size, train_data_df.shape[1]
@@ -322,12 +325,12 @@ def calculate_false_discovery_rate(
     return false_discovery_rate
 
 
-def evaluate_experiment(result_dict: dict, experiment_id: str) -> dict:
+def evaluate_experiment(result_dict: dict, data_name: str) -> dict:
     """Evaluate the experiment and extract the feature subset selection matrices.
 
     Args:
         result_dict: Dictionary containing the results of the cross-validation iterations for different methods.
-        experiment_id: The ID of the experiment to evaluate.
+        data_name: The ID of the experiment to evaluate.
     Returns:
         A dictionary containing the evaluation results, including the feature importance matrices, stability, and
         performance metrics.
@@ -354,36 +357,34 @@ def evaluate_experiment(result_dict: dict, experiment_id: str) -> dict:
         ).tolist()
 
         # if no features were selected, stability cannot be calculated
-        if "noise" not in experiment_id.lower():
+        if "noise" not in data_name.lower():
             # calculate the stability of the feature importance matrix
             result_dict["evaluation"][method]["stability"] = calculate_stability(
                 result_dict["evaluation"][method]["importance_matrix"]
             )
+            # calculate the performance of the feature selection method
+            performance_metrics_df = evaluate_performance(
+                feature_importance_matrix=result_dict["evaluation"][method]["importance_matrix"],
+                experiment_input_data_df=experiment_input_data_df,
+                hold_out_test_data_df=hold_out_test_data_df,
+                seed_for_random_forest=result_dict["reverse_random_forest_meta_data"]["random_seeds"][0],
+            )
+            # store the performance metrics in the result dictionary
+            result_dict["evaluation"][method]["performance_metrics"] = performance_metrics_df
         else:
             # calculate the false discovery rate for the feature selection method
             result_dict["evaluation"][method]["false_discovery_rate"] = calculate_false_discovery_rate(
                 result_dict["evaluation"][method]["number_of_selected_features"], experiment_input_data_df.shape[1] - 1
             )
-
-        # calculate the performance of the feature selection method
-        performance_metrics_df = evaluate_performance(
-            feature_importance_matrix=result_dict["evaluation"][method]["importance_matrix"],
-            experiment_input_data_df=experiment_input_data_df,
-            # TODO  hold_out_test_data_df=hold_out_test_data_df,
-            hold_out_test_data_df=experiment_input_data_df,
-            seed_for_random_forest=result_dict["reverse_random_forest_meta_data"]["random_seeds"][0],
-        )
-        # store the performance metrics in the result dictionary
-        result_dict["evaluation"][method]["performance_metrics"] = performance_metrics_df
     return result_dict
 
 
-def evaluate_repeated_experiments(experiment_id_list, result_dict_directory_path) -> tuple[list[dict], dict]:
+def evaluate_repeated_experiments(result_dict_directory_path, data_name) -> tuple[list[dict], dict]:
     """Evaluate the repeated experiments and extract the feature subset selection matrices.
 
     Args:
-        experiment_id_list: List of experiment IDs to evaluate.
         result_dict_directory_path: Path to the directory containing the result dictionaries for the experiments.
+        data_name: The name of the dataset used in the experiments.
     Returns:
         A tuple containing:
             - A list of dictionaries containing the evaluated results for each experiment.
@@ -391,18 +392,18 @@ def evaluate_repeated_experiments(experiment_id_list, result_dict_directory_path
     """
     evaluated_result_dict_list = []
     summarized_result_dict: dict[str, dict] = {}
-    # iterate over the repeated experiments
-    for experiment_id in experiment_id_list:
-        # load the result dictionary for the given experiment
-        file_path = os.path.join(result_dict_directory_path, f"{experiment_id}_result_dict.pkl")
-        if not Path(file_path).exists():
-            raise FileNotFoundError(f"File {file_path} not found.")
+    # iterate over all files of the repeated experiments in the directory
+    for file_path in result_dict_directory_path.iterdir():
+        if "std_rf" not in file_path.name:
+            continue
+        if not file_path.name.endswith(".pkl"):
+            raise ValueError("asf")
 
         with open(file_path, "rb") as file:
             result_dict = pickle.load(file)
 
         # evaluate the experiment and extract the feature subset selection matrices
-        evaluated_result_dict = evaluate_experiment(result_dict=result_dict, experiment_id=experiment_id)
+        evaluated_result_dict = evaluate_experiment(result_dict=result_dict, data_name=data_name)
         evaluated_result_dict_list.append(evaluated_result_dict)
 
         for method, evaluation_results_dict in evaluated_result_dict["evaluation"].items():
@@ -411,7 +412,13 @@ def evaluate_repeated_experiments(experiment_id_list, result_dict_directory_path
             for key, value in evaluation_results_dict.items():
                 if key == "importance_matrix":
                     continue
-                if key not in summarized_result_dict[method]:
+                if key == "stability":
+                    if key not in summarized_result_dict[method]:
+                        summarized_result_dict[method][key] = [value]
+                    else:
+                        summarized_result_dict[method][key].append(value)
+
+                elif key not in summarized_result_dict[method]:
                     # initialize the key in the summarized result dictionary
                     summarized_result_dict[method][key] = value
                 elif isinstance(value, pd.DataFrame):
@@ -419,8 +426,10 @@ def evaluate_repeated_experiments(experiment_id_list, result_dict_directory_path
                     summarized_result_dict[method][key] = pd.concat(
                         [summarized_result_dict[method][key], value], ignore_index=True
                     )
-                else:
+                elif isinstance(value, list):
                     summarized_result_dict[method][key].extend(value)
+                else:
+                    raise ValueError(f"Unkown type for results: {type(value)}")
 
     return evaluated_result_dict_list, summarized_result_dict
 
@@ -461,7 +470,12 @@ def visualize_runtime_benchmark(benchmark_dict):
         methods.
     """
     summarized_benchmark_dict = {}
-    methods = ["reverse_random_forests", "standard_random_forests", "standard_random_forests_default", "ranger_permutation"]
+    methods = [
+        "reverse_random_forests",
+        "standard_random_forests",
+        "standard_random_forests_default",
+        "ranger_permutation",
+    ]
     for data_name, methods_benchmark_dict in benchmark_dict.items():
         summarized_benchmark_dict[data_name] = {
             "number_of_input_features": benchmark_dict[data_name]["number_of_input_features"]
@@ -481,19 +495,11 @@ def visualize_runtime_benchmark(benchmark_dict):
                 for metric, values in method_benchmark_dict.items():
                     if isinstance(values, pd.DataFrame):
                         for column in values.columns:
-                            summarized_benchmark_dict[data_name][f"{method}_{column}_mean"] = np.mean(
-                                values[column]
-                            )
-                            summarized_benchmark_dict[data_name][f"{method}_{column}_std"] = np.std(
-                                values[column]
-                            )
+                            summarized_benchmark_dict[data_name][f"{method}_{column}_mean"] = np.mean(values[column])
+                            summarized_benchmark_dict[data_name][f"{method}_{column}_std"] = np.std(values[column])
                     elif isinstance(values, list):
-                        summarized_benchmark_dict[data_name][f"{method}_{metric}_mean"] = np.mean(
-                            values
-                        )
-                        summarized_benchmark_dict[data_name][f"{method}_{metric}_std"] = np.std(
-                            values
-                        )
+                        summarized_benchmark_dict[data_name][f"{method}_{metric}_mean"] = np.mean(values)
+                        summarized_benchmark_dict[data_name][f"{method}_{metric}_std"] = np.std(values)
 
     # Convert the benchmark_dict to a DataFrame
     summarized_benchmark_df = pd.DataFrame(summarized_benchmark_dict).T
@@ -522,15 +528,16 @@ def plot_time_benchmark2(summarized_benchmark_df: pd.DataFrame, methods: list):
         y = summarized_benchmark_df[f"{method}_wall_times_mean"]
         yerr = summarized_benchmark_df[f"{method}_wall_times_std"]
         plt.errorbar(
-            x, y,
+            x,
+            y,
             yerr=yerr,
-            fmt='-o',
+            fmt="-o",
             capsize=4,
             # label=method_labels.get(method, method.title())
             label=method.replace("_", " ").title(),
         )
 
-    plt.xticks(x, datasets, rotation=25, ha='right')
+    plt.xticks(x, datasets, rotation=25, ha="right")
     plt.xlabel("Dataset")
     plt.ylabel("Wall Time Mean (s)")
     plt.title("Wall Time per Feature Selection Method across Datasets")
@@ -619,10 +626,13 @@ def plot_time_vs_input_features(summarized_benchmark_df: pd.DataFrame, methods: 
     scatter_handles = []
 
     # Prepare normalization for marker sizes
-    all_sel_feats = np.concatenate([
-        summarized_benchmark_df[f"{method}_number_of_selected_features_mean"].values
-        for method in methods if "default" not in method
-    ])
+    all_sel_feats = np.concatenate(
+        [
+            summarized_benchmark_df[f"{method}_number_of_selected_features_mean"].values
+            for method in methods
+            if "default" not in method
+        ]
+    )
     # Avoid division by zero in normalization
     min_sel, max_sel = np.min(all_sel_feats), np.max(all_sel_feats)
     marker_min, marker_max = 60, 400  # min and max marker size
@@ -640,10 +650,11 @@ def plot_time_vs_input_features(summarized_benchmark_df: pd.DataFrame, methods: 
         if max_sel > min_sel:
             sizes = marker_min + (marker_max - marker_min) * (sel_feats - min_sel) / (max_sel - min_sel)
         else:
-            sizes = np.full_like(sel_feats, (marker_min + marker_max)/2)
+            sizes = np.full_like(sel_feats, (marker_min + marker_max) / 2)
 
         sc = plt.scatter(
-            x, y,
+            x,
+            y,
             c=sel_feats,
             s=sizes,
             cmap="viridis",
@@ -657,10 +668,11 @@ def plot_time_vs_input_features(summarized_benchmark_df: pd.DataFrame, methods: 
 
         # Optional: errorbars for wall time
         plt.errorbar(
-            x, y,
+            x,
+            y,
             yerr=yerr,
             # xerr=xerr,
-            fmt='none',
+            fmt="none",
             ecolor="gray",
             elinewidth=1,
             capsize=4,
@@ -680,8 +692,8 @@ def plot_time_vs_input_features(summarized_benchmark_df: pd.DataFrame, methods: 
 
 
 def plot_wT(summarized_benchmark_df, methods: list):
-    summarized_benchmark_df.loc["Random Noise Normal", "number_of_input_features"] = 14
-    summarized_benchmark_df.loc["Random Noise Normal"] += 5
+    # summarized_benchmark_df.loc["Random Noise Normal", "number_of_input_features"] = 14
+    # summarized_benchmark_df.loc["Random Noise Normal"] += 5
 
     datasets = summarized_benchmark_df.index.tolist()
 
@@ -694,9 +706,9 @@ def plot_wT(summarized_benchmark_df, methods: list):
     linecolor = "black"
 
     # Collect all selected_features values for normalization
-    all_sel_feats = np.concatenate([
-        summarized_benchmark_df[f"{m}_number_of_selected_features_mean"].values for m in methods
-    ])
+    all_sel_feats = np.concatenate(
+        [summarized_benchmark_df[f"{m}_number_of_selected_features_mean"].values for m in methods]
+    )
     min_sel, max_sel = np.min(all_sel_feats), np.max(all_sel_feats)
     marker_min, marker_max = 70, 320
 
@@ -720,7 +732,8 @@ def plot_wT(summarized_benchmark_df, methods: list):
 
         # Scatter points (colored by #selected features)
         sc = plt.scatter(
-            x, y,
+            x,
+            y,
             c=sel_feats,
             s=sizes,
             alpha=0.87,
@@ -728,26 +741,21 @@ def plot_wT(summarized_benchmark_df, methods: list):
             zorder=3,
         )
         # Trend line: grayscale + distinct linestyle
-        line = plt.plot(
-            x, y,
-            alpha=0.8, lw=2, color=linecolor, linestyle=linestyles[i]
-        )[0]
+        line = plt.plot(x, y, alpha=0.8, lw=2, color=linecolor, linestyle=linestyles[i])[0]
 
         # # Collect a custom legend handle with the line color
         # legend_lines.append(
         #     Line2D([0], [0], color=colors[i], lw=2, label=method.title())
         # )
         # Add to custom legend (distinct linestyle)
-        legend_lines.append(
-            Line2D([0], [0], color=linecolor, lw=2, linestyle=linestyles[i],
-                   label=method.title())
-        )
+        legend_lines.append(Line2D([0], [0], color=linecolor, lw=2, linestyle=linestyles[i], label=method.title()))
 
         # Errorbars (optional)
         plt.errorbar(
-            x, y,
+            x,
+            y,
             yerr=yerr,
-            fmt='none',
+            fmt="none",
             elinewidth=1,
             capsize=4,
             alpha=0.5,
@@ -762,9 +770,16 @@ def plot_wT(summarized_benchmark_df, methods: list):
     plt.tight_layout()
     plt.show()
 
+
 def plot_false_discovery_rate(summarized_benchmark_df: pd.DataFrame, methods: list):
-    # plot the false discovery rate
-    datasets = summarized_benchmark_df.index.tolist()
+    """Plot the false discovery rate for each feature selection method."""
+
+    # Filter datasets that contain "noise" in their name
+    datasets = []
+    for date_name in summarized_benchmark_df.index:
+        if "noise" in date_name.lower():
+            datasets.append(date_name)
+
     x = np.arange(len(methods))
     bar_width = 0.7
 
@@ -777,21 +792,30 @@ def plot_false_discovery_rate(summarized_benchmark_df: pd.DataFrame, methods: li
         if "noise" not in dataset.lower():
             continue
         ax = axes[i]
-        means = [summarized_benchmark_df.loc[dataset, f"{m}_false_discovery_rate_mean"] for m in methods]
-        stds = [summarized_benchmark_df.loc[dataset, f"{m}_false_discovery_rate_std"] for m in methods]
-        labels = ["Reverse\nRandom Forests", "Standard\nRandom Forests", "Default Standard\nRandom Forests",
-                  "Ranger\npermutation"]
+        # means = [summarized_benchmark_df.loc[dataset, f"{m}_false_discovery_rate_mean"] for m in methods]
+        # stds = [summarized_benchmark_df.loc[dataset, f"{m}_false_discovery_rate_std"] for m in methods]
+        means = [summarized_benchmark_df.loc[dataset, f"{m}_number_of_selected_features_mean"] for m in methods]
+        stds = [summarized_benchmark_df.loc[dataset, f"{m}_number_of_selected_features_std"] for m in methods]
+        labels = [
+            "Reverse\nRandom Forests",
+            "Standard\nRandom Forests",
+            "Default Standard\nRandom Forests",
+            "Ranger\npermutation",
+        ]
 
         bars = ax.bar(x, means, yerr=stds, capsize=4, width=bar_width, color="tab:blue", alpha=0.7)
         ax.set_xticks(x)
-        ax.set_xticklabels(labels, rotation=35, ha='right')
-        ax.set_ylim(0, max(summarized_benchmark_df[[f"{m}_false_discovery_rate_mean" for m in methods]].max()) * 1.3)
+        ax.set_xticklabels(labels, rotation=35, ha="right")
+        # ax.set_ylim(0, max(summarized_benchmark_df[[f"{m}_false_discovery_rate_mean" for m in methods]].max()) * 1.3)
+        ax.set_ylim(
+            0, max(summarized_benchmark_df[[f"{m}_number_of_selected_features_mean" for m in methods]].max()) * 1.3
+        )
         ax.set_title(f"{dataset} Distributed")
         if i == 0:
             ax.set_ylabel("False discovery rate")
         # Annotate bars
         for j, mean in enumerate(means):
-            ax.text(j, mean + stds[j] + 0.01, f"{mean:.2f}", ha='center', va='bottom', fontsize=8)
+            ax.text(j, mean + stds[j] + 0.01, f"{mean:.2f}", ha="center", va="bottom", fontsize=8)
 
     fig.suptitle("False Discovery Rate per Feature Selection Method\n(mean ± SD across CV folds)", fontsize=12)
     fig.tight_layout(rect=(0.0, 0.0, 1.0, 1.0))  # Adjust layout to make room for the title
@@ -858,23 +882,34 @@ def evaluate_benchmark_experiment_grid():
         # ],
     }
     # result_dict_directory_path = "../../results"
-    result_dict_directory_path = "results/tiny_test"
+    result_dict_directory_path = "results/thres_02"
     # result_dict_directory_path = "../../results/benchmark_2025_06_03"
     # result_dict_directory_path = "../../results/colon_2025_05_15"
     # result_dict_directory_path = "../../results/prostate_2025-05-26"
 
     evaluation_dict = {}
-    summaries_dict = {}  # number of input features for the benchmark
-    # iterate over the analysed datasets
-    for data_display_name, experiment_id_list in experiments_dict.items():
-        list_of_evaluated_results, summarized_result_dict = evaluate_repeated_experiments(
-            experiment_id_list, result_dict_directory_path
-        )
+    summaries_dict = {}
+    # iterate over directories within result directory result_dict_directory_path
+    for entry in os.listdir(result_dict_directory_path):
+        full_path = Path(os.path.join(result_dict_directory_path, entry))
+        if os.path.isdir(full_path):
+            # Process the directory
+            print(f"Found directory: {entry}")
+            match = re.match(r"benchmark_(.+?)_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}", entry)
+            data_display_name = match.group(1) if match else None
+            print(data_display_name)
+        else:
+            # Not a directory, skip
+            continue
+
+        # iterate over the analysed datasets
+        # for data_display_name, experiment_id_list in experiments_dict.items():
+        list_of_evaluated_results, summarized_result_dict = evaluate_repeated_experiments(full_path, data_display_name)
         evaluation_dict[data_display_name] = list_of_evaluated_results
         summaries_dict[data_display_name] = summarized_result_dict
         summaries_dict[data_display_name]["number_of_input_features"] = list_of_evaluated_results[0][
             "reverse_random_forest"
-        ][0].shape[1]
+        ][0].shape[0]
 
     # print_results(summaries_dict)
 
@@ -887,7 +922,7 @@ def evaluate_benchmark_experiment_grid():
 
 
 # unpickle summary file
-summary_file_path = Path("results/tiny_test/benchmark_summary.pkl")
+summary_file_path = Path("results/thres_02/benchmark_summary.pkl")
 with open(summary_file_path, "rb") as summary_file:
     summary_dict = pickle.load(summary_file)
 print_results(summary_dict)

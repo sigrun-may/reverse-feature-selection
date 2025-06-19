@@ -117,7 +117,7 @@ def main():
             # create directory for repeated experiment
             now_str = datetime.datetime.now(tz=ZoneInfo("Europe/Berlin")).strftime("%Y-%m-%d_%H-%M")
             result_folder_name = f"benchmark_{data_name}"
-            experiment_path = Path(f"{result_base_path}/{result_folder_name}_{now_str}")
+            experiment_path = Path(f"{result_base_path}/{now_str}_{result_folder_name}")
             experiment_path.mkdir(parents=True, exist_ok=True)
 
             # define meta data for the experiment
