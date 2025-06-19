@@ -3,8 +3,6 @@ import os
 import numpy as np
 import pandas as pd
 import pytest
-from feature_selection_benchmark.data_loader_tools import load_train_holdout_data_for_balanced_train_sample_size
-
 
 from feature_selection_benchmark.data_loader_tools import (
     balance_sample_size_of_hold_out_data,
@@ -12,6 +10,7 @@ from feature_selection_benchmark.data_loader_tools import (
     convert_to_single_df,
     generate_random_noise_data,
     get_indices_for_selected_and_deselected_samples,
+    load_train_holdout_data_for_balanced_train_sample_size,
     shuffle,
 )
 
