@@ -19,11 +19,14 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def cross_validate(data_df: pd.DataFrame, meta_data: dict, feature_selection_function) -> list[pd.DataFrame]:
+def cross_validate(
+    data_df: pd.DataFrame, label: pd.Series, meta_data: dict, feature_selection_function
+) -> list[pd.DataFrame]:
     """Perform outer cross-validation and calculate raw values for determining feature subsets.
 
     Args:
         data_df: The dataset for feature selection.
+        label: The labels for the dataset.
         meta_data: The metadata related to the dataset and experiment.
         feature_selection_function: The function to use for feature selection.
 
@@ -72,7 +75,7 @@ def cross_validate(data_df: pd.DataFrame, meta_data: dict, feature_selection_fun
 
         # Calculate raw values and feature subsets
         selected_feature_subset = feature_selection_function(
-            data_df=data_df, train_indices=train_indices, meta_data=meta_data
+            x=data_df, y=label, train_indices=train_indices, meta_data=meta_data
         )
         wall_time = perf_counter() - start_perf_counter
         wall_times_list.append(wall_time)
