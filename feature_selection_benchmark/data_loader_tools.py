@@ -198,7 +198,7 @@ def shuffle(data: pd.DataFrame, label: pd.Series, shuffle_seed: int | None = Non
 
 def load_train_holdout_data_for_balanced_train_sample_size(
     meta_data_dict: dict,
-) -> tuple[pd.DataFrame, pd.DataFrame]:
+) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
     """Load remaining test data from standardized train sample size.
 
     The data is loaded and parsed from the internet (see mltb2.data). The function selects all samples but the first 15
@@ -287,12 +287,12 @@ def load_train_holdout_data_for_balanced_train_sample_size(
     assert train_data_df.shape[0] == len(train_indices) == len(y_train) == 30
     assert train_data_df.shape[1] == data_df.shape[1]
 
-    hold_out_data_df = convert_to_single_df(hold_out_data_df, y_test)
-    train_data_df = convert_to_single_df(train_data_df, y_train)
-    assert train_data_df.shape[1] == hold_out_data_df.shape[1] == data_df.shape[1] + 1  # label column
-    assert train_data_df.shape[0] + hold_out_data_df.shape[0] == data_df.shape[0]
+    # hold_out_data_df = convert_to_single_df(hold_out_data_df, y_test)
+    # train_data_df = convert_to_single_df(train_data_df, y_train)
+    # assert train_data_df.shape[1] == hold_out_data_df.shape[1] == data_df.shape[1] + 1  # label column
+    # assert train_data_df.shape[0] + hold_out_data_df.shape[0] == data_df.shape[0]
 
-    return train_data_df, hold_out_data_df
+    return train_data_df, y_train, hold_out_data_df, y_test
 
 
 def generate_random_noise_data(
