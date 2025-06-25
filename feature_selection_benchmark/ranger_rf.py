@@ -21,11 +21,14 @@ from sklearn.metrics import roc_auc_score
 warnings.filterwarnings("ignore")
 
 
-def ranger_random_forest(data_df: pd.DataFrame, train_indices: np.ndarray, meta_data: dict) -> dict:
+def ranger_random_forest(
+    data_df: pd.DataFrame, label_series: pd.Series, train_indices: np.ndarray, meta_data: dict
+) -> dict:
     """Calculate importance with the R ranger package with optimized hyperparameters.
 
     Args:
         data_df: The training data.
+        label_series: The labels for the training data.
         train_indices: The indices of the training split.
         meta_data: The metadata related to the dataset and experiment. Must contain the random state
             for reproducibility of the random forest. Key: "random_state".
@@ -33,6 +36,7 @@ def ranger_random_forest(data_df: pd.DataFrame, train_indices: np.ndarray, meta_
     Returns:
         The permutation importances.
     """
+    data_df.insert(loc=0, column="label", value=label_series)
 
     def optuna_objective(trial):
         params = {
@@ -76,11 +80,12 @@ def ranger_random_forest(data_df: pd.DataFrame, train_indices: np.ndarray, meta_
     }
 
 
-def sklearn_random_forest(data_df: pd.DataFrame, train_indices: np.ndarray, meta_data: dict):
+def sklearn_random_forest(x: pd.DataFrame, y: pd.Series, train_indices: np.ndarray, meta_data: dict):
     """Optimize the hyperparameters of a random forest classifier using optuna.
 
     Args:
-        data_df: The training data.
+        x: The training data.
+        y: The labels for the training data.
         train_indices: The indices of the training split.
         meta_data: The metadata related to the dataset and experiment.
 
@@ -88,13 +93,17 @@ def sklearn_random_forest(data_df: pd.DataFrame, train_indices: np.ndarray, meta
         The feature importances, the summed shap values, the permutation importance, the out-of-bag (OOB) score
         and the best hyperparameter values.
     """
+    x_train = x.iloc[train_indices, :]
+    y_train = y[train_indices]
+    assert x_train.index.equals(y_train.index), "Indices of x_train and y_train do not match."
+    assert len(x_train.index) == len(train_indices), "Length of x_train does not match length of train_indices."
 
     def optuna_objective(trial):
         rf_clf = RandomForestClassifier(
             oob_score=roc_auc_score,
             max_depth=trial.suggest_int("max_depth", 1, 15),
             n_estimators=trial.suggest_int("n_estimators", 500, meta_data["max_trees_random_forest"]),
-            max_features=trial.suggest_int("max_features", (0.3 * data_df.shape[1] - 1), data_df.shape[1] - 1),
+            max_features=trial.suggest_int("max_features", (0.3 * x.shape[1]), x.shape[1]),
             min_samples_leaf=trial.suggest_int("min_samples_leaf", 2, math.floor(len(train_indices) / 2)),
             min_samples_split=trial.suggest_int("min_samples_split", 2, 5),
             min_impurity_decrease=trial.suggest_float("min_impurity_decrease", 0.001, 0.99),
@@ -102,7 +111,7 @@ def sklearn_random_forest(data_df: pd.DataFrame, train_indices: np.ndarray, meta
             class_weight="balanced_subsample",
             n_jobs=meta_data["n_cpus"],
         )
-        rf_clf.fit(data_df.iloc[train_indices, 1:], data_df.loc[train_indices, "label"])
+        rf_clf.fit(x_train, y_train)
         score = rf_clf.oob_score_
         return score
 
@@ -132,14 +141,14 @@ def sklearn_random_forest(data_df: pd.DataFrame, train_indices: np.ndarray, meta
         class_weight="balanced_subsample",
     )
     start = datetime.now(tz=UTC)
-    clf.fit(data_df.iloc[train_indices, 1:], data_df.loc[train_indices, "label"])
+    clf.fit(x_train, y_train)
     gini_feature_importances = clf.feature_importances_
     duration = datetime.now(tz=UTC) - start
     print("number of selected features (gini default): ", np.sum(gini_feature_importances > 0))
 
     # train random forest with optimized parameters
     clf.set_params(**study.best_params)
-    clf.fit(data_df.iloc[train_indices, 1:], data_df.loc[train_indices, "label"])
+    clf.fit(x_train, y_train)
     gini_feature_importances_optimized = clf.feature_importances_
     print("number of selected features (gini optimized): ", np.sum(gini_feature_importances_optimized > 0))
 
